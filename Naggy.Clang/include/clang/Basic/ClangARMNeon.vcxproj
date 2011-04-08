@@ -1,0 +1,116 @@
+﻿<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGUID>{B455E5DC-0142-44AF-928C-5217894DBF9C}</ProjectGUID>
+    <SccProjectName />
+    <SccLocalPath />
+    <Keyword>Win32Proj</Keyword>
+    <Platform>Win32</Platform>
+    <ProjectName>ClangARMNeon</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+    <PropertyGroup>
+      <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Midl>
+      <AdditionalIncludeDirectories>D:/llvm/llvm-2.8/include;D:/llvm/llvm-2.8/tools/clang/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Midl>
+      <AdditionalIncludeDirectories>D:/llvm/llvm-2.8/include;D:/llvm/llvm-2.8/tools/clang/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="arm_neon.inc.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Building arm_neon.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\..\..\bin\Debug\tblgen.exe -gen-arm-neon-sema -I D:/llvm/llvm-2.8/tools/clang/include/clang/Basic -I D:/llvm/llvm-2.8/lib/Target -I D:/llvm/llvm-2.8/include D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/arm_neon.td -o D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/arm_neon.inc
+if errorlevel 1 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/arm_neon.inc.rule;D:\llvm\llvm-2.8\bin\Debug\tblgen.exe;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\arm_neon.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\Attr.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DeclNodes.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\Diagnostic.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticAnalysisKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticASTKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticCategories.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticCommonKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticDriverKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticFrontendKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticGroups.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticLexKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticParseKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticSemaKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\StmtNodes.td;D:\llvm\llvm-2.8\include\llvm\CodeGen\ValueTypes.td;D:\llvm\llvm-2.8\include\llvm\CompilerDriver\Common.td;D:\llvm\llvm-2.8\include\llvm\Intrinsics.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsAlpha.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsARM.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsCellSPU.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsPowerPC.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsX86.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsXCore.td;D:\llvm\llvm-2.8\include\llvm\Target\Target.td;D:\llvm\llvm-2.8\include\llvm\Target\TargetCallingConv.td;D:\llvm\llvm-2.8\include\llvm\Target\TargetSchedule.td;D:\llvm\llvm-2.8\include\llvm\Target\TargetSelectionDAG.td;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\arm_neon.inc;%(Outputs)</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Building arm_neon.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\..\..\bin\Release\tblgen.exe -gen-arm-neon-sema -I D:/llvm/llvm-2.8/tools/clang/include/clang/Basic -I D:/llvm/llvm-2.8/lib/Target -I D:/llvm/llvm-2.8/include D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/arm_neon.td -o D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/arm_neon.inc
+if errorlevel 1 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/arm_neon.inc.rule;D:\llvm\llvm-2.8\bin\Release\tblgen.exe;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\arm_neon.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\Attr.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DeclNodes.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\Diagnostic.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticAnalysisKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticASTKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticCategories.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticCommonKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticDriverKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticFrontendKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticGroups.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticLexKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticParseKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\DiagnosticSemaKinds.td;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\StmtNodes.td;D:\llvm\llvm-2.8\include\llvm\CodeGen\ValueTypes.td;D:\llvm\llvm-2.8\include\llvm\CompilerDriver\Common.td;D:\llvm\llvm-2.8\include\llvm\Intrinsics.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsAlpha.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsARM.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsCellSPU.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsPowerPC.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsX86.td;D:\llvm\llvm-2.8\include\llvm\IntrinsicsXCore.td;D:\llvm\llvm-2.8\include\llvm\Target\Target.td;D:\llvm\llvm-2.8\include\llvm\Target\TargetCallingConv.td;D:\llvm\llvm-2.8\include\llvm\Target\TargetSchedule.td;D:\llvm\llvm-2.8\include\llvm\Target\TargetSelectionDAG.td;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\arm_neon.inc;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="CMakeFiles\ClangARMNeon.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'"></Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/CMakeFiles/ClangARMNeon.rule;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\arm_neon.inc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeFiles\ClangARMNeon;%(Outputs)</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'"></Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/CMakeFiles/ClangARMNeon.rule;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\arm_neon.inc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeFiles\ClangARMNeon;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="CMakeLists.txt">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Building Custom Rule D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"C:\Program Files\CMake 2.8\bin\cmake.exe" -HD:/llvm/llvm-2.8 -BD:/llvm/llvm-2.8 --check-stamp-file D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeFiles\generate.stamp
+if errorlevel 1 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/CMakeLists.txt;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeLists.txt;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeLists.txt;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeFiles\generate.stamp;%(Outputs)</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Building Custom Rule D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"C:\Program Files\CMake 2.8\bin\cmake.exe" -HD:/llvm/llvm-2.8 -BD:/llvm/llvm-2.8 --check-stamp-file D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeFiles\generate.stamp
+if errorlevel 1 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:/llvm/llvm-2.8/tools/clang/include/clang/Basic/CMakeLists.txt;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeLists.txt;D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeLists.txt;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\llvm\llvm-2.8\tools\clang\include\clang\Basic\CMakeFiles\generate.stamp;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="CMakeFiles\ClangARMNeon" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="D:/llvm/llvm-2.8/ZERO_CHECK.vcxproj">
+      <Project>B01C35F6-F35A-45D1-9C6F-7E763244FF89</Project>
+    </ProjectReference>
+    <ProjectReference Include="D:/llvm/llvm-2.8/utils/TableGen/tblgen.vcxproj">
+      <Project>BDE886CB-B51D-4DBA-A80E-BE06C1F60E3C</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
