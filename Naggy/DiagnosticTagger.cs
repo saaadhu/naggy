@@ -5,6 +5,8 @@ using System.Text;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Tagging;
 using NaggyClang;
+using System.IO;
+using EnvDTE;
 
 namespace Naggy
 {
@@ -12,47 +14,57 @@ namespace Naggy
     {
         private readonly ITextBuffer buffer;
         private readonly ITextDocument document;
+        private readonly ClangAdapter clangAdapter;
+        private readonly DTE dte;
+
         readonly List<Tuple<SnapshotSpan, string>> spansAndErrorMessages = new List<Tuple<SnapshotSpan, string>>();
         DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1000);
 
-        public DiagnosticTagger(ITextBuffer buffer)
+        public DiagnosticTagger(DTE dte, ITextBuffer buffer)
         {
+            this.dte = dte;
             this.buffer = buffer;
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
             buffer.Properties.TryGetProperty(typeof (ITextDocument), out document);
-            //document.FileActionOccurred += new EventHandler<TextDocumentFileActionEventArgs>(document_FileActionOccurred);
+
+            var filePath = document.FilePath;
+            var includePaths = AVRStudio.GetIncludePaths(filePath, dte);
+            clangAdapter = new ClangAdapter(filePath, new List<string>(includePaths));
+
+            debouncer.Add(0, FindDiagnostics);
         }
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
         {
             debouncer.Add(0, FindDiagnostics);
         }
-
         private SnapshotSpan lastTotalDiagnosticsSpan;
 
         private void FindDiagnostics()
         {
             spansAndErrorMessages.Clear();
-            var filePath = document.FilePath;
 
             int minPosition = buffer.CurrentSnapshot.Length;
             int maxPosition = 0; 
 
-            ClangAdapter c = new ClangAdapter();
-            foreach (var diagnostic in c.GetDiagnostics(filePath))
+            foreach (var diagnostic in clangAdapter.GetDiagnostics(buffer.CurrentSnapshot.GetText()))
             {
-                if (diagnostic.StartLine != 0)
-                    diagnostic.StartLine--;
+                // Crude check, should find a more sophisticated way to check if two paths are equal, ignoring different directory separator chars.
+                if (Path.GetFileName(diagnostic.FilePath) == Path.GetFileName(document.FilePath))
+                {
+                    if (diagnostic.StartLine != 0)
+                        diagnostic.StartLine--;
 
-                var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
-                var startPosition = textLine.Start.Position;
-                var endPosition = textLine.End.Position;
+                    var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
+                    var startPosition = textLine.Start.Position;
+                    var endPosition = textLine.End.Position;
 
-                minPosition = Math.Min(minPosition, startPosition);
-                maxPosition = Math.Max(maxPosition, endPosition);
+                    minPosition = Math.Min(minPosition, startPosition);
+                    maxPosition = Math.Max(maxPosition, endPosition);
 
-                SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
-                spansAndErrorMessages.Add(Tuple.Create(span, diagnostic.Message));
+                    SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
+                    spansAndErrorMessages.Add(Tuple.Create(span, diagnostic.Message));
+                }
             }
 
             if (spansAndErrorMessages.Any())

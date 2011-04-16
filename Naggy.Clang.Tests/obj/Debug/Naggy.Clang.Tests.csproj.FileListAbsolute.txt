@@ -1,0 +1,7 @@
+E:\naggy\Naggy.Clang.Tests\bin\Debug\Naggy.Clang.Tests.dll
+E:\naggy\Naggy.Clang.Tests\bin\Debug\Naggy.Clang.Tests.pdb
+E:\naggy\Naggy.Clang.Tests\bin\Debug\Naggy.Clang.dll
+E:\naggy\Naggy.Clang.Tests\bin\Debug\Naggy.Clang.pdb
+E:\naggy\Naggy.Clang.Tests\obj\Debug\ResolveAssemblyReference.cache
+E:\naggy\Naggy.Clang.Tests\obj\Debug\Naggy.Clang.Tests.dll
+E:\naggy\Naggy.Clang.Tests\obj\Debug\Naggy.Clang.Tests.pdb

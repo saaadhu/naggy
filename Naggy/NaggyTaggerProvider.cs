@@ -7,6 +7,8 @@ using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Tagging;
 using Microsoft.VisualStudio.Utilities;
 using NaggyClang;
+using Microsoft.VisualStudio.Shell;
+using EnvDTE;
 
 namespace Naggy
 {
@@ -17,9 +19,14 @@ namespace Naggy
     {
         public ITagger<T> CreateTagger<T>(ITextBuffer buffer) where T : ITag
         {
-            Func<ITagger<T>> taggerFunc = () => new DiagnosticTagger(buffer) as ITagger<T>;
+            var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
+            Func<ITagger<T>> taggerFunc = () => new DiagnosticTagger(dte, buffer) as ITagger<T>;
             return buffer.Properties.GetOrCreateSingletonProperty<ITagger<T>>(taggerFunc);
         }
+
+        [Import]
+        internal SVsServiceProvider ServiceProvider = null;
+
     }
 }
 
