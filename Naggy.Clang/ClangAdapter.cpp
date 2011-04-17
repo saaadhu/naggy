@@ -78,10 +78,10 @@ List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
 	return diagnostics;
 }
 
-void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths)
+void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols)
 {
 	CXIndex idx = clang_createIndex(0, 1);
-	const int argsCount = includePaths->Count + 1;
+	const int argsCount = includePaths->Count + predefinedSymbols->Count + 1;
 	char **args = new char*[argsCount];
 
 	int index = 0;
@@ -89,6 +89,11 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths)
 	{
 		args[index++] = (char*)ToCString("-I" + path);
 	}
+	for each(String ^symbol in predefinedSymbols)
+	{
+		args[index++] = (char*)ToCString("-D" + symbol);
+	}
+
 	args[index++] = "-fspell-checking";
 
 	m_filePath = (char *) ToCString(filePath);

@@ -76,7 +76,7 @@ namespace Naggy.Clang.Tests
         }
 
         [TestMethod]
-        public void GetDiagnostics_InvalidDereference_DiagnosticDetailsAreCorrect()
+        public void GetDiagnostics_IntFunctionNotReturningAValue_DiagnosticDetailsAreCorrect()
         {
             File.WriteAllText(sourceFilePath, @"
 /* Some source file */
@@ -87,6 +87,26 @@ int fun() {
             Assert.AreEqual(sourceFilePath, diag.FilePath);
             Assert.AreEqual(4, diag.StartLine);
             Assert.AreEqual(1, diag.StartColumn);
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_SymbolInSourceCodeProvidedInPredefinedSymbolList_NoDiagnosticsReturned()
+        {
+            File.WriteAllText(sourceFilePath, @"int main() { return FOO; }");
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>() { "FOO=2" });
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count);
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_MisspelledMemberName_DiagnosticIncludesSuggestedMember()
+        {
+            File.WriteAllText(sourceFilePath, @"struct A { int Foo; }; int main() { struct A a; a.Fo = 2; }");
+            var adapter = new ClangAdapter(sourceFilePath);
+            var diags = adapter.GetDiagnostics();
+
+            StringAssert.Contains(diags.First().Message, "did you mean 'Foo'?");
         }
 
         [TestInitialize]

@@ -25,12 +25,13 @@ namespace NaggyClang {
 		CXTranslationUnit m_translationUnit;
 		char* m_filePath;
 	public:
-		ClangAdapter(String ^fileName) {Initialize(fileName, gcnew List<String^>());}
-		ClangAdapter(String ^fileName, List<String^> ^includePaths) { Initialize(fileName, includePaths); }
+		ClangAdapter(String ^fileName) {Initialize(fileName, gcnew List<String^>(), gcnew List<String^>());}
+		ClangAdapter(String ^fileName, List<String^> ^includePaths) { Initialize(fileName, includePaths, gcnew List<String^>()); }
+		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols) { Initialize(fileName, includePaths, symbols); }
 		List<Diagnostic^> ^GetDiagnostics(String ^contents);
 		List<Diagnostic^> ^GetDiagnostics();
 
 	private:
-		void Initialize(String ^fileName, List<String^> ^includePaths);
+		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols);
 	};
 }
