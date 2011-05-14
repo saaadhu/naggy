@@ -16,11 +16,10 @@
 
 #include "llvm/Type.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/DataTypes.h"
 #include <map>
 
 namespace llvm {
-
-class StringRef;
 
 /// This class provides a symbol table of name/type pairs with operations to
 /// support constructing, searching and iterating over the symbol table. The
@@ -134,7 +133,7 @@ private:
   /// is refined.
   virtual void refineAbstractType(const DerivedType *OldTy, const Type *NewTy);
 
-  /// This function markes a type as being concrete (defined).
+  /// This function marks a type as being concrete (defined).
   virtual void typeBecameConcrete(const DerivedType *AbsTy);
 
 /// @}

@@ -16,6 +16,8 @@
 #define LLVM_CLANG_ANALYSIS_ANALYSISCONTEXT_H
 
 #include "clang/AST/Decl.h"
+#include "clang/AST/Expr.h"
+#include "clang/Analysis/CFG.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -26,8 +28,8 @@ namespace clang {
 
 class Decl;
 class Stmt;
-class CFG;
-class CFGBlock;
+class CFGReverseBlockReachabilityAnalysis;
+class CFGStmtMap;
 class LiveVariables;
 class ParentMap;
 class PseudoConstantAnalysis;
@@ -45,26 +47,32 @@ class AnalysisContext {
   // TranslationUnit is NULL if we don't have multiple translation units.
   idx::TranslationUnit *TU;
 
-  // AnalysisContext owns the following data.
-  CFG *cfg, *completeCFG;
+  llvm::OwningPtr<CFG> cfg, completeCFG;
+  llvm::OwningPtr<CFGStmtMap> cfgStmtMap;
+
+  CFG::BuildOptions cfgBuildOptions;
+  CFG::BuildOptions::ForcedBlkExprs *forcedBlkExprs;
+  
   bool builtCFG, builtCompleteCFG;
-  LiveVariables *liveness;
-  LiveVariables *relaxedLiveness;
-  ParentMap *PM;
-  PseudoConstantAnalysis *PCA;
-  llvm::DenseMap<const BlockDecl*,void*> *ReferencedBlockVars;
+  const bool useUnoptimizedCFG;
+
+  llvm::OwningPtr<LiveVariables> liveness;
+  llvm::OwningPtr<LiveVariables> relaxedLiveness;
+  llvm::OwningPtr<ParentMap> PM;
+  llvm::OwningPtr<PseudoConstantAnalysis> PCA;
+  llvm::OwningPtr<CFGReverseBlockReachabilityAnalysis> CFA;
+
   llvm::BumpPtrAllocator A;
-  bool UseUnoptimizedCFG;  
-  bool AddEHEdges;
+
+  // FIXME: remove.
+  llvm::DenseMap<const BlockDecl*,void*> *ReferencedBlockVars;
+
 public:
   AnalysisContext(const Decl *d, idx::TranslationUnit *tu,
                   bool useUnoptimizedCFG = false,
-                  bool addehedges = false)
-    : D(d), TU(tu), cfg(0), completeCFG(0),
-      builtCFG(false), builtCompleteCFG(false),
-      liveness(0), relaxedLiveness(0), PM(0), PCA(0),
-      ReferencedBlockVars(0), UseUnoptimizedCFG(useUnoptimizedCFG),
-      AddEHEdges(addehedges) {}
+                  bool addehedges = false,
+                  bool addImplicitDtors = false,
+                  bool addInitializers = false);
 
   ~AnalysisContext();
 
@@ -77,15 +85,27 @@ public:
   /// callExprs.  If this is false, then try/catch statements and blocks
   /// reachable from them can appear to be dead in the CFG, analysis passes must
   /// cope with that.
-  bool getAddEHEdges() const { return AddEHEdges; }
-  
-  bool getUseUnoptimizedCFG() const { return UseUnoptimizedCFG; }
+  bool getAddEHEdges() const { return cfgBuildOptions.AddEHEdges; }  
+  bool getUseUnoptimizedCFG() const {
+      return cfgBuildOptions.PruneTriviallyFalseEdges;
+  }
+  bool getAddImplicitDtors() const { return cfgBuildOptions.AddImplicitDtors; }
+  bool getAddInitializers() const { return cfgBuildOptions.AddInitializers; }
 
+  void registerForcedBlockExpression(const Stmt *stmt);
+  const CFGBlock *getBlockForRegisteredExpression(const Stmt *stmt);
+  
   Stmt *getBody();
   CFG *getCFG();
   
+  CFGStmtMap *getCFGStmtMap();
+
+  CFGReverseBlockReachabilityAnalysis *getCFGReachablityAnalysis();
+  
   /// Return a version of the CFG without any edges pruned.
   CFG *getUnoptimizedCFG();
+
+  void dumpCFG();
 
   ParentMap &getParentMap();
   PseudoConstantAnalysis *getPseudoConstantAnalysis();
@@ -106,15 +126,21 @@ class AnalysisContextManager {
   typedef llvm::DenseMap<const Decl*, AnalysisContext*> ContextMap;
   ContextMap Contexts;
   bool UseUnoptimizedCFG;
+  bool AddImplicitDtors;
+  bool AddInitializers;
 public:
-  AnalysisContextManager(bool useUnoptimizedCFG = false)
-    : UseUnoptimizedCFG(useUnoptimizedCFG) {}
+  AnalysisContextManager(bool useUnoptimizedCFG = false,
+      bool addImplicitDtors = false, bool addInitializers = false)
+    : UseUnoptimizedCFG(useUnoptimizedCFG), AddImplicitDtors(addImplicitDtors),
+      AddInitializers(addInitializers) {}
   
   ~AnalysisContextManager();
 
   AnalysisContext *getContext(const Decl *D, idx::TranslationUnit *TU = 0);
 
   bool getUseUnoptimizedCFG() const { return UseUnoptimizedCFG; }
+  bool getAddImplicitDtors() const { return AddImplicitDtors; }
+  bool getAddInitializers() const { return AddInitializers; }
 
   // Discard all previously created AnalysisContexts.
   void clear();
@@ -196,9 +222,10 @@ class StackFrameContext : public LocationContext {
 
   friend class LocationContextManager;
   StackFrameContext(AnalysisContext *ctx, const LocationContext *parent,
-                    const Stmt *s, const CFGBlock *blk, unsigned idx)
-    : LocationContext(StackFrame, ctx, parent), CallSite(s), Block(blk),
-      Index(idx) {}
+                    const Stmt *s, const CFGBlock *blk, 
+                    unsigned idx)
+    : LocationContext(StackFrame, ctx, parent), CallSite(s),
+      Block(blk), Index(idx) {}
 
 public:
   ~StackFrameContext() {}
@@ -282,8 +309,8 @@ public:
 
   const StackFrameContext *getStackFrame(AnalysisContext *ctx,
                                          const LocationContext *parent,
-                                         const Stmt *s, const CFGBlock *blk,
-                                         unsigned idx);
+                                         const Stmt *s,
+                                         const CFGBlock *blk, unsigned idx);
 
   const ScopeContext *getScope(AnalysisContext *ctx,
                                const LocationContext *parent,

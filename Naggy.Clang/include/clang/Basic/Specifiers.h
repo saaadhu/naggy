@@ -55,6 +55,7 @@ namespace clang {
     TST_typeofExpr,
     TST_decltype,     // C++0x decltype
     TST_auto,         // C++0x auto
+    TST_unknown_anytype, // __unknown_anytype extension
     TST_error         // erroneous type
   };
   
@@ -93,6 +94,23 @@ namespace clang {
     /// independent storage but which can be "moved", i.e.
     /// efficiently cannibalized for its resources.
     VK_XValue
+  };
+
+  /// A further classification of the kind of object referenced by an
+  /// l-value or x-value.
+  enum ExprObjectKind {
+    /// An ordinary object is located at an address in memory.
+    OK_Ordinary,
+
+    /// A bitfield object is a bitfield on a C or C++ record.
+    OK_BitField,
+
+    /// A vector component is an element or range of elements on a vector.
+    OK_VectorComponent,
+
+    /// An Objective C property is a logical field of an Objective-C
+    /// object which is read and written via Objective C method calls.
+    OK_ObjCProperty
   };
 
   // \brief Describes the kind of template specialization that a

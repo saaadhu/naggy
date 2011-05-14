@@ -16,6 +16,7 @@
 #ifndef LLVM_CODEGEN_MACHINECONSTANTPOOL_H
 #define LLVM_CODEGEN_MACHINECONSTANTPOOL_H
 
+#include "llvm/ADT/DenseSet.h"
 #include <cassert>
 #include <climits>
 #include <vector>
@@ -79,7 +80,7 @@ public:
   } Val;
 
   /// The required alignment for this entry. The top bit is set when Val is
-  /// a MachineConstantPoolValue.
+  /// a target specific MachineConstantPoolValue.
   unsigned Alignment;
 
   MachineConstantPoolEntry(const Constant *V, unsigned A)
@@ -92,6 +93,9 @@ public:
     Alignment |= 1U << (sizeof(unsigned)*CHAR_BIT-1);
   }
 
+  /// isMachineConstantPoolEntry - Return true if the MachineConstantPoolEntry
+  /// is indeed a target specific constantpool entry, not a wrapper over a
+  /// Constant.
   bool isMachineConstantPoolEntry() const {
     return (int)Alignment < 0;
   }
@@ -130,6 +134,8 @@ class MachineConstantPool {
   const TargetData *TD;   ///< The machine's TargetData.
   unsigned PoolAlignment; ///< The alignment for the pool.
   std::vector<MachineConstantPoolEntry> Constants; ///< The pool of constants.
+  /// MachineConstantPoolValues that use an existing MachineConstantPoolEntry.
+  DenseSet<MachineConstantPoolValue*> MachineCPVsSharingEntries;
 public:
   /// @brief The only constructor.
   explicit MachineConstantPool(const TargetData *td)

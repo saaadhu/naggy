@@ -45,8 +45,8 @@ def charize_microsoft_ext : Extension<"@# is a microsoft extension">;
 
 def ext_token_used : Extension<"extension used">;
 
-def err_unterminated_string : Error<"missing terminating '\"' character">;
-def err_unterminated_char : Error<"missing terminating ' character">;
+def warn_unterminated_string : ExtWarn<"missing terminating '\"' character">;
+def warn_unterminated_char : ExtWarn<"missing terminating ' character">;
 def err_empty_character : Error<"empty character constant">;
 def err_unterminated_block_comment : Error<"unterminated /* comment">;
 def err_invalid_character_to_charify : Error<
@@ -98,6 +98,10 @@ def warn_hex_escape_too_large : ExtWarn<"hex escape sequence out of range">;
 def ext_string_too_long : Extension<"string literal of length %0 exceeds "
   "maximum length %1 that %select{C90|ISO C99|C++}2 compilers are required to "
   "support">, InGroup<OverlengthStrings>;
+def warn_ucn_escape_too_large : ExtWarn<
+  "character unicode escape sequence too long for its type">;
+def warn_ucn_not_valid_in_c89 : ExtWarn<
+  "unicode escape sequences are only valid in C99 or C++">;
   
 //===----------------------------------------------------------------------===//
 // PTH Diagnostics
@@ -110,7 +114,8 @@ def err_invalid_pth_file : Error<
 //===----------------------------------------------------------------------===//
 // Preprocessor Diagnostics
 //===----------------------------------------------------------------------===//
-def pp_hash_warning : Warning<"#warning%0">, InGroup<PoundWarning>;
+def pp_hash_warning : Warning<"#warning%0">,
+  InGroup<PoundWarning>, DefaultWarnShowInSystemHeader;
 def pp_include_next_in_primary : Warning<
   "#include_next in primary source file">;
 def pp_include_macros_out_of_predefines : Error<
@@ -235,16 +240,17 @@ def err_pragma_push_pop_macro_malformed : Error<
    "pragma %0 requires a parenthesized string">;
 def warn_pragma_pop_macro_no_push : Warning<
    "pragma pop_macro could not pop '%0', no matching push_macro">;
-def warn_pragma_message : Warning<"%0">;
+def warn_pragma_message : Warning<"%0">,
+   InGroup<PoundPragmaMessage>, DefaultWarnNoWerror;
 def warn_pragma_ignored : Warning<"unknown pragma ignored">,
    InGroup<UnknownPragmas>, DefaultIgnore;
 def ext_stdc_pragma_ignored : ExtWarn<"unknown pragma in STDC namespace">,
    InGroup<UnknownPragmas>;
-def ext_stdc_pragma_syntax :
+def ext_on_off_switch_syntax :
    ExtWarn<"expected 'ON' or 'OFF' or 'DEFAULT' in pragma">,
    InGroup<UnknownPragmas>;
-def ext_stdc_pragma_syntax_eom :
-   ExtWarn<"expected end of macro in STDC pragma">,
+def ext_pragma_syntax_eod :
+   ExtWarn<"expected end of directive in pragma">,
    InGroup<UnknownPragmas>;
 def warn_stdc_fenv_access_not_supported :
    Warning<"pragma STDC FENV_ACCESS ON is not supported, ignoring pragma">,

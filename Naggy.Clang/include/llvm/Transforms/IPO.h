@@ -99,6 +99,8 @@ ModulePass *createGVExtractionPass(std::vector<GlobalValue*>& GVs, bool
 /// createFunctionInliningPass - Return a new pass object that uses a heuristic
 /// to inline direct function calls to small functions.
 ///
+/// The -inline-threshold command line option takes precedence over the
+/// threshold given here.
 Pass *createFunctionInliningPass();
 Pass *createFunctionInliningPass(int Threshold);
 
@@ -150,7 +152,6 @@ ModulePass *createDeadArgHackingPass();
 /// equal to maxElements (maxElements == 0 means always promote).
 ///
 Pass *createArgumentPromotionPass(unsigned maxElements = 3);
-Pass *createStructRetPromotionPass();
 
 //===----------------------------------------------------------------------===//
 /// createIPConstantPropagationPass - This pass propagates constants from call
@@ -185,12 +186,6 @@ ModulePass *createBlockExtractorPass();
 /// createStripDeadPrototypesPass - This pass removes any function declarations
 /// (prototypes) that are not used.
 ModulePass *createStripDeadPrototypesPass();
-
-//===----------------------------------------------------------------------===//
-/// createPartialSpecializationPass - This pass specializes functions for
-/// constant arguments.
-///
-ModulePass *createPartialSpecializationPass();
 
 //===----------------------------------------------------------------------===//
 /// createFunctionAttrsPass - This pass discovers functions that do not access

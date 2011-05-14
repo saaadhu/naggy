@@ -51,8 +51,8 @@ class MDNode;
 /// This is a very important LLVM class. It is the base class of all values 
 /// computed by a program that may be used as operands to other values. Value is
 /// the super class of other important classes such as Instruction and Function.
-/// All Values have a Type. Type is not a subclass of Value. All types can have
-/// a name and they should belong to some Module. Setting the name on the Value
+/// All Values have a Type. Type is not a subclass of Value. Some values can
+/// have a name and they belong to some Module.  Setting the name on the Value
 /// automatically updates the module's symbol table.
 ///
 /// Every value has a "use list" that keeps track of which other Values are
@@ -252,6 +252,12 @@ public:
     return SubclassOptionalData;
   }
 
+  /// clearSubclassOptionalData - Clear the optional flags contained in
+  /// this value.
+  void clearSubclassOptionalData() {
+    SubclassOptionalData = 0;
+  }
+
   /// hasSameSubclassOptionalData - Test whether the optional flags contained
   /// in this value are equal to the optional flags in the given value.
   bool hasSameSubclassOptionalData(const Value *V) const {
@@ -285,15 +291,9 @@ public:
     return const_cast<Value*>(this)->stripPointerCasts();
   }
 
-  /// getUnderlyingObject - This method strips off any GEP address adjustments
-  /// and pointer casts from the specified value, returning the original object
-  /// being addressed.  Note that the returned value has pointer type if the
-  /// specified value does.  If the MaxLookup value is non-zero, it limits the
-  /// number of instructions to be stripped off.
-  Value *getUnderlyingObject(unsigned MaxLookup = 6);
-  const Value *getUnderlyingObject(unsigned MaxLookup = 6) const {
-    return const_cast<Value*>(this)->getUnderlyingObject(MaxLookup);
-  }
+  /// isDereferenceablePointer - Test if this value is always a pointer to
+  /// allocated and suitably aligned memory for a simple load or store.
+  bool isDereferenceablePointer() const;
   
   /// DoPHITranslation - If this value is a PHI node with CurBB as its parent,
   /// return the value in the PHI node corresponding to PredBB.  If not, return

@@ -22,7 +22,8 @@ namespace llvm {
 // Debug info constants.
 
 enum {
-  LLVMDebugVersion = (8 << 16),         // Current version of debug information.
+  LLVMDebugVersion = (9 << 16),         // Current version of debug information.
+  LLVMDebugVersion8 = (8 << 16),         // Cconstant for version 8.
   LLVMDebugVersion7 = (7 << 16),        // Constant for version 7.
   LLVMDebugVersion6 = (6 << 16),        // Constant for version 6.
   LLVMDebugVersion5 = (5 << 16),        // Constant for version 5.
@@ -44,11 +45,9 @@ enum llvm_dwarf_constants {
   // llvm mock tags
   DW_TAG_invalid = ~0U,                 // Tag for invalid results.
 
-  DW_TAG_anchor = 0,                    // Tag for descriptor anchors.
   DW_TAG_auto_variable = 0x100,         // Tag for local (auto) variables.
   DW_TAG_arg_variable = 0x101,          // Tag for argument variables.
   DW_TAG_return_variable = 0x102,       // Tag for return variables.
-
   DW_TAG_vector_type = 0x103,           // Tag for vector types.
 
   DW_TAG_user_base = 0x1000,            // Recommended base for user tags.
@@ -118,6 +117,7 @@ enum dwarf_constants {
   DW_TAG_imported_unit = 0x3d,
   DW_TAG_condition = 0x3f,
   DW_TAG_shared_type = 0x40,
+  DW_TAG_rvalue_reference_type = 0x41,
   DW_TAG_lo_user = 0x4080,
   DW_TAG_hi_user = 0xffff,
 
@@ -231,6 +231,10 @@ enum dwarf_constants {
   DW_AT_APPLE_major_runtime_vers = 0x3fe5,
   DW_AT_APPLE_runtime_class = 0x3fe6,
   DW_AT_APPLE_omit_frame_ptr = 0x3fe7,
+  DW_AT_APPLE_property_name = 0x3fe8,
+  DW_AT_APPLE_property_getter = 0x3fe9,
+  DW_AT_APPLE_property_setter = 0x3fea,
+  DW_AT_APPLE_property_attribute = 0x3feb,
 
   // Attribute form encodings
   DW_FORM_addr = 0x01,
@@ -407,6 +411,7 @@ enum dwarf_constants {
   DW_OP_call_ref = 0x9a,
   DW_OP_form_tls_address = 0x9b,
   DW_OP_call_frame_cfa = 0x9c,
+  DW_OP_bit_piece = 0x9d,
   DW_OP_lo_user = 0xe0,
   DW_OP_hi_user = 0xff,
 
@@ -509,6 +514,7 @@ enum dwarf_constants {
   DW_DSC_range = 0x01,
 
   // Line Number Standard Opcode Encodings
+  DW_LNS_extended_op = 0x00,
   DW_LNS_copy = 0x01,
   DW_LNS_advance_pc = 0x02,
   DW_LNS_advance_line = 0x03,
@@ -583,7 +589,15 @@ enum dwarf_constants {
   DW_EH_PE_datarel = 0x30,
   DW_EH_PE_funcrel = 0x40,
   DW_EH_PE_aligned = 0x50,
-  DW_EH_PE_indirect = 0x80
+  DW_EH_PE_indirect = 0x80,
+
+  // Apple Objective-C Property Attributes
+  DW_APPLE_PROPERTY_readonly = 0x01,
+  DW_APPLE_PROPERTY_readwrite = 0x02,
+  DW_APPLE_PROPERTY_assign = 0x04,
+  DW_APPLE_PROPERTY_retain = 0x08,
+  DW_APPLE_PROPERTY_copy = 0x10,
+  DW_APPLE_PROPERTY_nonatomic = 0x20
 };
 
 /// TagString - Return the string for the specified tag.

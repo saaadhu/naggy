@@ -44,7 +44,7 @@ namespace clang {
   /// \brief Retrieves the repository path (e.g., Subversion path) that 
   /// identifies the particular Clang branch, tag, or trunk from which this
   /// Clang was built.
-  llvm::StringRef getClangRepositoryPath();
+  std::string getClangRepositoryPath();
   
   /// \brief Retrieves the repository revision number (or identifer) from which
   ///  this Clang was built.
@@ -58,6 +58,11 @@ namespace clang {
   ///   which includes the clang version number, the repository version, 
   ///   and the vendor tag.
   std::string getClangFullVersion();
+
+  /// \brief Retrieves a string representing the complete clang version suitable
+  ///   for use in the CPP __VERSION__ macro, which includes the clang version
+  ///   number, the repository version, and the vendor tag.
+  std::string getClangFullCPPVersion();
 }
 
 #endif // LLVM_CLANG_BASIC_VERSION_H

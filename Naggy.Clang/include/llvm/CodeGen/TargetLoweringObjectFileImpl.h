@@ -57,6 +57,12 @@ public:
 
   virtual void Initialize(MCContext &Ctx, const TargetMachine &TM);
 
+  virtual const MCSection *getEHFrameSection() const;
+
+  virtual void emitPersonalityValue(MCStreamer &Streamer,
+                                    const TargetMachine &TM,
+                                    const MCSymbol *Sym) const;
+
   const MCSection *getDataRelSection() const { return DataRelSection; }
 
   /// getSectionForConstant - Given a constant with the SectionKind, return a
@@ -79,6 +85,11 @@ public:
   getExprForDwarfGlobalReference(const GlobalValue *GV, Mangler *Mang,
                                  MachineModuleInfo *MMI, unsigned Encoding,
                                  MCStreamer &Streamer) const;
+
+  // getCFIPersonalitySymbol - The symbol that gets passed to .cfi_personality.
+  virtual MCSymbol *
+  getCFIPersonalitySymbol(const GlobalValue *GV, Mangler *Mang,
+                          MachineModuleInfo *MMI) const;
 };
 
 
@@ -92,7 +103,7 @@ class TargetLoweringObjectFileMachO : public TargetLoweringObjectFile {
   ///
   const MCSection *TLSBSSSection;         // Defaults to ".tbss".
   
-  /// TLSTLVSection - Section for thread local structure infomation.
+  /// TLSTLVSection - Section for thread local structure information.
   /// Contains the source code name of the variable, visibility and a pointer
   /// to the initial value (.tdata or .tbss).
   const MCSection *TLSTLVSection;         // Defaults to ".tlv".
@@ -120,6 +131,8 @@ public:
   ~TargetLoweringObjectFileMachO() {}
 
   virtual void Initialize(MCContext &Ctx, const TargetMachine &TM);
+
+  virtual const MCSection *getEHFrameSection() const;
 
   virtual const MCSection *
   SelectSectionForGlobal(const GlobalValue *GV, SectionKind Kind,
@@ -168,6 +181,11 @@ public:
                                  MachineModuleInfo *MMI, unsigned Encoding,
                                  MCStreamer &Streamer) const;
 
+  // getCFIPersonalitySymbol - The symbol that gets passed to .cfi_personality.
+  virtual MCSymbol *
+  getCFIPersonalitySymbol(const GlobalValue *GV, Mangler *Mang,
+                          MachineModuleInfo *MMI) const;
+
   virtual unsigned getPersonalityEncoding() const;
   virtual unsigned getLSDAEncoding() const;
   virtual unsigned getFDEEncoding() const;
@@ -183,6 +201,8 @@ public:
   ~TargetLoweringObjectFileCOFF() {}
 
   virtual void Initialize(MCContext &Ctx, const TargetMachine &TM);
+
+  virtual const MCSection *getEHFrameSection() const;
 
   virtual const MCSection *getDrectveSection() const { return DrectveSection; }
 

@@ -20,9 +20,13 @@
 OPTION("<input>", INPUT, Input, INVALID, INVALID, DriverOption, 0, 0, 0)
 OPTION("<unknown>", UNKNOWN, Unknown, INVALID, INVALID, 0, 0, 0, 0)
 OPTION("--help", _help, Flag, INVALID, help, 0, 0, 0, 0)
+OPTION("--noexecstack", no_exec_stack, Flag, INVALID, INVALID, 0, 0,
+       "Mark the file as not needing an executable stack", 0)
 OPTION("--version", _version, Flag, INVALID, version, 0, 0, 0, 0)
 OPTION("-I", I, JoinedOrSeparate, INVALID, INVALID, 0, 0,
        "Add directory to include search path", "<directory>")
+OPTION("-L", L, Flag, INVALID, INVALID, 0, 0,
+       "Save temporary labels in the symbol table. Note this may change .s semantics, it should almost never be used on compiler generated code!", 0)
 OPTION("-filetype", filetype, Separate, INVALID, INVALID, 0, 0,
        "Specify the output file type ('asm', 'null', or 'obj')", 0)
 OPTION("-help", help, Flag, INVALID, INVALID, 0, 0,
@@ -45,3 +49,4 @@ OPTION("-triple", triple, Separate, INVALID, INVALID, 0, 0,
        "Specify target triple (e.g. x86_64-pc-linux-gnu)", 0)
 OPTION("-version", version, Flag, INVALID, INVALID, 0, 0,
        "Print the assembler version", 0)
+OPTION("-v", v, Flag, INVALID, version, 0, 0, 0, 0)

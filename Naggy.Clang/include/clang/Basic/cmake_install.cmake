@@ -1,8 +1,8 @@
-# Install script for directory: D:/llvm/llvm-2.8/tools/clang/include/clang/Basic
+# Install script for directory: E:/llvm/tools/clang/include/clang/Basic
 
 # Set the install prefix
 IF(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  SET(CMAKE_INSTALL_PREFIX "C:/Program Files/LLVM")
+  SET(CMAKE_INSTALL_PREFIX "C:/Program Files (x86)/LLVM")
 ENDIF(NOT DEFINED CMAKE_INSTALL_PREFIX)
 STRING(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 

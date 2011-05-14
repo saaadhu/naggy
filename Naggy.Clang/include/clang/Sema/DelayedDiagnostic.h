@@ -101,7 +101,7 @@ public:
 
 private:
   unsigned Access : 2;
-  bool IsMember;
+  unsigned IsMember : 1;
   NamedDecl *Target;
   CXXRecordDecl *NamingClass;
   QualType BaseObjectType;
@@ -119,30 +119,11 @@ public:
 
   SourceLocation Loc;
 
-  union {
-    /// Deprecation.
-    struct { NamedDecl *Decl; } DeprecationData;
-
-    /// Access control.
-    char AccessData[sizeof(AccessedEntity)];
-  };
-
-  void destroy() {
-    switch (Kind) {
-    case Access: getAccessData().~AccessedEntity(); break;
-    case Deprecation: break;
-    }
-  }
+  void Destroy();
 
   static DelayedDiagnostic makeDeprecation(SourceLocation Loc,
-                                           NamedDecl *D) {
-    DelayedDiagnostic DD;
-    DD.Kind = Deprecation;
-    DD.Triggered = false;
-    DD.Loc = Loc;
-    DD.DeprecationData.Decl = D;
-    return DD;
-  }
+                                           const NamedDecl *D,
+                                           llvm::StringRef Msg);
 
   static DelayedDiagnostic makeAccess(SourceLocation Loc,
                                       const AccessedEntity &Entity) {
@@ -155,11 +136,37 @@ public:
   }
 
   AccessedEntity &getAccessData() {
+    assert(Kind == Access && "Not an access diagnostic.");
     return *reinterpret_cast<AccessedEntity*>(AccessData);
   }
   const AccessedEntity &getAccessData() const {
+    assert(Kind == Access && "Not an access diagnostic.");
     return *reinterpret_cast<const AccessedEntity*>(AccessData);
   }
+
+  const NamedDecl *getDeprecationDecl() const {
+    assert(Kind == Deprecation && "Not a deprecation diagnostic.");
+    return DeprecationData.Decl;
+  }
+
+  llvm::StringRef getDeprecationMessage() const {
+    assert(Kind == Deprecation && "Not a deprecation diagnostic.");
+    return llvm::StringRef(DeprecationData.Message,
+                           DeprecationData.MessageLen);
+  }
+
+private:
+  union {
+    /// Deprecation.
+    struct {
+      const NamedDecl *Decl;
+      const char *Message;
+      size_t MessageLen;
+    } DeprecationData;
+
+    /// Access control.
+    char AccessData[sizeof(AccessedEntity)];
+  };
 };
 
 }

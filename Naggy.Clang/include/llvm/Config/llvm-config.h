@@ -47,7 +47,7 @@
 /* #undef LLVM_MANDIR */
 
 /* Build multithreading support into LLVM */
-#define LLVM_MULTITHREADED
+#define LLVM_MULTITHREADED 1
 
 /* LLVM architecture name for the native architecture, if available */
 #define LLVM_NATIVE_ARCH X86
@@ -61,11 +61,14 @@
 /* LLVM name for the native AsmPrinter init function, if available */
 #define LLVM_NATIVE_ASMPRINTER LLVMInitializeX86AsmPrinter
 
+/* LLVM name for the native AsmPrinter init function, if available */
+/* #undef LLVM_NATIVE_ASMPARSER */
+
 /* Define if this is Unixish platform */
 /* #undef LLVM_ON_UNIX */
 
 /* Define if this is Win32ish platform */
-#define LLVM_ON_WIN32
+#define LLVM_ON_WIN32 1
 
 /* Define to path to circo program if found or 'echo circo' otherwise */
 /* #undef LLVM_PATH_CIRCO */
@@ -91,7 +94,10 @@
 /* Define to path to twopi program if found or 'echo twopi' otherwise */
 /* #undef LLVM_PATH_TWOPI */
 
+/* Define to path to xdot.py program if found or 'echo xdot.py' otherwise */
+/* #undef LLVM_PATH_XDOT_PY */
+
 /* Installation prefix directory */
-#define LLVM_PREFIX "C:/Program Files/LLVM"
+#define LLVM_PREFIX "C:/Program Files (x86)/LLVM"
 
 #endif

@@ -15,6 +15,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <set>
 
 namespace llvm {
   class MemoryBuffer;
@@ -43,10 +44,24 @@ public:
   /// The implicit PCH included at the start of the translation unit, or empty.
   std::string ImplicitPCHInclude;
 
+  /// \brief Headers that will be converted to chained PCHs in memory.
+  std::vector<std::string> ChainedIncludes;
+
   /// \brief When true, disables most of the normal validation performed on
   /// precompiled headers.
   bool DisablePCHValidation;
-  
+
+  /// \brief When true, disables the use of the stat cache within a
+  /// precompiled header or AST file.
+  bool DisableStatCache;
+
+  /// \brief Dump declarations that are deserialized from PCH, for testing.
+  bool DumpDeserializedPCHDecls;
+
+  /// \brief This is a set of names for decls that we do not want to be
+  /// deserialized, and we emit an error if they are; for testing purposes.
+  std::set<std::string> DeserializedPCHDeclsToErrorOn;
+
   /// \brief If non-zero, the implicit PCH include is actually a precompiled
   /// preamble that covers this number of bytes in the main source file.
   ///
@@ -60,6 +75,10 @@ public:
 
   /// If given, a PTH cache file to use for speeding up header parsing.
   std::string TokenCache;
+
+  /// \brief True if the SourceManager should report the original file name for
+  /// contents of files that were remapped to other files. Defaults to true.
+  bool RemappedFilesKeepOriginalName;
 
   /// \brief The set of file remappings, which take existing files on
   /// the system (the first part of each pair) and gives them the
@@ -117,8 +136,10 @@ public:
   
 public:
   PreprocessorOptions() : UsePredefines(true), DetailedRecord(false),
-                          DisablePCHValidation(false),
+                          DisablePCHValidation(false), DisableStatCache(false),
+                          DumpDeserializedPCHDecls(false),
                           PrecompiledPreambleBytes(0, true),
+                          RemappedFilesKeepOriginalName(true),
                           RetainRemappedFileBuffers(false) { }
 
   void addMacroDef(llvm::StringRef Name) {

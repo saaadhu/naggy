@@ -27,6 +27,12 @@ BREAKSTMT(BreakStmt, Stmt)
 CXXCATCHSTMT(CXXCatchStmt, Stmt)
 #undef CXXCATCHSTMT
 
+#ifndef CXXFORRANGESTMT
+#  define CXXFORRANGESTMT(Type, Base) STMT(Type, Base)
+#endif
+CXXFORRANGESTMT(CXXForRangeStmt, Stmt)
+#undef CXXFORRANGESTMT
+
 #ifndef CXXTRYSTMT
 #  define CXXTRYSTMT(Type, Base) STMT(Type, Base)
 #endif
@@ -61,6 +67,26 @@ DOSTMT(DoStmt, Stmt)
 #  define EXPR(Type, Base) STMT(Type, Base)
 #endif
 ABSTRACT_STMT(EXPR(Expr, Stmt))
+#ifndef ABSTRACTCONDITIONALOPERATOR
+#  define ABSTRACTCONDITIONALOPERATOR(Type, Base) EXPR(Type, Base)
+#endif
+ABSTRACT_STMT(ABSTRACTCONDITIONALOPERATOR(AbstractConditionalOperator, Expr))
+#ifndef BINARYCONDITIONALOPERATOR
+#  define BINARYCONDITIONALOPERATOR(Type, Base) ABSTRACTCONDITIONALOPERATOR(Type, Base)
+#endif
+BINARYCONDITIONALOPERATOR(BinaryConditionalOperator, AbstractConditionalOperator)
+#undef BINARYCONDITIONALOPERATOR
+
+#ifndef CONDITIONALOPERATOR
+#  define CONDITIONALOPERATOR(Type, Base) ABSTRACTCONDITIONALOPERATOR(Type, Base)
+#endif
+CONDITIONALOPERATOR(ConditionalOperator, AbstractConditionalOperator)
+#undef CONDITIONALOPERATOR
+
+STMT_RANGE(AbstractConditionalOperator, BinaryConditionalOperator, ConditionalOperator)
+
+#undef ABSTRACTCONDITIONALOPERATOR
+
 #ifndef ADDRLABELEXPR
 #  define ADDRLABELEXPR(Type, Base) EXPR(Type, Base)
 #endif
@@ -72,6 +98,12 @@ ADDRLABELEXPR(AddrLabelExpr, Expr)
 #endif
 ARRAYSUBSCRIPTEXPR(ArraySubscriptExpr, Expr)
 #undef ARRAYSUBSCRIPTEXPR
+
+#ifndef ARRAYTYPETRAITEXPR
+#  define ARRAYTYPETRAITEXPR(Type, Base) EXPR(Type, Base)
+#endif
+ARRAYTYPETRAITEXPR(ArrayTypeTraitExpr, Expr)
+#undef ARRAYTYPETRAITEXPR
 
 #ifndef BINARYOPERATOR
 #  define BINARYOPERATOR(Type, Base) EXPR(Type, Base)
@@ -86,6 +118,12 @@ COMPOUNDASSIGNOPERATOR(CompoundAssignOperator, BinaryOperator)
 STMT_RANGE(BinaryOperator, BinaryOperator, CompoundAssignOperator)
 
 #undef BINARYOPERATOR
+
+#ifndef BINARYTYPETRAITEXPR
+#  define BINARYTYPETRAITEXPR(Type, Base) EXPR(Type, Base)
+#endif
+BINARYTYPETRAITEXPR(BinaryTypeTraitExpr, Expr)
+#undef BINARYTYPETRAITEXPR
 
 #ifndef BLOCKDECLREFEXPR
 #  define BLOCKDECLREFEXPR(Type, Base) EXPR(Type, Base)
@@ -143,17 +181,17 @@ CXXDELETEEXPR(CXXDeleteExpr, Expr)
 CXXDEPENDENTSCOPEMEMBEREXPR(CXXDependentScopeMemberExpr, Expr)
 #undef CXXDEPENDENTSCOPEMEMBEREXPR
 
-#ifndef CXXEXPRWITHTEMPORARIES
-#  define CXXEXPRWITHTEMPORARIES(Type, Base) EXPR(Type, Base)
-#endif
-CXXEXPRWITHTEMPORARIES(CXXExprWithTemporaries, Expr)
-#undef CXXEXPRWITHTEMPORARIES
-
 #ifndef CXXNEWEXPR
 #  define CXXNEWEXPR(Type, Base) EXPR(Type, Base)
 #endif
 CXXNEWEXPR(CXXNewExpr, Expr)
 #undef CXXNEWEXPR
+
+#ifndef CXXNOEXCEPTEXPR
+#  define CXXNOEXCEPTEXPR(Type, Base) EXPR(Type, Base)
+#endif
+CXXNOEXCEPTEXPR(CXXNoexceptExpr, Expr)
+#undef CXXNOEXCEPTEXPR
 
 #ifndef CXXNULLPTRLITERALEXPR
 #  define CXXNULLPTRLITERALEXPR(Type, Base) EXPR(Type, Base)
@@ -197,10 +235,22 @@ CXXTYPEIDEXPR(CXXTypeidExpr, Expr)
 CXXUNRESOLVEDCONSTRUCTEXPR(CXXUnresolvedConstructExpr, Expr)
 #undef CXXUNRESOLVEDCONSTRUCTEXPR
 
+#ifndef CXXUUIDOFEXPR
+#  define CXXUUIDOFEXPR(Type, Base) EXPR(Type, Base)
+#endif
+CXXUUIDOFEXPR(CXXUuidofExpr, Expr)
+#undef CXXUUIDOFEXPR
+
 #ifndef CALLEXPR
 #  define CALLEXPR(Type, Base) EXPR(Type, Base)
 #endif
 CALLEXPR(CallExpr, Expr)
+#ifndef CUDAKERNELCALLEXPR
+#  define CUDAKERNELCALLEXPR(Type, Base) CALLEXPR(Type, Base)
+#endif
+CUDAKERNELCALLEXPR(CUDAKernelCallExpr, CallExpr)
+#undef CUDAKERNELCALLEXPR
+
 #ifndef CXXMEMBERCALLEXPR
 #  define CXXMEMBERCALLEXPR(Type, Base) CALLEXPR(Type, Base)
 #endif
@@ -301,12 +351,6 @@ CHOOSEEXPR(ChooseExpr, Expr)
 COMPOUNDLITERALEXPR(CompoundLiteralExpr, Expr)
 #undef COMPOUNDLITERALEXPR
 
-#ifndef CONDITIONALOPERATOR
-#  define CONDITIONALOPERATOR(Type, Base) EXPR(Type, Base)
-#endif
-CONDITIONALOPERATOR(ConditionalOperator, Expr)
-#undef CONDITIONALOPERATOR
-
 #ifndef DECLREFEXPR
 #  define DECLREFEXPR(Type, Base) EXPR(Type, Base)
 #endif
@@ -325,6 +369,18 @@ DEPENDENTSCOPEDECLREFEXPR(DependentScopeDeclRefExpr, Expr)
 DESIGNATEDINITEXPR(DesignatedInitExpr, Expr)
 #undef DESIGNATEDINITEXPR
 
+#ifndef EXPRWITHCLEANUPS
+#  define EXPRWITHCLEANUPS(Type, Base) EXPR(Type, Base)
+#endif
+EXPRWITHCLEANUPS(ExprWithCleanups, Expr)
+#undef EXPRWITHCLEANUPS
+
+#ifndef EXPRESSIONTRAITEXPR
+#  define EXPRESSIONTRAITEXPR(Type, Base) EXPR(Type, Base)
+#endif
+EXPRESSIONTRAITEXPR(ExpressionTraitExpr, Expr)
+#undef EXPRESSIONTRAITEXPR
+
 #ifndef EXTVECTORELEMENTEXPR
 #  define EXTVECTORELEMENTEXPR(Type, Base) EXPR(Type, Base)
 #endif
@@ -342,6 +398,12 @@ FLOATINGLITERAL(FloatingLiteral, Expr)
 #endif
 GNUNULLEXPR(GNUNullExpr, Expr)
 #undef GNUNULLEXPR
+
+#ifndef GENERICSELECTIONEXPR
+#  define GENERICSELECTIONEXPR(Type, Base) EXPR(Type, Base)
+#endif
+GENERICSELECTIONEXPR(GenericSelectionExpr, Expr)
+#undef GENERICSELECTIONEXPR
 
 #ifndef IMAGINARYLITERAL
 #  define IMAGINARYLITERAL(Type, Base) EXPR(Type, Base)
@@ -378,12 +440,6 @@ MEMBEREXPR(MemberExpr, Expr)
 #endif
 OBJCENCODEEXPR(ObjCEncodeExpr, Expr)
 #undef OBJCENCODEEXPR
-
-#ifndef OBJCIMPLICITSETTERGETTERREFEXPR
-#  define OBJCIMPLICITSETTERGETTERREFEXPR(Type, Base) EXPR(Type, Base)
-#endif
-OBJCIMPLICITSETTERGETTERREFEXPR(ObjCImplicitSetterGetterRefExpr, Expr)
-#undef OBJCIMPLICITSETTERGETTERREFEXPR
 
 #ifndef OBJCISAEXPR
 #  define OBJCISAEXPR(Type, Base) EXPR(Type, Base)
@@ -427,17 +483,17 @@ OBJCSELECTOREXPR(ObjCSelectorExpr, Expr)
 OBJCSTRINGLITERAL(ObjCStringLiteral, Expr)
 #undef OBJCSTRINGLITERAL
 
-#ifndef OBJCSUPEREXPR
-#  define OBJCSUPEREXPR(Type, Base) EXPR(Type, Base)
-#endif
-OBJCSUPEREXPR(ObjCSuperExpr, Expr)
-#undef OBJCSUPEREXPR
-
 #ifndef OFFSETOFEXPR
 #  define OFFSETOFEXPR(Type, Base) EXPR(Type, Base)
 #endif
 OFFSETOFEXPR(OffsetOfExpr, Expr)
 #undef OFFSETOFEXPR
+
+#ifndef OPAQUEVALUEEXPR
+#  define OPAQUEVALUEEXPR(Type, Base) EXPR(Type, Base)
+#endif
+OPAQUEVALUEEXPR(OpaqueValueExpr, Expr)
+#undef OPAQUEVALUEEXPR
 
 #ifndef OVERLOADEXPR
 #  define OVERLOADEXPR(Type, Base) EXPR(Type, Base)
@@ -458,6 +514,12 @@ UNRESOLVEDMEMBEREXPR(UnresolvedMemberExpr, OverloadExpr)
 STMT_RANGE(OverloadExpr, UnresolvedLookupExpr, UnresolvedMemberExpr)
 
 #undef OVERLOADEXPR
+
+#ifndef PACKEXPANSIONEXPR
+#  define PACKEXPANSIONEXPR(Type, Base) EXPR(Type, Base)
+#endif
+PACKEXPANSIONEXPR(PackExpansionExpr, Expr)
+#undef PACKEXPANSIONEXPR
 
 #ifndef PARENEXPR
 #  define PARENEXPR(Type, Base) EXPR(Type, Base)
@@ -483,11 +545,11 @@ PREDEFINEDEXPR(PredefinedExpr, Expr)
 SHUFFLEVECTOREXPR(ShuffleVectorExpr, Expr)
 #undef SHUFFLEVECTOREXPR
 
-#ifndef SIZEOFALIGNOFEXPR
-#  define SIZEOFALIGNOFEXPR(Type, Base) EXPR(Type, Base)
+#ifndef SIZEOFPACKEXPR
+#  define SIZEOFPACKEXPR(Type, Base) EXPR(Type, Base)
 #endif
-SIZEOFALIGNOFEXPR(SizeOfAlignOfExpr, Expr)
-#undef SIZEOFALIGNOFEXPR
+SIZEOFPACKEXPR(SizeOfPackExpr, Expr)
+#undef SIZEOFPACKEXPR
 
 #ifndef STMTEXPR
 #  define STMTEXPR(Type, Base) EXPR(Type, Base)
@@ -501,11 +563,17 @@ STMTEXPR(StmtExpr, Expr)
 STRINGLITERAL(StringLiteral, Expr)
 #undef STRINGLITERAL
 
-#ifndef TYPESCOMPATIBLEEXPR
-#  define TYPESCOMPATIBLEEXPR(Type, Base) EXPR(Type, Base)
+#ifndef SUBSTNONTYPETEMPLATEPARMPACKEXPR
+#  define SUBSTNONTYPETEMPLATEPARMPACKEXPR(Type, Base) EXPR(Type, Base)
 #endif
-TYPESCOMPATIBLEEXPR(TypesCompatibleExpr, Expr)
-#undef TYPESCOMPATIBLEEXPR
+SUBSTNONTYPETEMPLATEPARMPACKEXPR(SubstNonTypeTemplateParmPackExpr, Expr)
+#undef SUBSTNONTYPETEMPLATEPARMPACKEXPR
+
+#ifndef UNARYEXPRORTYPETRAITEXPR
+#  define UNARYEXPRORTYPETRAITEXPR(Type, Base) EXPR(Type, Base)
+#endif
+UNARYEXPRORTYPETRAITEXPR(UnaryExprOrTypeTraitExpr, Expr)
+#undef UNARYEXPRORTYPETRAITEXPR
 
 #ifndef UNARYOPERATOR
 #  define UNARYOPERATOR(Type, Base) EXPR(Type, Base)
@@ -525,7 +593,7 @@ UNARYTYPETRAITEXPR(UnaryTypeTraitExpr, Expr)
 VAARGEXPR(VAArgExpr, Expr)
 #undef VAARGEXPR
 
-STMT_RANGE(Expr, AddrLabelExpr, VAArgExpr)
+STMT_RANGE(Expr, BinaryConditionalOperator, VAArgExpr)
 
 #undef EXPR
 
@@ -607,10 +675,28 @@ OBJCFORCOLLECTIONSTMT(ObjCForCollectionStmt, Stmt)
 RETURNSTMT(ReturnStmt, Stmt)
 #undef RETURNSTMT
 
+#ifndef SEHEXCEPTSTMT
+#  define SEHEXCEPTSTMT(Type, Base) STMT(Type, Base)
+#endif
+SEHEXCEPTSTMT(SEHExceptStmt, Stmt)
+#undef SEHEXCEPTSTMT
+
+#ifndef SEHFINALLYSTMT
+#  define SEHFINALLYSTMT(Type, Base) STMT(Type, Base)
+#endif
+SEHFINALLYSTMT(SEHFinallyStmt, Stmt)
+#undef SEHFINALLYSTMT
+
+#ifndef SEHTRYSTMT
+#  define SEHTRYSTMT(Type, Base) STMT(Type, Base)
+#endif
+SEHTRYSTMT(SEHTryStmt, Stmt)
+#undef SEHTRYSTMT
+
 #ifndef SWITCHCASE
 #  define SWITCHCASE(Type, Base) STMT(Type, Base)
 #endif
-SWITCHCASE(SwitchCase, Stmt)
+ABSTRACT_STMT(SWITCHCASE(SwitchCase, Stmt))
 #ifndef CASESTMT
 #  define CASESTMT(Type, Base) SWITCHCASE(Type, Base)
 #endif
@@ -623,7 +709,7 @@ CASESTMT(CaseStmt, SwitchCase)
 DEFAULTSTMT(DefaultStmt, SwitchCase)
 #undef DEFAULTSTMT
 
-STMT_RANGE(SwitchCase, SwitchCase, DefaultStmt)
+STMT_RANGE(SwitchCase, CaseStmt, DefaultStmt)
 
 #undef SWITCHCASE
 

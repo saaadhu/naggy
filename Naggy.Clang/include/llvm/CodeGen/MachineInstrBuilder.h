@@ -18,6 +18,7 @@
 #define LLVM_CODEGEN_MACHINEINSTRBUILDER_H
 
 #include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace llvm {
 
@@ -47,6 +48,7 @@ public:
   /// Allow automatic conversion to the machine instruction we are working on.
   ///
   operator MachineInstr*() const { return MI; }
+  MachineInstr *operator->() const { return MI; }
   operator MachineBasicBlock::iterator() const { return MI; }
 
   /// addReg - Add a new virtual register operand...
@@ -122,6 +124,13 @@ public:
     return *this;
   }
 
+  const MachineInstrBuilder &setMemRefs(MachineInstr::mmo_iterator b,
+                                        MachineInstr::mmo_iterator e) const {
+    MI->setMemRefs(b, e);
+    return *this;
+  }
+
+
   const MachineInstrBuilder &addOperand(const MachineOperand &MO) const {
     MI->addOperand(MO);
     return *this;
@@ -135,6 +144,29 @@ public:
   const MachineInstrBuilder &addSym(MCSymbol *Sym) const {
     MI->addOperand(MachineOperand::CreateMCSymbol(Sym));
     return *this;
+  }
+
+  const MachineInstrBuilder &setMIFlags(unsigned Flags) const {
+    MI->setFlags(Flags);
+    return *this;
+  }
+
+  const MachineInstrBuilder &setMIFlag(MachineInstr::MIFlag Flag) const {
+    MI->setFlag(Flag);
+    return *this;
+  }
+
+  // Add a displacement from an existing MachineOperand with an added offset.
+  const MachineInstrBuilder &addDisp(const MachineOperand &Disp,
+                                     int64_t off) const {
+    switch (Disp.getType()) {
+      default:
+        llvm_unreachable("Unhandled operand type in addDisp()");
+      case MachineOperand::MO_Immediate:
+        return addImm(Disp.getImm() + off);
+      case MachineOperand::MO_GlobalAddress:
+        return addGlobalAddress(Disp.getGlobal(), Disp.getOffset() + off);
+    }
   }
 };
 

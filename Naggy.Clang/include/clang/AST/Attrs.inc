@@ -3,7 +3,7 @@
 #ifndef LLVM_CLANG_ATTR_CLASSES_INC
 #define LLVM_CLANG_ATTR_CLASSES_INC
 
-class AliasAttr : public Attr {
+class AliasAttr : public InheritableAttr {
 unsigned aliaseeLength;
 char *aliasee;
 
@@ -12,7 +12,7 @@ char *aliasee;
   AliasAttr(SourceLocation L, ASTContext &Ctx
               , llvm::StringRef Aliasee
              )
-    : Attr(attr::Alias, L)
+    : InheritableAttr(attr::Alias, L)
               , aliaseeLength(Aliasee.size()),aliasee(new (Ctx, 1) char[aliaseeLength])
   {
       std::memcpy(aliasee, Aliasee.data(), aliaseeLength);
@@ -37,12 +37,12 @@ char *aliasee;
   static bool classof(const AliasAttr *) { return true; }
 };
 
-class AlignMac68kAttr : public Attr {
+class AlignMac68kAttr : public InheritableAttr {
 
  public:
   AlignMac68kAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::AlignMac68k, L)
+    : InheritableAttr(attr::AlignMac68k, L)
   {
   }
 
@@ -53,7 +53,7 @@ class AlignMac68kAttr : public Attr {
   static bool classof(const AlignMac68kAttr *) { return true; }
 };
 
-class AlignedAttr : public Attr {
+class AlignedAttr : public InheritableAttr {
 bool isalignmentExpr;
 union {
 Expr *alignmentExpr;
@@ -65,7 +65,7 @@ TypeSourceInfo *alignmentType;
   AlignedAttr(SourceLocation L, ASTContext &Ctx
               , bool IsAlignmentExpr, void *Alignment
              )
-    : Attr(attr::Aligned, L)
+    : InheritableAttr(attr::Aligned, L)
               , isalignmentExpr(IsAlignmentExpr)
   {
     if (isalignmentExpr)
@@ -95,12 +95,12 @@ TypeSourceInfo *alignmentType;
   static bool classof(const AlignedAttr *) { return true; }
 };
 
-class AlwaysInlineAttr : public Attr {
+class AlwaysInlineAttr : public InheritableAttr {
 
  public:
   AlwaysInlineAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::AlwaysInline, L)
+    : InheritableAttr(attr::AlwaysInline, L)
   {
   }
 
@@ -111,12 +111,12 @@ class AlwaysInlineAttr : public Attr {
   static bool classof(const AlwaysInlineAttr *) { return true; }
 };
 
-class AnalyzerNoReturnAttr : public Attr {
+class AnalyzerNoReturnAttr : public InheritableAttr {
 
  public:
   AnalyzerNoReturnAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::AnalyzerNoReturn, L)
+    : InheritableAttr(attr::AnalyzerNoReturn, L)
   {
   }
 
@@ -127,7 +127,7 @@ class AnalyzerNoReturnAttr : public Attr {
   static bool classof(const AnalyzerNoReturnAttr *) { return true; }
 };
 
-class AnnotateAttr : public Attr {
+class AnnotateAttr : public InheritableAttr {
 unsigned annotationLength;
 char *annotation;
 
@@ -136,7 +136,7 @@ char *annotation;
   AnnotateAttr(SourceLocation L, ASTContext &Ctx
               , llvm::StringRef Annotation
              )
-    : Attr(attr::Annotate, L)
+    : InheritableAttr(attr::Annotate, L)
               , annotationLength(Annotation.size()),annotation(new (Ctx, 1) char[annotationLength])
   {
       std::memcpy(annotation, Annotation.data(), annotationLength);
@@ -161,7 +161,7 @@ char *annotation;
   static bool classof(const AnnotateAttr *) { return true; }
 };
 
-class AsmLabelAttr : public Attr {
+class AsmLabelAttr : public InheritableAttr {
 unsigned labelLength;
 char *label;
 
@@ -170,7 +170,7 @@ char *label;
   AsmLabelAttr(SourceLocation L, ASTContext &Ctx
               , llvm::StringRef Label
              )
-    : Attr(attr::AsmLabel, L)
+    : InheritableAttr(attr::AsmLabel, L)
               , labelLength(Label.size()),label(new (Ctx, 1) char[labelLength])
   {
       std::memcpy(label, Label.data(), labelLength);
@@ -195,23 +195,85 @@ char *label;
   static bool classof(const AsmLabelAttr *) { return true; }
 };
 
-class BaseCheckAttr : public Attr {
+class AvailabilityAttr : public InheritableAttr {
+IdentifierInfo * platform;
+
+VersionTuple introduced;
+
+
+VersionTuple deprecated;
+
+
+VersionTuple obsoleted;
+
+
+bool unavailable;
+
 
  public:
-  BaseCheckAttr(SourceLocation L, ASTContext &Ctx
+  AvailabilityAttr(SourceLocation L, ASTContext &Ctx
+              , IdentifierInfo * Platform
+              , VersionTuple Introduced
+              , VersionTuple Deprecated
+              , VersionTuple Obsoleted
+              , bool Unavailable
              )
-    : Attr(attr::BaseCheck, L)
+    : InheritableAttr(attr::Availability, L)
+              , platform(Platform)
+              , introduced(Introduced)
+              , deprecated(Deprecated)
+              , obsoleted(Obsoleted)
+              , unavailable(Unavailable)
   {
+
+
+
+
+
   }
 
-  virtual BaseCheckAttr *clone (ASTContext &C) const;
+  virtual AvailabilityAttr *clone (ASTContext &C) const;
+  IdentifierInfo * getPlatform() const {
+    return platform;
+  }
 
+  VersionTuple getIntroduced() const {
+    return introduced;
+  }
+  void setIntroduced(ASTContext &C, VersionTuple V) {
+    introduced = V;
+  }
 
-  static bool classof(const Attr *A) { return A->getKind() == attr::BaseCheck; }
-  static bool classof(const BaseCheckAttr *) { return true; }
+  VersionTuple getDeprecated() const {
+    return deprecated;
+  }
+  void setDeprecated(ASTContext &C, VersionTuple V) {
+    deprecated = V;
+  }
+
+  VersionTuple getObsoleted() const {
+    return obsoleted;
+  }
+  void setObsoleted(ASTContext &C, VersionTuple V) {
+    obsoleted = V;
+  }
+
+  bool getUnavailable() const {
+    return unavailable;
+  }
+
+static llvm::StringRef getPrettyPlatformName(llvm::StringRef Platform) {
+    return llvm::StringSwitch<llvm::StringRef>(Platform)
+             .Case("ios", "iOS")
+             .Case("macosx", "Mac OS X")
+             .Default(llvm::StringRef());
+} 
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::Availability; }
+  static bool classof(const AvailabilityAttr *) { return true; }
 };
 
-class BlocksAttr : public Attr {
+class BlocksAttr : public InheritableAttr {
 public:
   enum BlockType {
     ByRef
@@ -224,7 +286,7 @@ private:
   BlocksAttr(SourceLocation L, ASTContext &Ctx
               , BlockType Type
              )
-    : Attr(attr::Blocks, L)
+    : InheritableAttr(attr::Blocks, L)
               , type(Type)
   {
 
@@ -241,12 +303,12 @@ private:
   static bool classof(const BlocksAttr *) { return true; }
 };
 
-class CDeclAttr : public Attr {
+class CDeclAttr : public InheritableAttr {
 
  public:
   CDeclAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::CDecl, L)
+    : InheritableAttr(attr::CDecl, L)
   {
   }
 
@@ -257,12 +319,28 @@ class CDeclAttr : public Attr {
   static bool classof(const CDeclAttr *) { return true; }
 };
 
-class CFReturnsNotRetainedAttr : public Attr {
+class CFConsumedAttr : public InheritableParamAttr {
+
+ public:
+  CFConsumedAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableParamAttr(attr::CFConsumed, L)
+  {
+  }
+
+  virtual CFConsumedAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::CFConsumed; }
+  static bool classof(const CFConsumedAttr *) { return true; }
+};
+
+class CFReturnsNotRetainedAttr : public InheritableAttr {
 
  public:
   CFReturnsNotRetainedAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::CFReturnsNotRetained, L)
+    : InheritableAttr(attr::CFReturnsNotRetained, L)
   {
   }
 
@@ -273,12 +351,12 @@ class CFReturnsNotRetainedAttr : public Attr {
   static bool classof(const CFReturnsNotRetainedAttr *) { return true; }
 };
 
-class CFReturnsRetainedAttr : public Attr {
+class CFReturnsRetainedAttr : public InheritableAttr {
 
  public:
   CFReturnsRetainedAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::CFReturnsRetained, L)
+    : InheritableAttr(attr::CFReturnsRetained, L)
   {
   }
 
@@ -289,12 +367,126 @@ class CFReturnsRetainedAttr : public Attr {
   static bool classof(const CFReturnsRetainedAttr *) { return true; }
 };
 
-class CarriesDependencyAttr : public Attr {
+class CUDAConstantAttr : public InheritableAttr {
+
+ public:
+  CUDAConstantAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::CUDAConstant, L)
+  {
+  }
+
+  virtual CUDAConstantAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::CUDAConstant; }
+  static bool classof(const CUDAConstantAttr *) { return true; }
+};
+
+class CUDADeviceAttr : public Attr {
+
+ public:
+  CUDADeviceAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : Attr(attr::CUDADevice, L)
+  {
+  }
+
+  virtual CUDADeviceAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::CUDADevice; }
+  static bool classof(const CUDADeviceAttr *) { return true; }
+};
+
+class CUDAGlobalAttr : public InheritableAttr {
+
+ public:
+  CUDAGlobalAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::CUDAGlobal, L)
+  {
+  }
+
+  virtual CUDAGlobalAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::CUDAGlobal; }
+  static bool classof(const CUDAGlobalAttr *) { return true; }
+};
+
+class CUDAHostAttr : public Attr {
+
+ public:
+  CUDAHostAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : Attr(attr::CUDAHost, L)
+  {
+  }
+
+  virtual CUDAHostAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::CUDAHost; }
+  static bool classof(const CUDAHostAttr *) { return true; }
+};
+
+class CUDALaunchBoundsAttr : public InheritableAttr {
+int maxThreads;
+
+int minBlocks;
+
+
+ public:
+  CUDALaunchBoundsAttr(SourceLocation L, ASTContext &Ctx
+              , int MaxThreads
+              , int MinBlocks
+             )
+    : InheritableAttr(attr::CUDALaunchBounds, L)
+              , maxThreads(MaxThreads)
+              , minBlocks(MinBlocks)
+  {
+
+
+  }
+
+  virtual CUDALaunchBoundsAttr *clone (ASTContext &C) const;
+  int getMaxThreads() const {
+    return maxThreads;
+  }
+
+  int getMinBlocks() const {
+    return minBlocks;
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::CUDALaunchBounds; }
+  static bool classof(const CUDALaunchBoundsAttr *) { return true; }
+};
+
+class CUDASharedAttr : public InheritableAttr {
+
+ public:
+  CUDASharedAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::CUDAShared, L)
+  {
+  }
+
+  virtual CUDASharedAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::CUDAShared; }
+  static bool classof(const CUDASharedAttr *) { return true; }
+};
+
+class CarriesDependencyAttr : public InheritableParamAttr {
 
  public:
   CarriesDependencyAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::CarriesDependency, L)
+    : InheritableParamAttr(attr::CarriesDependency, L)
   {
   }
 
@@ -305,7 +497,7 @@ class CarriesDependencyAttr : public Attr {
   static bool classof(const CarriesDependencyAttr *) { return true; }
 };
 
-class CleanupAttr : public Attr {
+class CleanupAttr : public InheritableAttr {
 FunctionDecl * functionDecl;
 
 
@@ -313,7 +505,7 @@ FunctionDecl * functionDecl;
   CleanupAttr(SourceLocation L, ASTContext &Ctx
               , FunctionDecl * FunctionDecl
              )
-    : Attr(attr::Cleanup, L)
+    : InheritableAttr(attr::Cleanup, L)
               , functionDecl(FunctionDecl)
   {
 
@@ -330,12 +522,28 @@ FunctionDecl * functionDecl;
   static bool classof(const CleanupAttr *) { return true; }
 };
 
-class ConstAttr : public Attr {
+class CommonAttr : public InheritableAttr {
+
+ public:
+  CommonAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::Common, L)
+  {
+  }
+
+  virtual CommonAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::Common; }
+  static bool classof(const CommonAttr *) { return true; }
+};
+
+class ConstAttr : public InheritableAttr {
 
  public:
   ConstAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Const, L)
+    : InheritableAttr(attr::Const, L)
   {
   }
 
@@ -346,7 +554,7 @@ class ConstAttr : public Attr {
   static bool classof(const ConstAttr *) { return true; }
 };
 
-class ConstructorAttr : public Attr {
+class ConstructorAttr : public InheritableAttr {
 int priority;
 
 
@@ -354,7 +562,7 @@ int priority;
   ConstructorAttr(SourceLocation L, ASTContext &Ctx
               , int Priority
              )
-    : Attr(attr::Constructor, L)
+    : InheritableAttr(attr::Constructor, L)
               , priority(Priority)
   {
 
@@ -371,12 +579,12 @@ int priority;
   static bool classof(const ConstructorAttr *) { return true; }
 };
 
-class DLLExportAttr : public Attr {
+class DLLExportAttr : public InheritableAttr {
 
  public:
   DLLExportAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::DLLExport, L)
+    : InheritableAttr(attr::DLLExport, L)
   {
   }
 
@@ -387,12 +595,12 @@ class DLLExportAttr : public Attr {
   static bool classof(const DLLExportAttr *) { return true; }
 };
 
-class DLLImportAttr : public Attr {
+class DLLImportAttr : public InheritableAttr {
 
  public:
   DLLImportAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::DLLImport, L)
+    : InheritableAttr(attr::DLLImport, L)
   {
   }
 
@@ -403,23 +611,41 @@ class DLLImportAttr : public Attr {
   static bool classof(const DLLImportAttr *) { return true; }
 };
 
-class DeprecatedAttr : public Attr {
+class DeprecatedAttr : public InheritableAttr {
+unsigned messageLength;
+char *message;
+
 
  public:
   DeprecatedAttr(SourceLocation L, ASTContext &Ctx
+              , llvm::StringRef Message
              )
-    : Attr(attr::Deprecated, L)
+    : InheritableAttr(attr::Deprecated, L)
+              , messageLength(Message.size()),message(new (Ctx, 1) char[messageLength])
   {
+      std::memcpy(message, Message.data(), messageLength);
   }
 
   virtual DeprecatedAttr *clone (ASTContext &C) const;
+  llvm::StringRef getMessage() const {
+    return llvm::StringRef(message, messageLength);
+  }
+  unsigned getMessageLength() const {
+    return messageLength;
+  }
+  void setMessage(ASTContext &C, llvm::StringRef S) {
+    messageLength = S.size();
+    this->message = new (C, 1) char [messageLength];
+    std::memcpy(this->message, S.data(), messageLength);
+  }
+
 
 
   static bool classof(const Attr *A) { return A->getKind() == attr::Deprecated; }
   static bool classof(const DeprecatedAttr *) { return true; }
 };
 
-class DestructorAttr : public Attr {
+class DestructorAttr : public InheritableAttr {
 int priority;
 
 
@@ -427,7 +653,7 @@ int priority;
   DestructorAttr(SourceLocation L, ASTContext &Ctx
               , int Priority
              )
-    : Attr(attr::Destructor, L)
+    : InheritableAttr(attr::Destructor, L)
               , priority(Priority)
   {
 
@@ -444,12 +670,12 @@ int priority;
   static bool classof(const DestructorAttr *) { return true; }
 };
 
-class FastCallAttr : public Attr {
+class FastCallAttr : public InheritableAttr {
 
  public:
   FastCallAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::FastCall, L)
+    : InheritableAttr(attr::FastCall, L)
   {
   }
 
@@ -460,12 +686,12 @@ class FastCallAttr : public Attr {
   static bool classof(const FastCallAttr *) { return true; }
 };
 
-class FinalAttr : public Attr {
+class FinalAttr : public InheritableAttr {
 
  public:
   FinalAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Final, L)
+    : InheritableAttr(attr::Final, L)
   {
   }
 
@@ -476,7 +702,7 @@ class FinalAttr : public Attr {
   static bool classof(const FinalAttr *) { return true; }
 };
 
-class FormatAttr : public Attr {
+class FormatAttr : public InheritableAttr {
 unsigned typeLength;
 char *type;
 
@@ -491,7 +717,7 @@ int firstArg;
               , int FormatIdx
               , int FirstArg
              )
-    : Attr(attr::Format, L)
+    : InheritableAttr(attr::Format, L)
               , typeLength(Type.size()),type(new (Ctx, 1) char[typeLength])
               , formatIdx(FormatIdx)
               , firstArg(FirstArg)
@@ -528,7 +754,7 @@ int firstArg;
   static bool classof(const FormatAttr *) { return true; }
 };
 
-class FormatArgAttr : public Attr {
+class FormatArgAttr : public InheritableAttr {
 int formatIdx;
 
 
@@ -536,7 +762,7 @@ int formatIdx;
   FormatArgAttr(SourceLocation L, ASTContext &Ctx
               , int FormatIdx
              )
-    : Attr(attr::FormatArg, L)
+    : InheritableAttr(attr::FormatArg, L)
               , formatIdx(FormatIdx)
   {
 
@@ -553,12 +779,12 @@ int formatIdx;
   static bool classof(const FormatArgAttr *) { return true; }
 };
 
-class GNUInlineAttr : public Attr {
+class GNUInlineAttr : public InheritableAttr {
 
  public:
   GNUInlineAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::GNUInline, L)
+    : InheritableAttr(attr::GNUInline, L)
   {
   }
 
@@ -569,28 +795,12 @@ class GNUInlineAttr : public Attr {
   static bool classof(const GNUInlineAttr *) { return true; }
 };
 
-class HidingAttr : public Attr {
-
- public:
-  HidingAttr(SourceLocation L, ASTContext &Ctx
-             )
-    : Attr(attr::Hiding, L)
-  {
-  }
-
-  virtual HidingAttr *clone (ASTContext &C) const;
-
-
-  static bool classof(const Attr *A) { return A->getKind() == attr::Hiding; }
-  static bool classof(const HidingAttr *) { return true; }
-};
-
-class IBActionAttr : public Attr {
+class IBActionAttr : public InheritableAttr {
 
  public:
   IBActionAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::IBAction, L)
+    : InheritableAttr(attr::IBAction, L)
   {
   }
 
@@ -601,12 +811,12 @@ class IBActionAttr : public Attr {
   static bool classof(const IBActionAttr *) { return true; }
 };
 
-class IBOutletAttr : public Attr {
+class IBOutletAttr : public InheritableAttr {
 
  public:
   IBOutletAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::IBOutlet, L)
+    : InheritableAttr(attr::IBOutlet, L)
   {
   }
 
@@ -617,23 +827,23 @@ class IBOutletAttr : public Attr {
   static bool classof(const IBOutletAttr *) { return true; }
 };
 
-class IBOutletCollectionAttr : public Attr {
-QualType interface;
+class IBOutletCollectionAttr : public InheritableAttr {
+QualType interFace;
 
 
  public:
   IBOutletCollectionAttr(SourceLocation L, ASTContext &Ctx
-              , QualType Interface
+              , QualType InterFace
              )
-    : Attr(attr::IBOutletCollection, L)
-              , interface(Interface)
+    : InheritableAttr(attr::IBOutletCollection, L)
+              , interFace(InterFace)
   {
 
   }
 
   virtual IBOutletCollectionAttr *clone (ASTContext &C) const;
-  QualType getInterface() const {
-    return interface;
+  QualType getInterFace() const {
+    return interFace;
   }
 
 
@@ -642,7 +852,7 @@ QualType interface;
   static bool classof(const IBOutletCollectionAttr *) { return true; }
 };
 
-class InitPriorityAttr : public Attr {
+class InitPriorityAttr : public InheritableAttr {
 unsigned priority;
 
 
@@ -650,7 +860,7 @@ unsigned priority;
   InitPriorityAttr(SourceLocation L, ASTContext &Ctx
               , unsigned Priority
              )
-    : Attr(attr::InitPriority, L)
+    : InheritableAttr(attr::InitPriority, L)
               , priority(Priority)
   {
 
@@ -667,7 +877,39 @@ unsigned priority;
   static bool classof(const InitPriorityAttr *) { return true; }
 };
 
-class MSP430InterruptAttr : public Attr {
+class MBlazeInterruptHandlerAttr : public InheritableAttr {
+
+ public:
+  MBlazeInterruptHandlerAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::MBlazeInterruptHandler, L)
+  {
+  }
+
+  virtual MBlazeInterruptHandlerAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::MBlazeInterruptHandler; }
+  static bool classof(const MBlazeInterruptHandlerAttr *) { return true; }
+};
+
+class MBlazeSaveVolatilesAttr : public InheritableAttr {
+
+ public:
+  MBlazeSaveVolatilesAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::MBlazeSaveVolatiles, L)
+  {
+  }
+
+  virtual MBlazeSaveVolatilesAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::MBlazeSaveVolatiles; }
+  static bool classof(const MBlazeSaveVolatilesAttr *) { return true; }
+};
+
+class MSP430InterruptAttr : public InheritableAttr {
 unsigned number;
 
 
@@ -675,7 +917,7 @@ unsigned number;
   MSP430InterruptAttr(SourceLocation L, ASTContext &Ctx
               , unsigned Number
              )
-    : Attr(attr::MSP430Interrupt, L)
+    : InheritableAttr(attr::MSP430Interrupt, L)
               , number(Number)
   {
 
@@ -692,12 +934,12 @@ unsigned number;
   static bool classof(const MSP430InterruptAttr *) { return true; }
 };
 
-class MallocAttr : public Attr {
+class MallocAttr : public InheritableAttr {
 
  public:
   MallocAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Malloc, L)
+    : InheritableAttr(attr::Malloc, L)
   {
   }
 
@@ -708,7 +950,7 @@ class MallocAttr : public Attr {
   static bool classof(const MallocAttr *) { return true; }
 };
 
-class MaxFieldAlignmentAttr : public Attr {
+class MaxFieldAlignmentAttr : public InheritableAttr {
 unsigned alignment;
 
 
@@ -716,7 +958,7 @@ unsigned alignment;
   MaxFieldAlignmentAttr(SourceLocation L, ASTContext &Ctx
               , unsigned Alignment
              )
-    : Attr(attr::MaxFieldAlignment, L)
+    : InheritableAttr(attr::MaxFieldAlignment, L)
               , alignment(Alignment)
   {
 
@@ -733,12 +975,92 @@ unsigned alignment;
   static bool classof(const MaxFieldAlignmentAttr *) { return true; }
 };
 
-class NSReturnsNotRetainedAttr : public Attr {
+class MayAliasAttr : public InheritableAttr {
+
+ public:
+  MayAliasAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::MayAlias, L)
+  {
+  }
+
+  virtual MayAliasAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::MayAlias; }
+  static bool classof(const MayAliasAttr *) { return true; }
+};
+
+class MsStructAttr : public InheritableAttr {
+
+ public:
+  MsStructAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::MsStruct, L)
+  {
+  }
+
+  virtual MsStructAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::MsStruct; }
+  static bool classof(const MsStructAttr *) { return true; }
+};
+
+class NSConsumedAttr : public InheritableParamAttr {
+
+ public:
+  NSConsumedAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableParamAttr(attr::NSConsumed, L)
+  {
+  }
+
+  virtual NSConsumedAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::NSConsumed; }
+  static bool classof(const NSConsumedAttr *) { return true; }
+};
+
+class NSConsumesSelfAttr : public InheritableAttr {
+
+ public:
+  NSConsumesSelfAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::NSConsumesSelf, L)
+  {
+  }
+
+  virtual NSConsumesSelfAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::NSConsumesSelf; }
+  static bool classof(const NSConsumesSelfAttr *) { return true; }
+};
+
+class NSReturnsAutoreleasedAttr : public InheritableAttr {
+
+ public:
+  NSReturnsAutoreleasedAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::NSReturnsAutoreleased, L)
+  {
+  }
+
+  virtual NSReturnsAutoreleasedAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::NSReturnsAutoreleased; }
+  static bool classof(const NSReturnsAutoreleasedAttr *) { return true; }
+};
+
+class NSReturnsNotRetainedAttr : public InheritableAttr {
 
  public:
   NSReturnsNotRetainedAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::NSReturnsNotRetained, L)
+    : InheritableAttr(attr::NSReturnsNotRetained, L)
   {
   }
 
@@ -749,12 +1071,12 @@ class NSReturnsNotRetainedAttr : public Attr {
   static bool classof(const NSReturnsNotRetainedAttr *) { return true; }
 };
 
-class NSReturnsRetainedAttr : public Attr {
+class NSReturnsRetainedAttr : public InheritableAttr {
 
  public:
   NSReturnsRetainedAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::NSReturnsRetained, L)
+    : InheritableAttr(attr::NSReturnsRetained, L)
   {
   }
 
@@ -765,12 +1087,44 @@ class NSReturnsRetainedAttr : public Attr {
   static bool classof(const NSReturnsRetainedAttr *) { return true; }
 };
 
-class NoDebugAttr : public Attr {
+class NakedAttr : public InheritableAttr {
+
+ public:
+  NakedAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::Naked, L)
+  {
+  }
+
+  virtual NakedAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::Naked; }
+  static bool classof(const NakedAttr *) { return true; }
+};
+
+class NoCommonAttr : public InheritableAttr {
+
+ public:
+  NoCommonAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : InheritableAttr(attr::NoCommon, L)
+  {
+  }
+
+  virtual NoCommonAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::NoCommon; }
+  static bool classof(const NoCommonAttr *) { return true; }
+};
+
+class NoDebugAttr : public InheritableAttr {
 
  public:
   NoDebugAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::NoDebug, L)
+    : InheritableAttr(attr::NoDebug, L)
   {
   }
 
@@ -781,12 +1135,12 @@ class NoDebugAttr : public Attr {
   static bool classof(const NoDebugAttr *) { return true; }
 };
 
-class NoInlineAttr : public Attr {
+class NoInlineAttr : public InheritableAttr {
 
  public:
   NoInlineAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::NoInline, L)
+    : InheritableAttr(attr::NoInline, L)
   {
   }
 
@@ -797,12 +1151,12 @@ class NoInlineAttr : public Attr {
   static bool classof(const NoInlineAttr *) { return true; }
 };
 
-class NoInstrumentFunctionAttr : public Attr {
+class NoInstrumentFunctionAttr : public InheritableAttr {
 
  public:
   NoInstrumentFunctionAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::NoInstrumentFunction, L)
+    : InheritableAttr(attr::NoInstrumentFunction, L)
   {
   }
 
@@ -813,12 +1167,12 @@ class NoInstrumentFunctionAttr : public Attr {
   static bool classof(const NoInstrumentFunctionAttr *) { return true; }
 };
 
-class NoReturnAttr : public Attr {
+class NoReturnAttr : public InheritableAttr {
 
  public:
   NoReturnAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::NoReturn, L)
+    : InheritableAttr(attr::NoReturn, L)
   {
   }
 
@@ -829,12 +1183,12 @@ class NoReturnAttr : public Attr {
   static bool classof(const NoReturnAttr *) { return true; }
 };
 
-class NoThrowAttr : public Attr {
+class NoThrowAttr : public InheritableAttr {
 
  public:
   NoThrowAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::NoThrow, L)
+    : InheritableAttr(attr::NoThrow, L)
   {
   }
 
@@ -845,7 +1199,7 @@ class NoThrowAttr : public Attr {
   static bool classof(const NoThrowAttr *) { return true; }
 };
 
-class NonNullAttr : public Attr {
+class NonNullAttr : public InheritableAttr {
   unsigned argsSize;
   unsigned *args;
 
@@ -854,7 +1208,7 @@ class NonNullAttr : public Attr {
   NonNullAttr(SourceLocation L, ASTContext &Ctx
               , unsigned *Args, unsigned ArgsSize
              )
-    : Attr(attr::NonNull, L)
+    : InheritableAttr(attr::NonNull, L)
               , argsSize(ArgsSize), args(new (Ctx, 16) unsigned[argsSize])
   {
     std::memcpy(args, Args, argsSize * sizeof(unsigned));
@@ -885,12 +1239,12 @@ bool isNonNull(unsigned idx) const {
   static bool classof(const NonNullAttr *) { return true; }
 };
 
-class ObjCExceptionAttr : public Attr {
+class ObjCExceptionAttr : public InheritableAttr {
 
  public:
   ObjCExceptionAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::ObjCException, L)
+    : InheritableAttr(attr::ObjCException, L)
   {
   }
 
@@ -901,12 +1255,47 @@ class ObjCExceptionAttr : public Attr {
   static bool classof(const ObjCExceptionAttr *) { return true; }
 };
 
-class ObjCNSObjectAttr : public Attr {
+class ObjCMethodFamilyAttr : public InheritableAttr {
+public:
+  enum FamilyKind {
+    OMF_None,
+    OMF_alloc,
+    OMF_copy,
+    OMF_init,
+    OMF_mutableCopy,
+    OMF_new
+  };
+private:
+  FamilyKind family;
+
+
+ public:
+  ObjCMethodFamilyAttr(SourceLocation L, ASTContext &Ctx
+              , FamilyKind Family
+             )
+    : InheritableAttr(attr::ObjCMethodFamily, L)
+              , family(Family)
+  {
+
+  }
+
+  virtual ObjCMethodFamilyAttr *clone (ASTContext &C) const;
+  FamilyKind getFamily() const {
+    return family;
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::ObjCMethodFamily; }
+  static bool classof(const ObjCMethodFamilyAttr *) { return true; }
+};
+
+class ObjCNSObjectAttr : public InheritableAttr {
 
  public:
   ObjCNSObjectAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::ObjCNSObject, L)
+    : InheritableAttr(attr::ObjCNSObject, L)
   {
   }
 
@@ -915,6 +1304,22 @@ class ObjCNSObjectAttr : public Attr {
 
   static bool classof(const Attr *A) { return A->getKind() == attr::ObjCNSObject; }
   static bool classof(const ObjCNSObjectAttr *) { return true; }
+};
+
+class OpenCLKernelAttr : public Attr {
+
+ public:
+  OpenCLKernelAttr(SourceLocation L, ASTContext &Ctx
+             )
+    : Attr(attr::OpenCLKernel, L)
+  {
+  }
+
+  virtual OpenCLKernelAttr *clone (ASTContext &C) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::OpenCLKernel; }
+  static bool classof(const OpenCLKernelAttr *) { return true; }
 };
 
 class OverloadableAttr : public Attr {
@@ -933,12 +1338,12 @@ class OverloadableAttr : public Attr {
   static bool classof(const OverloadableAttr *) { return true; }
 };
 
-class OverrideAttr : public Attr {
+class OverrideAttr : public InheritableAttr {
 
  public:
   OverrideAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Override, L)
+    : InheritableAttr(attr::Override, L)
   {
   }
 
@@ -949,7 +1354,7 @@ class OverrideAttr : public Attr {
   static bool classof(const OverrideAttr *) { return true; }
 };
 
-class OwnershipAttr : public Attr {
+class OwnershipAttr : public InheritableAttr {
 public:
   enum OwnershipKind {
     Holds,
@@ -972,7 +1377,7 @@ char *module;
               , llvm::StringRef Module
               , unsigned *Args, unsigned ArgsSize
              )
-    : Attr(attr::Ownership, L)
+    : InheritableAttr(attr::Ownership, L)
               , ownKind(OwnKind)
               , moduleLength(Module.size()),module(new (Ctx, 1) char[moduleLength])
               , argsSize(ArgsSize), args(new (Ctx, 16) unsigned[argsSize])
@@ -1017,12 +1422,12 @@ char *module;
   static bool classof(const OwnershipAttr *) { return true; }
 };
 
-class PackedAttr : public Attr {
+class PackedAttr : public InheritableAttr {
 
  public:
   PackedAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Packed, L)
+    : InheritableAttr(attr::Packed, L)
   {
   }
 
@@ -1033,12 +1438,12 @@ class PackedAttr : public Attr {
   static bool classof(const PackedAttr *) { return true; }
 };
 
-class PascalAttr : public Attr {
+class PascalAttr : public InheritableAttr {
 
  public:
   PascalAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Pascal, L)
+    : InheritableAttr(attr::Pascal, L)
   {
   }
 
@@ -1049,12 +1454,43 @@ class PascalAttr : public Attr {
   static bool classof(const PascalAttr *) { return true; }
 };
 
-class PureAttr : public Attr {
+class PcsAttr : public InheritableAttr {
+public:
+  enum PCSType {
+    AAPCS,
+    AAPCS_VFP
+  };
+private:
+  PCSType pCS;
+
+
+ public:
+  PcsAttr(SourceLocation L, ASTContext &Ctx
+              , PCSType PCS
+             )
+    : InheritableAttr(attr::Pcs, L)
+              , pCS(PCS)
+  {
+
+  }
+
+  virtual PcsAttr *clone (ASTContext &C) const;
+  PCSType getPCS() const {
+    return pCS;
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::Pcs; }
+  static bool classof(const PcsAttr *) { return true; }
+};
+
+class PureAttr : public InheritableAttr {
 
  public:
   PureAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Pure, L)
+    : InheritableAttr(attr::Pure, L)
   {
   }
 
@@ -1065,7 +1501,7 @@ class PureAttr : public Attr {
   static bool classof(const PureAttr *) { return true; }
 };
 
-class RegparmAttr : public Attr {
+class RegparmAttr : public InheritableAttr {
 unsigned numParams;
 
 
@@ -1073,7 +1509,7 @@ unsigned numParams;
   RegparmAttr(SourceLocation L, ASTContext &Ctx
               , unsigned NumParams
              )
-    : Attr(attr::Regparm, L)
+    : InheritableAttr(attr::Regparm, L)
               , numParams(NumParams)
   {
 
@@ -1090,7 +1526,7 @@ unsigned numParams;
   static bool classof(const RegparmAttr *) { return true; }
 };
 
-class ReqdWorkGroupSizeAttr : public Attr {
+class ReqdWorkGroupSizeAttr : public InheritableAttr {
 unsigned xDim;
 
 unsigned yDim;
@@ -1104,7 +1540,7 @@ unsigned zDim;
               , unsigned YDim
               , unsigned ZDim
              )
-    : Attr(attr::ReqdWorkGroupSize, L)
+    : InheritableAttr(attr::ReqdWorkGroupSize, L)
               , xDim(XDim)
               , yDim(YDim)
               , zDim(ZDim)
@@ -1133,7 +1569,7 @@ unsigned zDim;
   static bool classof(const ReqdWorkGroupSizeAttr *) { return true; }
 };
 
-class SectionAttr : public Attr {
+class SectionAttr : public InheritableAttr {
 unsigned nameLength;
 char *name;
 
@@ -1142,7 +1578,7 @@ char *name;
   SectionAttr(SourceLocation L, ASTContext &Ctx
               , llvm::StringRef Name
              )
-    : Attr(attr::Section, L)
+    : InheritableAttr(attr::Section, L)
               , nameLength(Name.size()),name(new (Ctx, 1) char[nameLength])
   {
       std::memcpy(name, Name.data(), nameLength);
@@ -1167,7 +1603,7 @@ char *name;
   static bool classof(const SectionAttr *) { return true; }
 };
 
-class SentinelAttr : public Attr {
+class SentinelAttr : public InheritableAttr {
 int sentinel;
 
 int nullPos;
@@ -1178,7 +1614,7 @@ int nullPos;
               , int Sentinel
               , int NullPos
              )
-    : Attr(attr::Sentinel, L)
+    : InheritableAttr(attr::Sentinel, L)
               , sentinel(Sentinel)
               , nullPos(NullPos)
   {
@@ -1201,12 +1637,12 @@ int nullPos;
   static bool classof(const SentinelAttr *) { return true; }
 };
 
-class StdCallAttr : public Attr {
+class StdCallAttr : public InheritableAttr {
 
  public:
   StdCallAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::StdCall, L)
+    : InheritableAttr(attr::StdCall, L)
   {
   }
 
@@ -1217,12 +1653,12 @@ class StdCallAttr : public Attr {
   static bool classof(const StdCallAttr *) { return true; }
 };
 
-class ThisCallAttr : public Attr {
+class ThisCallAttr : public InheritableAttr {
 
  public:
   ThisCallAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::ThisCall, L)
+    : InheritableAttr(attr::ThisCall, L)
   {
   }
 
@@ -1233,12 +1669,12 @@ class ThisCallAttr : public Attr {
   static bool classof(const ThisCallAttr *) { return true; }
 };
 
-class TransparentUnionAttr : public Attr {
+class TransparentUnionAttr : public InheritableAttr {
 
  public:
   TransparentUnionAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::TransparentUnion, L)
+    : InheritableAttr(attr::TransparentUnion, L)
   {
   }
 
@@ -1249,28 +1685,46 @@ class TransparentUnionAttr : public Attr {
   static bool classof(const TransparentUnionAttr *) { return true; }
 };
 
-class UnavailableAttr : public Attr {
+class UnavailableAttr : public InheritableAttr {
+unsigned messageLength;
+char *message;
+
 
  public:
   UnavailableAttr(SourceLocation L, ASTContext &Ctx
+              , llvm::StringRef Message
              )
-    : Attr(attr::Unavailable, L)
+    : InheritableAttr(attr::Unavailable, L)
+              , messageLength(Message.size()),message(new (Ctx, 1) char[messageLength])
   {
+      std::memcpy(message, Message.data(), messageLength);
   }
 
   virtual UnavailableAttr *clone (ASTContext &C) const;
+  llvm::StringRef getMessage() const {
+    return llvm::StringRef(message, messageLength);
+  }
+  unsigned getMessageLength() const {
+    return messageLength;
+  }
+  void setMessage(ASTContext &C, llvm::StringRef S) {
+    messageLength = S.size();
+    this->message = new (C, 1) char [messageLength];
+    std::memcpy(this->message, S.data(), messageLength);
+  }
+
 
 
   static bool classof(const Attr *A) { return A->getKind() == attr::Unavailable; }
   static bool classof(const UnavailableAttr *) { return true; }
 };
 
-class UnusedAttr : public Attr {
+class UnusedAttr : public InheritableAttr {
 
  public:
   UnusedAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Unused, L)
+    : InheritableAttr(attr::Unused, L)
   {
   }
 
@@ -1281,12 +1735,12 @@ class UnusedAttr : public Attr {
   static bool classof(const UnusedAttr *) { return true; }
 };
 
-class UsedAttr : public Attr {
+class UsedAttr : public InheritableAttr {
 
  public:
   UsedAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Used, L)
+    : InheritableAttr(attr::Used, L)
   {
   }
 
@@ -1297,12 +1751,46 @@ class UsedAttr : public Attr {
   static bool classof(const UsedAttr *) { return true; }
 };
 
-class VecReturnAttr : public Attr {
+class UuidAttr : public InheritableAttr {
+unsigned guidLength;
+char *guid;
+
+
+ public:
+  UuidAttr(SourceLocation L, ASTContext &Ctx
+              , llvm::StringRef Guid
+             )
+    : InheritableAttr(attr::Uuid, L)
+              , guidLength(Guid.size()),guid(new (Ctx, 1) char[guidLength])
+  {
+      std::memcpy(guid, Guid.data(), guidLength);
+  }
+
+  virtual UuidAttr *clone (ASTContext &C) const;
+  llvm::StringRef getGuid() const {
+    return llvm::StringRef(guid, guidLength);
+  }
+  unsigned getGuidLength() const {
+    return guidLength;
+  }
+  void setGuid(ASTContext &C, llvm::StringRef S) {
+    guidLength = S.size();
+    this->guid = new (C, 1) char [guidLength];
+    std::memcpy(this->guid, S.data(), guidLength);
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::Uuid; }
+  static bool classof(const UuidAttr *) { return true; }
+};
+
+class VecReturnAttr : public InheritableAttr {
 
  public:
   VecReturnAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::VecReturn, L)
+    : InheritableAttr(attr::VecReturn, L)
   {
   }
 
@@ -1313,7 +1801,7 @@ class VecReturnAttr : public Attr {
   static bool classof(const VecReturnAttr *) { return true; }
 };
 
-class VisibilityAttr : public Attr {
+class VisibilityAttr : public InheritableAttr {
 public:
   enum VisibilityType {
     Default,
@@ -1328,7 +1816,7 @@ private:
   VisibilityAttr(SourceLocation L, ASTContext &Ctx
               , VisibilityType Visibility
              )
-    : Attr(attr::Visibility, L)
+    : InheritableAttr(attr::Visibility, L)
               , visibility(Visibility)
   {
 
@@ -1345,12 +1833,12 @@ private:
   static bool classof(const VisibilityAttr *) { return true; }
 };
 
-class WarnUnusedResultAttr : public Attr {
+class WarnUnusedResultAttr : public InheritableAttr {
 
  public:
   WarnUnusedResultAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::WarnUnusedResult, L)
+    : InheritableAttr(attr::WarnUnusedResult, L)
   {
   }
 
@@ -1361,12 +1849,12 @@ class WarnUnusedResultAttr : public Attr {
   static bool classof(const WarnUnusedResultAttr *) { return true; }
 };
 
-class WeakAttr : public Attr {
+class WeakAttr : public InheritableAttr {
 
  public:
   WeakAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::Weak, L)
+    : InheritableAttr(attr::Weak, L)
   {
   }
 
@@ -1377,12 +1865,12 @@ class WeakAttr : public Attr {
   static bool classof(const WeakAttr *) { return true; }
 };
 
-class WeakImportAttr : public Attr {
+class WeakImportAttr : public InheritableAttr {
 
  public:
   WeakImportAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::WeakImport, L)
+    : InheritableAttr(attr::WeakImport, L)
   {
   }
 
@@ -1393,12 +1881,12 @@ class WeakImportAttr : public Attr {
   static bool classof(const WeakImportAttr *) { return true; }
 };
 
-class WeakRefAttr : public Attr {
+class WeakRefAttr : public InheritableAttr {
 
  public:
   WeakRefAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::WeakRef, L)
+    : InheritableAttr(attr::WeakRef, L)
   {
   }
 
@@ -1409,12 +1897,12 @@ class WeakRefAttr : public Attr {
   static bool classof(const WeakRefAttr *) { return true; }
 };
 
-class X86ForceAlignArgPointerAttr : public Attr {
+class X86ForceAlignArgPointerAttr : public InheritableAttr {
 
  public:
   X86ForceAlignArgPointerAttr(SourceLocation L, ASTContext &Ctx
              )
-    : Attr(attr::X86ForceAlignArgPointer, L)
+    : InheritableAttr(attr::X86ForceAlignArgPointer, L)
   {
   }
 

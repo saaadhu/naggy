@@ -80,7 +80,9 @@ public:
 
       DISPATCH_CASE(StmtExpr)
       DISPATCH_CASE(ConditionalOperator)
+      DISPATCH_CASE(BinaryConditionalOperator)
       DISPATCH_CASE(ObjCForCollectionStmt)
+      DISPATCH_CASE(CXXForRangeStmt)
 
       case Stmt::BinaryOperatorClass: {
         BinaryOperator* B = cast<BinaryOperator>(S);
@@ -102,8 +104,13 @@ public:
 
   DEFAULT_BLOCKSTMT_VISIT(StmtExpr)
   DEFAULT_BLOCKSTMT_VISIT(ConditionalOperator)
+  DEFAULT_BLOCKSTMT_VISIT(BinaryConditionalOperator)
 
   RetTy BlockStmt_VisitObjCForCollectionStmt(ObjCForCollectionStmt* S) {
+    return static_cast<ImplClass*>(this)->BlockStmt_VisitStmt(S);
+  }
+
+  RetTy BlockStmt_VisitCXXForRangeStmt(CXXForRangeStmt* S) {
     return static_cast<ImplClass*>(this)->BlockStmt_VisitStmt(S);
   }
 
@@ -155,7 +162,7 @@ public:
       }
     }
 
-    for (Stmt::child_iterator I=S->child_begin(), E=S->child_end(); I != E;++I)
+    for (Stmt::child_range I = S->children(); I; ++I)
       if (*I) static_cast<ImplClass*>(this)->Visit(*I);
   }
 };

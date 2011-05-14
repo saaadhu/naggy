@@ -192,8 +192,8 @@ template<class To, class FromTy> struct cast_convert_val<To,FromTy,FromTy> {
 
 // cast<X> - Return the argument parameter cast to the specified type.  This
 // casting operator asserts that the type is correct, so it does not return null
-// on failure.  But it will correctly return NULL when the input is NULL.
-// Used Like this:
+// on failure.  It does not allow a null argument (use cast_or_null for that).
+// It is typically used like this:
 //
 //  cast<Instruction>(myVal)->getParent()
 //
@@ -232,8 +232,8 @@ inline typename cast_retty<X, Y>::ret_type dyn_cast(const Y &Val) {
 // value is accepted.
 //
 template <class X, class Y>
-inline typename cast_retty<X, Y>::ret_type dyn_cast_or_null(const Y &Val) {
-  return (Val && isa<X>(Val)) ? cast<X, Y>(Val) : 0;
+inline typename cast_retty<X, Y*>::ret_type dyn_cast_or_null(Y *Val) {
+  return (Val && isa<X>(Val)) ? cast<X>(Val) : 0;
 }
 
 } // End llvm namespace

@@ -50,13 +50,22 @@ public:
   enum CommentFlag {
     ReloadReuse = 0x1
   };
-  
+
+  enum MIFlag {
+    NoFlags    = 0,
+    FrameSetup = 1 << 0                 // Instruction is used as a part of
+                                        // function frame setup code.
+  };
 private:
   const TargetInstrDesc *TID;           // Instruction descriptor.
-  unsigned short NumImplicitOps;        // Number of implicit operands (which
+  uint16_t NumImplicitOps;              // Number of implicit operands (which
                                         // are determined at construction time).
 
-  unsigned short AsmPrinterFlags;       // Various bits of information used by
+  uint8_t Flags;                        // Various bits of additional
+                                        // information about machine
+                                        // instruction.
+
+  uint8_t AsmPrinterFlags;              // Various bits of information used by
                                         // the AsmPrinter to emit helpful
                                         // comments.  This is *not* semantic
                                         // information.  Do not use this for
@@ -105,13 +114,13 @@ private:
   /// MachineInstr ctor - This constructor create a MachineInstr and add the
   /// implicit operands.  It reserves space for number of operands specified by
   /// TargetInstrDesc.  An explicit DebugLoc is supplied.
-  explicit MachineInstr(const TargetInstrDesc &TID, const DebugLoc dl, 
+  explicit MachineInstr(const TargetInstrDesc &TID, const DebugLoc dl,
                         bool NoImp = false);
 
   /// MachineInstr ctor - Work exactly the same as the ctor above, except that
   /// the MachineInstr is created and added to the end of the specified basic
   /// block.
-  MachineInstr(MachineBasicBlock *MBB, const DebugLoc dl, 
+  MachineInstr(MachineBasicBlock *MBB, const DebugLoc dl,
                const TargetInstrDesc &TID);
 
   ~MachineInstr();
@@ -125,7 +134,11 @@ public:
 
   /// getAsmPrinterFlags - Return the asm printer flags bitvector.
   ///
-  unsigned short getAsmPrinterFlags() const { return AsmPrinterFlags; }
+  uint8_t getAsmPrinterFlags() const { return AsmPrinterFlags; }
+
+  /// clearAsmPrinterFlags - clear the AsmPrinter bitvector
+  ///
+  void clearAsmPrinterFlags() { AsmPrinterFlags = 0; }
 
   /// getAsmPrinterFlag - Return whether an AsmPrinter flag is set.
   ///
@@ -136,13 +149,38 @@ public:
   /// setAsmPrinterFlag - Set a flag for the AsmPrinter.
   ///
   void setAsmPrinterFlag(CommentFlag Flag) {
-    AsmPrinterFlags |= (unsigned short)Flag;
+    AsmPrinterFlags |= (uint8_t)Flag;
+  }
+
+  /// getFlags - Return the MI flags bitvector.
+  uint8_t getFlags() const {
+    return Flags;
+  }
+
+  /// getFlag - Return whether an MI flag is set.
+  bool getFlag(MIFlag Flag) const {
+    return Flags & Flag;
+  }
+
+  /// setFlag - Set a MI flag.
+  void setFlag(MIFlag Flag) {
+    Flags |= (uint8_t)Flag;
+  }
+
+  void setFlags(unsigned flags) {
+    Flags = flags;
+  }
+
+  /// clearAsmPrinterFlag - clear specific AsmPrinter flags
+  ///
+  void clearAsmPrinterFlag(CommentFlag Flag) {
+    AsmPrinterFlags &= ~Flag;
   }
 
   /// getDebugLoc - Returns the debug location id of this MachineInstr.
   ///
   DebugLoc getDebugLoc() const { return debugLoc; }
-  
+
   /// getDesc - Returns the target instruction descriptor of this
   /// MachineInstr.
   const TargetInstrDesc &getDesc() const { return *TID; }
@@ -167,7 +205,17 @@ public:
   /// getNumExplicitOperands - Returns the number of non-implicit operands.
   ///
   unsigned getNumExplicitOperands() const;
-  
+
+  /// iterator/begin/end - Iterate over all operands of a machine instruction.
+  typedef std::vector<MachineOperand>::iterator mop_iterator;
+  typedef std::vector<MachineOperand>::const_iterator const_mop_iterator;
+
+  mop_iterator operands_begin() { return Operands.begin(); }
+  mop_iterator operands_end() { return Operands.end(); }
+
+  const_mop_iterator operands_begin() const { return Operands.begin(); }
+  const_mop_iterator operands_end() const { return Operands.end(); }
+
   /// Access to memory operands of the instruction
   mmo_iterator memoperands_begin() const { return MemRefs; }
   mmo_iterator memoperands_end() const { return MemRefsEnd; }
@@ -193,7 +241,7 @@ public:
   /// removeFromParent - This method unlinks 'this' from the containing basic
   /// block, and returns it, but does not delete it.
   MachineInstr *removeFromParent();
-  
+
   /// eraseFromParent - This method unlinks 'this' from the containing basic
   /// block and deletes it.
   void eraseFromParent();
@@ -205,18 +253,19 @@ public:
            getOpcode() == TargetOpcode::EH_LABEL ||
            getOpcode() == TargetOpcode::GC_LABEL;
   }
-  
+
   bool isPrologLabel() const {
     return getOpcode() == TargetOpcode::PROLOG_LABEL;
   }
   bool isEHLabel() const { return getOpcode() == TargetOpcode::EH_LABEL; }
   bool isGCLabel() const { return getOpcode() == TargetOpcode::GC_LABEL; }
   bool isDebugValue() const { return getOpcode() == TargetOpcode::DBG_VALUE; }
-  
+
   bool isPHI() const { return getOpcode() == TargetOpcode::PHI; }
   bool isKill() const { return getOpcode() == TargetOpcode::KILL; }
   bool isImplicitDef() const { return getOpcode()==TargetOpcode::IMPLICIT_DEF; }
   bool isInlineAsm() const { return getOpcode() == TargetOpcode::INLINEASM; }
+  bool isStackAligningInlineAsm() const;
   bool isInsertSubreg() const {
     return getOpcode() == TargetOpcode::INSERT_SUBREG;
   }
@@ -308,7 +357,7 @@ public:
     int Idx = findRegisterUseOperandIdx(Reg, isKill, TRI);
     return (Idx == -1) ? NULL : &getOperand(Idx);
   }
-  
+
   /// findRegisterDefOperandIdx() - Returns the operand index that is a def of
   /// the specified register or -1 if it is not found. If isDead is true, defs
   /// that are not dead are skipped. If Overlap is true, then it also looks for
@@ -330,7 +379,7 @@ public:
   /// operand list that is used to represent the predicate. It returns -1 if
   /// none is found.
   int findFirstPredOperandIdx() const;
-  
+
   /// isRegTiedToUseOperand - Given the index of a register def operand,
   /// check if the register def is tied to a source operand, due to either
   /// two-address elimination or inline assembly constraints. Returns the
@@ -378,8 +427,8 @@ public:
   void addRegisterDefined(unsigned IncomingReg,
                           const TargetRegisterInfo *RegInfo = 0);
 
-  /// setPhysRegsDeadExcept - Mark every physreg used by this instruction as dead
-  /// except those in the UsedRegs list.
+  /// setPhysRegsDeadExcept - Mark every physreg used by this instruction as
+  /// dead except those in the UsedRegs list.
   void setPhysRegsDeadExcept(const SmallVectorImpl<unsigned> &UsedRegs,
                              const TargetRegisterInfo &TRI);
 
@@ -412,9 +461,22 @@ public:
   /// return 0.
   unsigned isConstantValuePHI() const;
 
+  /// hasUnmodeledSideEffects - Return true if this instruction has side
+  /// effects that are not modeled by mayLoad / mayStore, etc.
+  /// For all instructions, the property is encoded in TargetInstrDesc::Flags
+  /// (see TargetInstrDesc::hasUnmodeledSideEffects(). The only exception is
+  /// INLINEASM instruction, in which case the side effect property is encoded
+  /// in one of its operands (see InlineAsm::Extra_HasSideEffect).
+  ///
+  bool hasUnmodeledSideEffects() const;
+
   /// allDefsAreDead - Return true if all the defs of this instruction are dead.
   ///
   bool allDefsAreDead() const;
+
+  /// copyImplicitOps - Copy implicit register operands from specified
+  /// instruction to this instruction.
+  void copyImplicitOps(const MachineInstr *MI);
 
   //
   // Debugging support
@@ -428,9 +490,9 @@ public:
   /// addOperand - Add the specified operand to the instruction.  If it is an
   /// implicit operand, it is added to the end of the operand list.  If it is
   /// an explicit operand it is added at the end of the explicit operand list
-  /// (before the first implicit operand). 
+  /// (before the first implicit operand).
   void addOperand(const MachineOperand &Op);
-  
+
   /// setDesc - Replace the instruction descriptor (thus opcode) of
   /// the current instruction with a new one.
   ///
@@ -467,12 +529,12 @@ private:
   /// addImplicitDefUseOperands - Add all implicit def and use operands to
   /// this instruction.
   void addImplicitDefUseOperands();
-  
+
   /// RemoveRegOperandsFromUseLists - Unlink all of the register operands in
   /// this instruction from their respective use lists.  This requires that the
   /// operands already be on their use lists.
   void RemoveRegOperandsFromUseLists();
-  
+
   /// AddRegOperandsToUseLists - Add all of the register operands in
   /// this instruction from their respective use lists.  This requires that the
   /// operands not be on their use lists yet.

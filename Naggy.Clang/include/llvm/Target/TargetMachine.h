@@ -29,7 +29,7 @@ class TargetIntrinsicInfo;
 class TargetJITInfo;
 class TargetLowering;
 class TargetSelectionDAGInfo;
-class TargetFrameInfo;
+class TargetFrameLowering;
 class JITCodeEmitter;
 class MCContext;
 class TargetRegisterInfo;
@@ -38,6 +38,7 @@ class PassManager;
 class Pass;
 class TargetELFWriterInfo;
 class formatted_raw_ostream;
+class raw_ostream;
 
 // Relocation model types.
 namespace Reloc {
@@ -98,12 +99,15 @@ protected: // Can only create subclasses.
 
   /// TheTarget - The Target that this machine was created for.
   const Target &TheTarget;
-  
+
   /// AsmInfo - Contains target specific asm information.
   ///
   const MCAsmInfo *AsmInfo;
 
   unsigned MCRelaxAll : 1;
+  unsigned MCNoExecStack : 1;
+  unsigned MCSaveTempLabels : 1;
+  unsigned MCUseLoc : 1;
 
 public:
   virtual ~TargetMachine();
@@ -116,16 +120,16 @@ public:
   // -- Stack frame information
   // -- Selection DAG lowering information
   //
-  virtual const TargetInstrInfo        *getInstrInfo() const { return 0; }
-  virtual const TargetFrameInfo        *getFrameInfo() const { return 0; }
+  virtual const TargetInstrInfo         *getInstrInfo() const { return 0; }
+  virtual const TargetFrameLowering *getFrameLowering() const { return 0; }
   virtual const TargetLowering    *getTargetLowering() const { return 0; }
   virtual const TargetSelectionDAGInfo *getSelectionDAGInfo() const{ return 0; }
-  virtual const TargetData            *getTargetData() const { return 0; }
-  
+  virtual const TargetData             *getTargetData() const { return 0; }
+
   /// getMCAsmInfo - Return target specific asm information.
   ///
   const MCAsmInfo *getMCAsmInfo() const { return AsmInfo; }
-  
+
   /// getSubtarget - This method returns a pointer to the specified type of
   /// TargetSubtarget.  In debug builds, it verifies that the object being
   /// returned is of the correct type.
@@ -138,7 +142,7 @@ public:
   /// details of graph coloring register allocation removed from it.
   ///
   virtual const TargetRegisterInfo *getRegisterInfo() const { return 0; }
-  
+
   /// getIntrinsicInfo - If intrinsic information is available, return it.  If
   /// not, return null.
   ///
@@ -148,17 +152,17 @@ public:
   /// otherwise return null.
   ///
   virtual TargetJITInfo *getJITInfo() { return 0; }
-  
+
   /// getInstrItineraryData - Returns instruction itinerary data for the target
   /// or specific subtarget.
   ///
-  virtual const InstrItineraryData getInstrItineraryData() const {  
-    return InstrItineraryData();
+  virtual const InstrItineraryData *getInstrItineraryData() const {
+    return 0;
   }
 
   /// getELFWriterInfo - If this target supports an ELF writer, return
   /// information for it, otherwise return null.
-  /// 
+  ///
   virtual const TargetELFWriterInfo *getELFWriterInfo() const { return 0; }
 
   /// hasMCRelaxAll - Check whether all machine code instructions should be
@@ -168,6 +172,26 @@ public:
   /// setMCRelaxAll - Set whether all machine code instructions should be
   /// relaxed.
   void setMCRelaxAll(bool Value) { MCRelaxAll = Value; }
+
+  /// hasMCSaveTempLabels - Check whether temporary labels will be preserved
+  /// (i.e., not treated as temporary).
+  bool hasMCSaveTempLabels() const { return MCSaveTempLabels; }
+
+  /// setMCSaveTempLabels - Set whether temporary labels will be preserved
+  /// (i.e., not treated as temporary).
+  void setMCSaveTempLabels(bool Value) { MCSaveTempLabels = Value; }
+
+  /// hasMCNoExecStack - Check whether an executable stack is not needed.
+  bool hasMCNoExecStack() const { return MCNoExecStack; }
+
+  /// setMCNoExecStack - Set whether an executabel stack is not needed.
+  void setMCNoExecStack(bool Value) { MCNoExecStack = Value; }
+
+  /// hasMCUseLoc - Check whether we should use dwarf's .loc directive.
+  bool hasMCUseLoc() const { return MCUseLoc; }
+
+  /// setMCUseLoc - Set whether all we should use dwarf's .loc directive.
+  void setMCUseLoc(bool Value) { MCUseLoc = Value; }
 
   /// getRelocationModel - Returns the code generation relocation model. The
   /// choices are static, PIC, and dynamic-no-pic, and target default.
@@ -253,6 +277,7 @@ public:
   ///
   virtual bool addPassesToEmitMC(PassManagerBase &,
                                  MCContext *&,
+                                 raw_ostream &,
                                  CodeGenOpt::Level,
                                  bool = true) {
     return true;
@@ -267,7 +292,7 @@ class LLVMTargetMachine : public TargetMachine {
 
 protected: // Can only create subclasses.
   LLVMTargetMachine(const Target &T, const std::string &TargetTriple);
-  
+
 private:
   /// addCommonCodeGenPasses - Add standard LLVM codegen passes used for
   /// both emitting to assembly files or machine code output.
@@ -277,9 +302,11 @@ private:
 
   virtual void setCodeModelForJIT();
   virtual void setCodeModelForStatic();
-  
+
 public:
-  
+
+  const std::string &getTargetTriple() const { return TargetTriple; }
+
   /// addPassesToEmitFile - Add passes to the specified pass manager to get the
   /// specified file emitted.  Typically this will involve several steps of code
   /// generation.  If OptLevel is None, the code generator should emit code as
@@ -289,7 +316,7 @@ public:
                                    CodeGenFileType FileType,
                                    CodeGenOpt::Level,
                                    bool DisableVerify = true);
-  
+
   /// addPassesToEmitMachineCode - Add passes to the specified pass manager to
   /// get machine code emitted.  This uses a JITCodeEmitter object to handle
   /// actually outputting the machine code and resolving things like the address
@@ -308,9 +335,10 @@ public:
   ///
   virtual bool addPassesToEmitMC(PassManagerBase &PM,
                                  MCContext *&Ctx,
+                                 raw_ostream &OS,
                                  CodeGenOpt::Level OptLevel,
                                  bool DisableVerify = true);
-  
+
   /// Target-Independent Code Generator Pass Configuration Options.
 
   /// addPreISelPasses - This method should add any "last minute" LLVM->LLVM
@@ -347,15 +375,15 @@ public:
   virtual bool addPreSched2(PassManagerBase &, CodeGenOpt::Level) {
     return false;
   }
-  
+
   /// addPreEmitPass - This pass may be implemented by targets that want to run
   /// passes immediately before machine code is emitted.  This should return
   /// true if -print-machineinstrs should print out the code after the passes.
   virtual bool addPreEmitPass(PassManagerBase &, CodeGenOpt::Level) {
     return false;
   }
-  
-  
+
+
   /// addCodeEmitter - This pass should be overridden by the target to add a
   /// code emitter, if supported.  If this is not supported, 'true' should be
   /// returned.

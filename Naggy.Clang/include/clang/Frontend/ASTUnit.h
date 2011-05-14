@@ -21,13 +21,13 @@
 #include "clang/Lex/PreprocessingRecord.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/FileManager.h"
+#include "clang/Basic/FileSystemOptions.h"
 #include "clang-c/Index.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/System/Path.h"
-#include "llvm/Support/Timer.h"
+#include "llvm/Support/Path.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -54,6 +54,14 @@ class TargetInfo;
 
 using namespace idx;
   
+/// \brief Allocator for a cached set of global code completions.
+class GlobalCodeCompletionAllocator 
+  : public CodeCompletionAllocator,
+    public llvm::RefCountedBase<GlobalCodeCompletionAllocator> 
+{
+
+};
+  
 /// \brief Utility class for loading a ASTContext from an AST file.
 ///
 class ASTUnit {
@@ -63,13 +71,15 @@ public:
   
 private:
   llvm::IntrusiveRefCntPtr<Diagnostic> Diagnostics;
-  llvm::OwningPtr<FileManager>      FileMgr;
-  llvm::OwningPtr<SourceManager>    SourceMgr;
+  llvm::IntrusiveRefCntPtr<FileManager>      FileMgr;
+  llvm::IntrusiveRefCntPtr<SourceManager>    SourceMgr;
   llvm::OwningPtr<HeaderSearch>     HeaderInfo;
-  llvm::OwningPtr<TargetInfo>       Target;
-  llvm::OwningPtr<Preprocessor>     PP;
-  llvm::OwningPtr<ASTContext>       Ctx;
-  
+  llvm::IntrusiveRefCntPtr<TargetInfo>       Target;
+  llvm::IntrusiveRefCntPtr<Preprocessor>     PP;
+  llvm::IntrusiveRefCntPtr<ASTContext>       Ctx;
+
+  FileSystemOptions FileSystemOpts;
+
   /// \brief The AST consumer that received information about the translation
   /// unit as it was parsed or loaded.
   llvm::OwningPtr<ASTConsumer> Consumer;
@@ -80,7 +90,14 @@ private:
   
   /// Optional owned invocation, just used to make the invocation used in
   /// LoadFromCommandLine available.
-  llvm::OwningPtr<CompilerInvocation> Invocation;
+  llvm::IntrusiveRefCntPtr<CompilerInvocation> Invocation;
+  
+  /// \brief The set of target features.
+  ///
+  /// FIXME: each time we reparse, we need to restore the set of target
+  /// features from this vector, because TargetInfo::CreateTargetInfo()
+  /// mangles the target options in place. Yuck!
+  std::vector<std::string> TargetFeatures;
   
   // OnlyLocalDecls - when true, walking this AST should only visit declarations
   // that come from the AST itself, not from included precompiled headers.
@@ -89,13 +106,19 @@ private:
 
   /// \brief Whether to capture any diagnostics produced.
   bool CaptureDiagnostics;
-  
+
   /// \brief Track whether the main file was loaded from an AST or not.
   bool MainFileIsAST;
 
   /// \brief Whether this AST represents a complete translation unit.
   bool CompleteTranslationUnit;
 
+  /// \brief Whether we should time each operation.
+  bool WantTiming;
+
+  /// \brief Whether the ASTUnit should delete the remapped buffers.
+  bool OwnsRemappedFileBuffers;
+  
   /// Track the top-level decls which appeared in an ASTUnit which was loaded
   /// from a source file.
   //
@@ -105,6 +128,14 @@ private:
   // more scalable search mechanisms.
   std::vector<Decl*> TopLevelDecls;
 
+  /// \brief The list of preprocessed entities which appeared when the ASTUnit
+  /// was loaded.
+  ///
+  /// FIXME: This is just an optimization hack to avoid deserializing large
+  /// parts of a PCH file while performing a walk or search. In the long term,
+  /// we should provide more scalable search mechanisms.
+  std::vector<PreprocessedEntity *> PreprocessedEntities;
+  
   /// The name of the original source file used to generate this ASTUnit.
   std::string OriginalSourceFile;
 
@@ -115,6 +146,13 @@ private:
   /// translation unit.
   llvm::SmallVector<StoredDiagnostic, 4> StoredDiagnostics;
 
+  /// \brief The number of stored diagnostics that come from the driver
+  /// itself.
+  ///
+  /// Diagnostics that come from the driver are retained from one parse to
+  /// the next.
+  unsigned NumStoredDiagnosticsFromDriver;
+  
   /// \brief Temporary files that should be removed when the ASTUnit is 
   /// destroyed.
   llvm::SmallVector<llvm::sys::Path, 4> TemporaryFiles;
@@ -199,22 +237,21 @@ private:
   /// a precompiled preamble.
   unsigned NumStoredDiagnosticsInPreamble;
 
-  /// \brief The group of timers associated with this translation unit.
-  llvm::OwningPtr<llvm::TimerGroup> TimerGroup;  
-
   /// \brief A list of the serialization ID numbers for each of the top-level
   /// declarations parsed within the precompiled preamble.
   std::vector<serialization::DeclID> TopLevelDeclsInPreamble;
 
-  ///
-  /// \defgroup CodeCompleteCaching Code-completion caching
-  ///
-  /// \{
-  ///
-
+  /// \brief A list of the offsets into the precompiled preamble which
+  /// correspond to preprocessed entities.
+  std::vector<uint64_t> PreprocessedEntitiesInPreamble;
+  
   /// \brief Whether we should be caching code-completion results.
   bool ShouldCacheCodeCompletionResults;
   
+  static void ConfigureDiags(llvm::IntrusiveRefCntPtr<Diagnostic> &Diags,
+                             const char **ArgBegin, const char **ArgEnd,
+                             ASTUnit &AST, bool CaptureDiagnostics);
+
 public:
   /// \brief A cached code-completion result, which may be introduced in one of
   /// many different contexts.
@@ -261,7 +298,17 @@ public:
     return CachedCompletionTypes; 
   }
   
+  /// \brief Retrieve the allocator used to cache global code completions.
+  llvm::IntrusiveRefCntPtr<GlobalCodeCompletionAllocator> 
+  getCachedCompletionAllocator() {
+    return CachedCompletionAllocator;
+  }
+  
 private:
+  /// \brief Allocator used to store cached code completions.
+  llvm::IntrusiveRefCntPtr<GlobalCodeCompletionAllocator>
+    CachedCompletionAllocator;
+
   /// \brief The set of cached code-completion results.
   std::vector<CachedCodeCompletionResult> CachedCompletionResults;
   
@@ -269,20 +316,24 @@ private:
   /// type, which is used for type equality comparisons.
   llvm::StringMap<unsigned> CachedCompletionTypes;
   
-  /// \brief The number of top-level declarations present the last time we
-  /// cached code-completion results.
+  /// \brief A string hash of the top-level declaration and macro definition 
+  /// names processed the last time that we reparsed the file.
   ///
-  /// The value is used to help detect when we should repopulate the global
-  /// completion cache.
-  unsigned NumTopLevelDeclsAtLastCompletionCache;
+  /// This hash value is used to determine when we need to refresh the 
+  /// global code-completion cache.
+  unsigned CompletionCacheTopLevelHashValue;
 
-  /// \brief The number of reparses left until we'll consider updating the
-  /// code-completion cache.
+  /// \brief A string hash of the top-level declaration and macro definition 
+  /// names processed the last time that we reparsed the precompiled preamble.
   ///
-  /// This is meant to avoid thrashing during reparsing, by not allowing the
-  /// code-completion cache to be updated on every reparse.
-  unsigned CacheCodeCompletionCoolDown;
+  /// This hash value is used to determine when we need to refresh the 
+  /// global code-completion cache after a rebuild of the precompiled preamble.
+  unsigned PreambleTopLevelHashValue;
 
+  /// \brief The current hash value for the top-level declaration and macro
+  /// definition names
+  unsigned CurrentTopLevelHashValue;
+  
   /// \brief Bit used by CIndex to mark when a translation unit may be in an
   /// inconsistent state, and is not safe to free.
   unsigned UnsafeToFree : 1;
@@ -293,14 +344,6 @@ private:
   
   /// \brief Clear out and deallocate 
   void ClearCachedCompletionResults();
-  
-  /// 
-  /// \}
-  ///
-  
-  /// \brief The timers we've created from the various parses, reparses, etc.
-  /// involved in this translation unit.
-  std::vector<llvm::Timer *> Timers;
   
   ASTUnit(const ASTUnit&); // DO NOT IMPLEMENT
   ASTUnit &operator=(const ASTUnit &); // DO NOT IMPLEMENT
@@ -319,7 +362,8 @@ private:
                                                      bool AllowRebuild = true,
                                                         unsigned MaxLines = 0);
   void RealizeTopLevelDeclsFromPreamble();
-
+  void RealizePreprocessedEntitiesFromPreamble();
+  
 public:
   class ConcurrencyCheck {
     volatile ASTUnit &Self;
@@ -352,11 +396,11 @@ public:
   const SourceManager &getSourceManager() const { return *SourceMgr; }
         SourceManager &getSourceManager()       { return *SourceMgr; }
 
-  const Preprocessor &getPreprocessor() const { return *PP.get(); }
-        Preprocessor &getPreprocessor()       { return *PP.get(); }
+  const Preprocessor &getPreprocessor() const { return *PP; }
+        Preprocessor &getPreprocessor()       { return *PP; }
 
-  const ASTContext &getASTContext() const { return *Ctx.get(); }
-        ASTContext &getASTContext()       { return *Ctx.get(); }
+  const ASTContext &getASTContext() const { return *Ctx; }
+        ASTContext &getASTContext()       { return *Ctx; }
 
   bool hasSema() const { return TheSema; }
   Sema &getSema() const { 
@@ -366,6 +410,8 @@ public:
   
   const FileManager &getFileManager() const { return *FileMgr; }
         FileManager &getFileManager()       { return *FileMgr; }
+
+  const FileSystemOptions &getFileSystemOpts() const { return FileSystemOpts; }
 
   const std::string &getOriginalSourceFileName();
   const std::string &getASTFileName();
@@ -379,12 +425,18 @@ public:
                         
   bool getOnlyLocalDecls() const { return OnlyLocalDecls; }
 
+  bool getOwnsRemappedFileBuffers() const { return OwnsRemappedFileBuffers; }
+  void setOwnsRemappedFileBuffers(bool val) { OwnsRemappedFileBuffers = val; }
+
   /// \brief Retrieve the maximum PCH level of declarations that a
   /// traversal of the translation unit should consider.
   unsigned getMaxPCHLevel() const;
 
   void setLastASTLocation(ASTLocation ALoc) { LastLoc = ALoc; }
   ASTLocation getLastASTLocation() const { return LastLoc; }
+
+
+  llvm::StringRef getMainFileName() const;
 
   typedef std::vector<Decl *>::iterator top_level_iterator;
 
@@ -423,6 +475,22 @@ public:
     TopLevelDeclsInPreamble.push_back(D);
   }
 
+  /// \brief Retrieve a reference to the current top-level name hash value.
+  ///
+  /// Note: This is used internally by the top-level tracking action
+  unsigned &getCurrentTopLevelHashValue() { return CurrentTopLevelHashValue; }
+  
+  typedef std::vector<PreprocessedEntity *>::iterator pp_entity_iterator;
+  
+  pp_entity_iterator pp_entity_begin();
+  pp_entity_iterator pp_entity_end();
+  
+  /// \brief Add a new preprocessed entity that's stored at the given offset
+  /// in the precompiled preamble.
+  void addPreprocessedEntityFromPreamble(uint64_t Offset) {
+    PreprocessedEntitiesInPreamble.push_back(Offset);
+  }
+  
   /// \brief Retrieve the mapping from File IDs to the preprocessed entities
   /// within that file.
   PreprocessedEntitiesByFileMap &getPreprocessedEntitiesByFile() {
@@ -457,17 +525,26 @@ public:
   unsigned cached_completion_size() const { 
     return CachedCompletionResults.size(); 
   }
-  
+
+  llvm::MemoryBuffer *getBufferForFile(llvm::StringRef Filename,
+                                       std::string *ErrorStr = 0);
+
   /// \brief Whether this AST represents a complete translation unit.
   ///
   /// If false, this AST is only a partial translation unit, e.g., one
   /// that might still be used as a precompiled header or preamble.
   bool isCompleteTranslationUnit() const { return CompleteTranslationUnit; }
 
+  typedef llvm::PointerUnion<const char *, const llvm::MemoryBuffer *>
+      FilenameOrMemBuf;
   /// \brief A mapping from a file name to the memory buffer that stores the
   /// remapped contents of that file.
-  typedef std::pair<std::string, const llvm::MemoryBuffer *> RemappedFile;
-  
+  typedef std::pair<std::string, FilenameOrMemBuf> RemappedFile;
+
+  /// \brief Create a ASTUnit. Gets ownership of the passed CompilerInvocation. 
+  static ASTUnit *create(CompilerInvocation *CI,
+                         llvm::IntrusiveRefCntPtr<Diagnostic> Diags);
+
   /// \brief Create a ASTUnit from an AST file.
   ///
   /// \param Filename - The AST file to load.
@@ -478,11 +555,25 @@ public:
   /// \returns - The initialized ASTUnit or null if the AST failed to load.
   static ASTUnit *LoadFromASTFile(const std::string &Filename,
                                   llvm::IntrusiveRefCntPtr<Diagnostic> Diags,
+                                  const FileSystemOptions &FileSystemOpts,
                                   bool OnlyLocalDecls = false,
                                   RemappedFile *RemappedFiles = 0,
                                   unsigned NumRemappedFiles = 0,
                                   bool CaptureDiagnostics = false);
 
+private:
+  /// \brief Helper function for \c LoadFromCompilerInvocation() and
+  /// \c LoadFromCommandLine(), which loads an AST from a compiler invocation.
+  ///
+  /// \param PrecompilePreamble Whether to precompile the preamble of this
+  /// translation unit, to improve the performance of reparsing.
+  ///
+  /// \returns \c true if a catastrophic failure occurred (which means that the
+  /// \c ASTUnit itself is invalid), or \c false otherwise.
+  bool LoadFromCompilerInvocation(bool PrecompilePreamble);
+  
+public:
+  
   /// LoadFromCompilerInvocation - Create an ASTUnit from a source file, via a
   /// CompilerInvocation object.
   ///
@@ -521,12 +612,15 @@ public:
                                     llvm::IntrusiveRefCntPtr<Diagnostic> Diags,
                                       llvm::StringRef ResourceFilesPath,
                                       bool OnlyLocalDecls = false,
+                                      bool CaptureDiagnostics = false,
                                       RemappedFile *RemappedFiles = 0,
                                       unsigned NumRemappedFiles = 0,
-                                      bool CaptureDiagnostics = false,
+                                      bool RemappedFilesKeepOriginalName = true,
                                       bool PrecompilePreamble = false,
                                       bool CompleteTranslationUnit = true,
-                                      bool CacheCodeCompletionResults = false);
+                                      bool CacheCodeCompletionResults = false,
+                                      bool CXXPrecompilePreamble = false,
+                                      bool CXXChainedPCH = false);
   
   /// \brief Reparse the source files using the same command-line options that
   /// were originally used to produce this translation unit.
@@ -566,6 +660,11 @@ public:
   ///
   /// \returns True if an error occurred, false otherwise.
   bool Save(llvm::StringRef File);
+
+  /// \brief Serialize this translation unit with the given output stream.
+  ///
+  /// \returns True if an error occurred, false otherwise.
+  bool serialize(llvm::raw_ostream &OS);
 };
 
 } // namespace clang

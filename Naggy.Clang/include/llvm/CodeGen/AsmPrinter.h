@@ -17,7 +17,7 @@
 #define LLVM_CODEGEN_ASMPRINTER_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/Support/DebugLoc.h"
+#include "llvm/Support/DataTypes.h"
 
 namespace llvm {
   class BlockAddress;
@@ -49,6 +49,7 @@ namespace llvm {
   class MCSection;
   class MCStreamer;
   class MCSymbol;
+  class MDNode;
   class DwarfDebug;
   class DwarfException;
   class Mangler;
@@ -181,6 +182,10 @@ namespace llvm {
     /// EmitFunctionBody - This method emits the body and trailer for a
     /// function.
     void EmitFunctionBody();
+
+    void emitPrologLabel(const MachineInstr &MI);
+
+    bool needsCFIMoves();
 
     /// EmitConstantPool - Print to the current output stream assembly
     /// representations of the constants in the constant pool MCP. This is
@@ -376,9 +381,16 @@ namespace llvm {
     /// operands.
     virtual MachineLocation getDebugValueLocation(const MachineInstr *MI) const;
 
+    /// getDwarfRegOpSize - get size required to emit given machine location
+    /// using dwarf encoding.
+    virtual unsigned getDwarfRegOpSize(const MachineLocation &MLoc) const;
+
     /// getISAEncoding - Get the value for DW_AT_APPLE_isa. Zero if no isa
     /// encoding specified.
     virtual unsigned getISAEncoding() { return 0; }
+
+    /// EmitDwarfRegOp - Emit dwarf register operation.
+    virtual void EmitDwarfRegOp(const MachineLocation &MLoc) const;
 
     //===------------------------------------------------------------------===//
     // Dwarf Lowering Routines
@@ -388,7 +400,8 @@ namespace llvm {
     /// frame.
     void EmitFrameMoves(const std::vector<MachineMove> &Moves,
                         MCSymbol *BaseLabel, bool isEH) const;
-
+    void EmitCFIFrameMove(const MachineMove &Move) const;
+    void EmitCFIFrameMoves(const std::vector<MachineMove> &Moves) const;
 
     //===------------------------------------------------------------------===//
     // Inline Asm Support
@@ -432,7 +445,7 @@ namespace llvm {
     mutable unsigned SetCounter;
 
     /// EmitInlineAsm - Emit a blob of inline asm to the output streamer.
-    void EmitInlineAsm(StringRef Str, unsigned LocCookie) const;
+    void EmitInlineAsm(StringRef Str, const MDNode *LocMDNode = 0) const;
 
     /// EmitInlineAsm - This method formats and emits the specified machine
     /// instruction that is an inline asm.
@@ -444,7 +457,8 @@ namespace llvm {
 
     /// EmitVisibility - This emits visibility information about symbol, if
     /// this is suported by the target.
-    void EmitVisibility(MCSymbol *Sym, unsigned Visibility) const;
+    void EmitVisibility(MCSymbol *Sym, unsigned Visibility,
+                        bool IsDefinition = true) const;
 
     void EmitLinkage(unsigned Linkage, MCSymbol *GVSym) const;
 

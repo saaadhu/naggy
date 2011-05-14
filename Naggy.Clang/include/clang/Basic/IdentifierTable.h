@@ -22,8 +22,9 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
-#include <string>
 #include <cassert>
+#include <cctype>
+#include <string>
 
 namespace llvm {
   template <typename T> struct DenseMapInfo;
@@ -53,7 +54,7 @@ class IdentifierInfo {
   // Objective-C keyword ('protocol' in '@protocol') or builtin (__builtin_inf).
   // First NUM_OBJC_KEYWORDS values are for Objective-C, the remaining values
   // are for builtins.
-  unsigned ObjCOrBuiltinID    :10;
+  unsigned ObjCOrBuiltinID    :11;
   bool HasMacro               : 1; // True if there is a #define for this.
   bool IsExtension            : 1; // True if identifier is a lang extension.
   bool IsPoisoned             : 1; // True if identifier is poisoned.
@@ -63,7 +64,7 @@ class IdentifierInfo {
                                    // file and wasn't modified since.
   bool RevertedTokenID        : 1; // True if RevertTokenIDToIdentifier was
                                    // called.
-  // 7 bits left in 32-bit word.
+  // 6 bits left in 32-bit word.
   void *FETokenInfo;               // Managed by the language front-end.
   llvm::StringMapEntry<IdentifierInfo*> *Entry;
 
@@ -71,7 +72,7 @@ class IdentifierInfo {
   void operator=(const IdentifierInfo&);  // NONASSIGNABLE.
 
   friend class IdentifierTable;
-
+  
 public:
   IdentifierInfo();
 
@@ -254,6 +255,54 @@ private:
   }
 };
 
+/// \brief an RAII object for [un]poisoning an identifier
+/// within a certain scope. II is allowed to be null, in
+/// which case, objects of this type have no effect.
+class PoisonIdentifierRAIIObject {
+  IdentifierInfo *const II;
+  const bool OldValue;
+public:
+  PoisonIdentifierRAIIObject(IdentifierInfo *II, bool NewValue)
+    : II(II), OldValue(II ? II->isPoisoned() : false) {
+    if(II)
+      II->setIsPoisoned(NewValue);
+  }
+
+  ~PoisonIdentifierRAIIObject() {
+    if(II)
+      II->setIsPoisoned(OldValue);
+  }
+};
+
+/// \brief An iterator that walks over all of the known identifiers
+/// in the lookup table.
+///
+/// Since this iterator uses an abstract interface via virtual
+/// functions, it uses an object-oriented interface rather than the
+/// more standard C++ STL iterator interface. In this OO-style
+/// iteration, the single function \c Next() provides dereference,
+/// advance, and end-of-sequence checking in a single
+/// operation. Subclasses of this iterator type will provide the
+/// actual functionality.
+class IdentifierIterator {
+private:
+  IdentifierIterator(const IdentifierIterator&); // Do not implement
+  IdentifierIterator &operator=(const IdentifierIterator&); // Do not implement
+
+protected:
+  IdentifierIterator() { }
+  
+public:
+  virtual ~IdentifierIterator();
+
+  /// \brief Retrieve the next string in the identifier table and
+  /// advances the iterator for the following string.
+  ///
+  /// \returns The next string in the identifier table. If there is
+  /// no such string, returns an empty \c llvm::StringRef.
+  virtual llvm::StringRef Next() = 0;
+};
+
 /// IdentifierInfoLookup - An abstract class used by IdentifierTable that
 ///  provides an interface for performing lookups from strings
 /// (const char *) to IdentiferInfo objects.
@@ -266,6 +315,18 @@ public:
   ///  of a reference.  If the pointer is NULL then the IdentifierInfo cannot
   ///  be found.
   virtual IdentifierInfo* get(llvm::StringRef Name) = 0;
+
+  /// \brief Retrieve an iterator into the set of all identifiers
+  /// known to this identifier lookup source.
+  ///
+  /// This routine provides access to all of the identifiers known to
+  /// the identifier lookup, allowing access to the contents of the
+  /// identifiers without introducing the overhead of constructing
+  /// IdentifierInfo objects for each.
+  ///
+  /// \returns A new iterator into the set of known identifiers. The
+  /// caller is responsible for deleting this iterator.
+  virtual IdentifierIterator *getIdentifiers() const;
 };
 
 /// \brief An abstract class used to resolve numerical identifier
@@ -283,7 +344,7 @@ public:
 
 /// IdentifierTable - This table implements an efficient mapping from strings to
 /// IdentifierInfo nodes.  It has no other purpose, but this is an
-/// extremely performance-critical piece of the code, as each occurrance of
+/// extremely performance-critical piece of the code, as each occurrence of
 /// every identifier goes through here when lexed.
 class IdentifierTable {
   // Shark shows that using MallocAllocator is *much* slower than using this
@@ -304,6 +365,11 @@ public:
     ExternalLookup = IILookup;
   }
 
+  /// \brief Retrieve the external identifier lookup object, if any.
+  IdentifierInfoLookup *getExternalIdentifierLookup() const {
+    return ExternalLookup;
+  }
+  
   llvm::BumpPtrAllocator& getAllocator() {
     return HashTable.getAllocator();
   }
@@ -396,6 +462,52 @@ public:
   void AddKeywords(const LangOptions &LangOpts);
 };
 
+/// ObjCMethodFamily - A family of Objective-C methods.  These
+/// families have no inherent meaning in the language, but are
+/// nonetheless central enough in the existing implementations to
+/// merit direct AST support.  While, in theory, arbitrary methods can
+/// be considered to form families, we focus here on the methods
+/// involving allocation and retain-count management, as these are the
+/// most "core" and the most likely to be useful to diverse clients
+/// without extra information.
+///
+/// Both selectors and actual method declarations may be classified
+/// into families.  Method families may impose additional restrictions
+/// beyond their selector name; for example, a method called '_init'
+/// that returns void is not considered to be in the 'init' family
+/// (but would be if it returned 'id').  It is also possible to
+/// explicitly change or remove a method's family.  Therefore the
+/// method's family should be considered the single source of truth.
+enum ObjCMethodFamily {
+  /// \brief No particular method family.
+  OMF_None,
+
+  // Selectors in these families may have arbitrary arity, may be
+  // written with arbitrary leading underscores, and may have
+  // additional CamelCase "words" in their first selector chunk
+  // following the family name.
+  OMF_alloc,
+  OMF_copy,
+  OMF_init,
+  OMF_mutableCopy,
+  OMF_new,
+
+  // These families are singletons consisting only of the nullary
+  // selector with the given name.
+  OMF_autorelease,
+  OMF_dealloc,
+  OMF_release,
+  OMF_retain,
+  OMF_retainCount
+};
+
+/// Enough bits to store any enumerator in ObjCMethodFamily or
+/// InvalidObjCMethodFamily.
+enum { ObjCMethodFamilyBitWidth = 4 };
+
+/// An invalid value of ObjCMethodFamily.
+enum { InvalidObjCMethodFamily = (1 << ObjCMethodFamilyBitWidth) - 1 };
+
 /// Selector - This smart pointer class efficiently represents Objective-C
 /// method names. This class will either point to an IdentifierInfo or a
 /// MultiKeywordSelector (which is private). This enables us to optimize
@@ -432,6 +544,8 @@ class Selector {
     return InfoPtr & ArgFlags;
   }
 
+  static ObjCMethodFamily getMethodFamilyImpl(Selector sel);
+
 public:
   friend class SelectorTable; // only the SelectorTable can create these
   friend class DeclarationName; // and the AST's DeclarationName.
@@ -463,11 +577,41 @@ public:
     return getIdentifierInfoFlag() == ZeroArg;
   }
   unsigned getNumArgs() const;
+  
+  
+  /// \brief Retrieve the identifier at a given position in the selector.
+  ///
+  /// Note that the identifier pointer returned may be NULL. Clients that only
+  /// care about the text of the identifier string, and not the specific, 
+  /// uniqued identifier pointer, should use \c getNameForSlot(), which returns
+  /// an empty string when the identifier pointer would be NULL.
+  ///
+  /// \param argIndex The index for which we want to retrieve the identifier.
+  /// This index shall be less than \c getNumArgs() unless this is a keyword
+  /// selector, in which case 0 is the only permissible value.
+  ///
+  /// \returns the uniqued identifier for this slot, or NULL if this slot has
+  /// no corresponding identifier.
   IdentifierInfo *getIdentifierInfoForSlot(unsigned argIndex) const;
-
+  
+  /// \brief Retrieve the name at a given position in the selector.
+  ///
+  /// \param argIndex The index for which we want to retrieve the name.
+  /// This index shall be less than \c getNumArgs() unless this is a keyword
+  /// selector, in which case 0 is the only permissible value.
+  ///
+  /// \returns the name for this slot, which may be the empty string if no
+  /// name was supplied.
+  llvm::StringRef getNameForSlot(unsigned argIndex) const;
+  
   /// getAsString - Derive the full selector name (e.g. "foo:bar:") and return
   /// it as an std::string.
   std::string getAsString() const;
+
+  /// getMethodFamily - Derive the conventional family of this method.
+  ObjCMethodFamily getMethodFamily() const {
+    return getMethodFamilyImpl(*this);
+  }
 
   static Selector getEmptyMarker() {
     return Selector(uintptr_t(-1));
@@ -498,6 +642,9 @@ public:
   Selector getNullarySelector(IdentifierInfo *ID) {
     return Selector(ID, 0);
   }
+
+  /// Return the total amount of memory allocated for managing selectors.
+  size_t getTotalMemory() const;
 
   /// constructSetterName - Return the setter name for the given
   /// identifier, i.e. "set" + Name where the initial character of Name
@@ -570,6 +717,17 @@ struct DenseMapInfo<clang::Selector> {
 template <>
 struct isPodLike<clang::Selector> { static const bool value = true; };
 
+template<>
+class PointerLikeTypeTraits<clang::Selector> {
+public:
+  static inline const void *getAsVoidPointer(clang::Selector P) {
+    return P.getAsOpaquePtr();
+  }
+  static inline clang::Selector getFromVoidPointer(const void *P) {
+    return clang::Selector(reinterpret_cast<uintptr_t>(P));
+  }
+  enum { NumLowBitsAvailable = 0 };  
+};
 
 // Provide PointerLikeTypeTraits for IdentifierInfo pointers, which
 // are not guaranteed to be 8-byte aligned.

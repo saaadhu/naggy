@@ -246,6 +246,13 @@ namespace llvm {
     static APFloat getSmallestNormalized(const fltSemantics &Sem,
                                          bool Negative = false);
 
+    /// getAllOnesValue - Returns a float which is bitcasted from
+    /// an all one value int.
+    ///
+    /// \param BitWidth - Select float type
+    /// \param isIEEE   - If 128 bit number, select between PPC and IEEE
+    static APFloat getAllOnesValue(unsigned BitWidth, bool isIEEE = false);
+
     /// Profile - Used to insert APFloat objects, or objects that contain
     ///  APFloat objects, into FoldingSets.
     void Profile(FoldingSetNodeID& NID) const;
@@ -345,6 +352,10 @@ namespace llvm {
     void toString(SmallVectorImpl<char> &Str,
                   unsigned FormatPrecision = 0,
                   unsigned FormatMaxPadding = 3) const;
+
+    /// getExactInverse - If this value has an exact multiplicative inverse,
+    /// store it in inv and return true.
+    bool getExactInverse(APFloat *inv) const;
 
   private:
 

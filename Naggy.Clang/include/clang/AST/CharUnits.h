@@ -14,7 +14,9 @@
 #ifndef LLVM_CLANG_AST_CHARUNITS_H
 #define LLVM_CLANG_AST_CHARUNITS_H
 
-#include "llvm/System/DataTypes.h"
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/Support/DataTypes.h"
+#include "llvm/Support/MathExtras.h"
 
 namespace clang {
   
@@ -32,7 +34,7 @@ namespace clang {
   /// architectures where the two are the same size.
   /// 
   /// For portability, never assume that a target character is 8 bits wide. Use 
-  /// CharUnit values whereever you calculate sizes, offsets, or alignments
+  /// CharUnit values wherever you calculate sizes, offsets, or alignments
   /// in character units.
   class CharUnits {
     public:
@@ -68,9 +70,23 @@ namespace clang {
         Quantity += Other.Quantity;
         return *this;
       }
+      CharUnits& operator++ () {
+        ++Quantity;
+        return *this;
+      }
+      CharUnits operator++ (int) {
+        return CharUnits(Quantity++);
+      }
       CharUnits& operator-= (const CharUnits &Other) {
         Quantity -= Other.Quantity;
         return *this;
+      }
+      CharUnits& operator-- () {
+        --Quantity;
+        return *this;
+      }
+      CharUnits operator-- (int) {
+        return CharUnits(Quantity--);
       }
        
       // Comparison operators.
@@ -131,11 +147,23 @@ namespace clang {
       CharUnits operator- (const CharUnits &Other) const {
         return CharUnits(Quantity - Other.Quantity);
       }
+      CharUnits operator- () const {
+        return CharUnits(-Quantity);
+      }
+
       
       // Conversions.
 
       /// getQuantity - Get the raw integer representation of this quantity.
       QuantityType getQuantity() const { return Quantity; }
+
+      /// RoundUpToAlignment - Returns the next integer (mod 2**64) that is
+      /// greater than or equal to this quantity and is a multiple of \arg
+      /// Align. Align must be non-zero.
+      CharUnits RoundUpToAlignment(const CharUnits &Align) {
+        return CharUnits(llvm::RoundUpToAlignment(Quantity, 
+                                                  Align.Quantity));
+      }
 
 
   }; // class CharUnit
@@ -145,5 +173,39 @@ inline clang::CharUnits operator* (clang::CharUnits::QuantityType Scale,
                                    const clang::CharUnits &CU) {
   return CU * Scale;
 }
+
+namespace llvm {
+
+template<> struct DenseMapInfo<clang::CharUnits> {
+  static clang::CharUnits getEmptyKey() {
+    clang::CharUnits::QuantityType Quantity =
+      DenseMapInfo<clang::CharUnits::QuantityType>::getEmptyKey();
+
+    return clang::CharUnits::fromQuantity(Quantity);
+  }
+
+  static clang::CharUnits getTombstoneKey() {
+    clang::CharUnits::QuantityType Quantity =
+      DenseMapInfo<clang::CharUnits::QuantityType>::getTombstoneKey();
+    
+    return clang::CharUnits::fromQuantity(Quantity);    
+  }
+
+  static unsigned getHashValue(const clang::CharUnits &CU) {
+    clang::CharUnits::QuantityType Quantity = CU.getQuantity();
+    return DenseMapInfo<clang::CharUnits::QuantityType>::getHashValue(Quantity);
+  }
+
+  static bool isEqual(const clang::CharUnits &LHS, 
+                      const clang::CharUnits &RHS) {
+    return LHS == RHS;
+  }
+};
+
+template <> struct isPodLike<clang::CharUnits> {
+  static const bool value = true;
+};
+  
+} // end namespace llvm
 
 #endif // LLVM_CLANG_AST_CHARUNITS_H

@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_SEMA_SCOPE_H
 #define LLVM_CLANG_SEMA_SCOPE_H
 
+#include "clang/Basic/Diagnostic.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace clang {
@@ -52,7 +53,7 @@ public:
     /// ClassScope - The scope of a struct/union/class definition.
     ClassScope = 0x20,
 
-    /// BlockScope - This is a scope that corresponds to a block object.
+    /// BlockScope - This is a scope that corresponds to a block/closure object.
     /// Blocks serve as top-level scopes for some objects like labels, they
     /// also prevent things like break and continue.  BlockScopes always have
     /// the FnScope, BreakScope, ContinueScope, and DeclScope flags set as well.
@@ -74,7 +75,10 @@ public:
     
     /// ObjCMethodScope - This scope corresponds to an Objective-C method body.
     /// It always has FnScope and DeclScope set as well.
-    ObjCMethodScope = 0x400
+    ObjCMethodScope = 0x400,
+
+    /// SwitchScope - This is a scope that corresponds to a switch statement.
+    SwitchScope = 0x800
   };
 private:
   /// The parent scope for this scope.  This is null for the translation-unit
@@ -94,12 +98,12 @@ private:
   Scope *FnParent;
 
   /// BreakParent/ContinueParent - This is a direct link to the immediately
-  /// preceeding BreakParent/ContinueParent if this scope is not one, or null if
+  /// preceding BreakParent/ContinueParent if this scope is not one, or null if
   /// there is no containing break/continue scope.
   Scope *BreakParent, *ContinueParent;
 
   /// ControlParent - This is a direct link to the immediately
-  /// preceeding ControlParent if this scope is not one, or null if
+  /// preceding ControlParent if this scope is not one, or null if
   /// there is no containing control scope.
   Scope *ControlParent;
 
@@ -131,11 +135,12 @@ private:
   typedef llvm::SmallVector<UsingDirectiveDecl *, 2> UsingDirectivesTy;
   UsingDirectivesTy UsingDirectives;
 
-  /// \brief The number of errors at the start of the given scope.
-  unsigned NumErrorsAtStart;
+  /// \brief Used to determine if errors occurred in this scope.
+  DiagnosticErrorTrap ErrorTrap;
   
 public:
-  Scope(Scope *Parent, unsigned ScopeFlags) {
+  Scope(Scope *Parent, unsigned ScopeFlags, Diagnostic &Diag)
+    : ErrorTrap(Diag) {
     Init(Parent, ScopeFlags);
   }
 
@@ -144,8 +149,7 @@ public:
   unsigned getFlags() const { return Flags; }
   void setFlags(unsigned F) { Flags = F; }
 
-  /// isBlockScope - Return true if this scope does not correspond to a
-  /// closure.
+  /// isBlockScope - Return true if this scope correspond to a closure.
   bool isBlockScope() const { return Flags & BlockScope; }
 
   /// getParent - Return the scope that this is nested in.
@@ -214,13 +218,7 @@ public:
   void* getEntity() const { return Entity; }
   void setEntity(void *E) { Entity = E; }
 
-  /// \brief Retrieve the number of errors that had been emitted when we
-  /// entered this scope.
-  unsigned getNumErrorsAtStart() const { return NumErrorsAtStart; }
-  
-  void setNumErrorsAtStart(unsigned NumErrors) {
-    NumErrorsAtStart = NumErrors;
-  }
+  bool hasErrorOccurred() const { return ErrorTrap.hasErrorOccurred(); }
                            
   /// isClassScope - Return true if this scope is a class/struct/union scope.
   bool isClassScope() const {
@@ -263,6 +261,20 @@ public:
   /// isAtCatchScope - Return true if this scope is @catch.
   bool isAtCatchScope() const {
     return getFlags() & Scope::AtCatchScope;
+  }
+
+  /// isSwitchScope - Return true if this scope is a switch scope.
+  bool isSwitchScope() const {
+    for (const Scope *S = this; S; S = S->getParent()) {
+      if (S->getFlags() & Scope::SwitchScope)
+        return true;
+      else if (S->getFlags() & (Scope::FnScope | Scope::ClassScope |
+                                Scope::BlockScope | Scope::TemplateParamScope |
+                                Scope::FunctionPrototypeScope |
+                                Scope::AtCatchScope | Scope::ObjCMethodScope))
+        return false;
+    }
+    return false;
   }
 
   typedef UsingDirectivesTy::iterator udir_iterator;
@@ -318,7 +330,7 @@ public:
     DeclsInScope.clear();
     UsingDirectives.clear();
     Entity = 0;
-    NumErrorsAtStart = 0;
+    ErrorTrap.reset();
   }
 };
 

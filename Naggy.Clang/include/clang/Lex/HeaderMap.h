@@ -17,6 +17,7 @@
 namespace llvm {
   class MemoryBuffer;
   class StringRef;
+  template <typename T> class SmallVectorImpl;
 }
 namespace clang {
   class FileEntry;
@@ -43,10 +44,14 @@ public:
 
   /// HeaderMap::Create - This attempts to load the specified file as a header
   /// map.  If it doesn't look like a HeaderMap, it gives up and returns null.
-  static const HeaderMap *Create(const FileEntry *FE);
+  static const HeaderMap *Create(const FileEntry *FE, FileManager &FM);
 
   /// LookupFile - Check to see if the specified relative filename is located in
   /// this HeaderMap.  If so, open it and return its FileEntry.
+  /// If RawPath is not NULL and the file is found, RawPath will be set to the
+  /// raw path at which the file was found in the file system. For example,
+  /// for a search path ".." and a filename "../file.h" this would be
+  /// "../../file.h".
   const FileEntry *LookupFile(llvm::StringRef Filename, FileManager &FM) const;
 
   /// getFileName - Return the filename of the headermap.

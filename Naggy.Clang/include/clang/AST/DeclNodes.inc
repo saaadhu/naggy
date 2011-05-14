@@ -49,6 +49,12 @@ LINKAGESPEC(LinkageSpec, Decl)
 #  define NAMED(Type, Base) DECL(Type, Base)
 #endif
 ABSTRACT_DECL(NAMED(Named, Decl))
+#ifndef LABEL
+#  define LABEL(Type, Base) NAMED(Type, Base)
+#endif
+LABEL(Label, NamedDecl)
+#undef LABEL
+
 #ifndef NAMESPACE
 #  define NAMESPACE(Type, Base) NAMED(Type, Base)
 #endif
@@ -213,11 +219,25 @@ DECL_RANGE(Tag, Enum, ClassTemplatePartialSpecialization)
 TEMPLATETYPEPARM(TemplateTypeParm, TypeDecl)
 #undef TEMPLATETYPEPARM
 
-#ifndef TYPEDEF
-#  define TYPEDEF(Type, Base) TYPE(Type, Base)
+#ifndef TYPEDEFNAME
+#  define TYPEDEFNAME(Type, Base) TYPE(Type, Base)
 #endif
-TYPEDEF(Typedef, TypeDecl)
+ABSTRACT_DECL(TYPEDEFNAME(TypedefName, TypeDecl))
+#ifndef TYPEALIAS
+#  define TYPEALIAS(Type, Base) TYPEDEFNAME(Type, Base)
+#endif
+TYPEALIAS(TypeAlias, TypedefNameDecl)
+#undef TYPEALIAS
+
+#ifndef TYPEDEF
+#  define TYPEDEF(Type, Base) TYPEDEFNAME(Type, Base)
+#endif
+TYPEDEF(Typedef, TypedefNameDecl)
 #undef TYPEDEF
+
+DECL_RANGE(TypedefName, TypeAlias, Typedef)
+
+#undef TYPEDEFNAME
 
 #ifndef UNRESOLVEDUSINGTYPENAME
 #  define UNRESOLVEDUSINGTYPENAME(Type, Base) TYPE(Type, Base)
@@ -309,6 +329,12 @@ DECL_RANGE(Function, Function, CXXDestructor)
 
 #undef FUNCTION
 
+#ifndef NONTYPETEMPLATEPARM
+#  define NONTYPETEMPLATEPARM(Type, Base) DECLARATOR(Type, Base)
+#endif
+NONTYPETEMPLATEPARM(NonTypeTemplateParm, DeclaratorDecl)
+#undef NONTYPETEMPLATEPARM
+
 #ifndef VAR
 #  define VAR(Type, Base) DECLARATOR(Type, Base)
 #endif
@@ -318,12 +344,6 @@ VAR(Var, DeclaratorDecl)
 #endif
 IMPLICITPARAM(ImplicitParam, VarDecl)
 #undef IMPLICITPARAM
-
-#ifndef NONTYPETEMPLATEPARM
-#  define NONTYPETEMPLATEPARM(Type, Base) VAR(Type, Base)
-#endif
-NONTYPETEMPLATEPARM(NonTypeTemplateParm, VarDecl)
-#undef NONTYPETEMPLATEPARM
 
 #ifndef PARMVAR
 #  define PARMVAR(Type, Base) VAR(Type, Base)
@@ -345,6 +365,12 @@ DECL_RANGE(Declarator, Field, ParmVar)
 ENUMCONSTANT(EnumConstant, ValueDecl)
 #undef ENUMCONSTANT
 
+#ifndef INDIRECTFIELD
+#  define INDIRECTFIELD(Type, Base) VALUE(Type, Base)
+#endif
+INDIRECTFIELD(IndirectField, ValueDecl)
+#undef INDIRECTFIELD
+
 #ifndef UNRESOLVEDUSINGVALUE
 #  define UNRESOLVEDUSINGVALUE(Type, Base) VALUE(Type, Base)
 #endif
@@ -355,7 +381,7 @@ DECL_RANGE(Value, Field, UnresolvedUsingValue)
 
 #undef VALUE
 
-DECL_RANGE(Named, Namespace, UnresolvedUsingValue)
+DECL_RANGE(Named, Label, UnresolvedUsingValue)
 
 #undef NAMED
 
@@ -404,10 +430,10 @@ LAST_DECL_RANGE(Decl, AccessSpec, TranslationUnit)
 DECL_CONTEXT_BASE(Function)
 DECL_CONTEXT_BASE(Tag)
 DECL_CONTEXT_BASE(ObjCContainer)
-DECL_CONTEXT(TranslationUnit)
+DECL_CONTEXT(Block)
+DECL_CONTEXT(LinkageSpec)
 DECL_CONTEXT(Namespace)
 DECL_CONTEXT(ObjCMethod)
-DECL_CONTEXT(LinkageSpec)
-DECL_CONTEXT(Block)
+DECL_CONTEXT(TranslationUnit)
 #undef DECL_CONTEXT
 #undef DECL_CONTEXT_BASE

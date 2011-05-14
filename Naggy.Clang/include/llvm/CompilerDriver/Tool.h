@@ -18,7 +18,7 @@
 
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/System/Path.h"
+#include "llvm/Support/Path.h"
 
 #include <string>
 #include <vector>
@@ -33,7 +33,7 @@ namespace llvmc {
   typedef llvm::StringSet<> InputLanguagesSet;
 
   /// Tool - Represents a single tool.
-  class Tool : public llvm::RefCountedBaseVPTR<Tool> {
+  class Tool : public llvm::RefCountedBaseVPTR {
   public:
 
     virtual ~Tool() {}
@@ -58,7 +58,7 @@ namespace llvmc {
 
     virtual const char*  Name() const = 0;
     virtual const char** InputLanguages() const = 0;
-    virtual const char*  OutputLanguage() const = 0;
+    virtual const char** OutputLanguages() const = 0;
 
     virtual bool IsJoin() const = 0;
     virtual bool WorksOnEmpty() const = 0;

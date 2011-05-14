@@ -41,8 +41,8 @@ AsmLabelAttr *AsmLabelAttr::clone(ASTContext &C) const {
   return new (C) AsmLabelAttr(getLocation(), C, getLabel());
 }
 
-BaseCheckAttr *BaseCheckAttr::clone(ASTContext &C) const {
-  return new (C) BaseCheckAttr(getLocation(), C);
+AvailabilityAttr *AvailabilityAttr::clone(ASTContext &C) const {
+  return new (C) AvailabilityAttr(getLocation(), C, platform, getIntroduced(), getDeprecated(), getObsoleted(), unavailable);
 }
 
 BlocksAttr *BlocksAttr::clone(ASTContext &C) const {
@@ -53,6 +53,10 @@ CDeclAttr *CDeclAttr::clone(ASTContext &C) const {
   return new (C) CDeclAttr(getLocation(), C);
 }
 
+CFConsumedAttr *CFConsumedAttr::clone(ASTContext &C) const {
+  return new (C) CFConsumedAttr(getLocation(), C);
+}
+
 CFReturnsNotRetainedAttr *CFReturnsNotRetainedAttr::clone(ASTContext &C) const {
   return new (C) CFReturnsNotRetainedAttr(getLocation(), C);
 }
@@ -61,12 +65,40 @@ CFReturnsRetainedAttr *CFReturnsRetainedAttr::clone(ASTContext &C) const {
   return new (C) CFReturnsRetainedAttr(getLocation(), C);
 }
 
+CUDAConstantAttr *CUDAConstantAttr::clone(ASTContext &C) const {
+  return new (C) CUDAConstantAttr(getLocation(), C);
+}
+
+CUDADeviceAttr *CUDADeviceAttr::clone(ASTContext &C) const {
+  return new (C) CUDADeviceAttr(getLocation(), C);
+}
+
+CUDAGlobalAttr *CUDAGlobalAttr::clone(ASTContext &C) const {
+  return new (C) CUDAGlobalAttr(getLocation(), C);
+}
+
+CUDAHostAttr *CUDAHostAttr::clone(ASTContext &C) const {
+  return new (C) CUDAHostAttr(getLocation(), C);
+}
+
+CUDALaunchBoundsAttr *CUDALaunchBoundsAttr::clone(ASTContext &C) const {
+  return new (C) CUDALaunchBoundsAttr(getLocation(), C, maxThreads, minBlocks);
+}
+
+CUDASharedAttr *CUDASharedAttr::clone(ASTContext &C) const {
+  return new (C) CUDASharedAttr(getLocation(), C);
+}
+
 CarriesDependencyAttr *CarriesDependencyAttr::clone(ASTContext &C) const {
   return new (C) CarriesDependencyAttr(getLocation(), C);
 }
 
 CleanupAttr *CleanupAttr::clone(ASTContext &C) const {
   return new (C) CleanupAttr(getLocation(), C, functionDecl);
+}
+
+CommonAttr *CommonAttr::clone(ASTContext &C) const {
+  return new (C) CommonAttr(getLocation(), C);
 }
 
 ConstAttr *ConstAttr::clone(ASTContext &C) const {
@@ -86,7 +118,7 @@ DLLImportAttr *DLLImportAttr::clone(ASTContext &C) const {
 }
 
 DeprecatedAttr *DeprecatedAttr::clone(ASTContext &C) const {
-  return new (C) DeprecatedAttr(getLocation(), C);
+  return new (C) DeprecatedAttr(getLocation(), C, getMessage());
 }
 
 DestructorAttr *DestructorAttr::clone(ASTContext &C) const {
@@ -113,10 +145,6 @@ GNUInlineAttr *GNUInlineAttr::clone(ASTContext &C) const {
   return new (C) GNUInlineAttr(getLocation(), C);
 }
 
-HidingAttr *HidingAttr::clone(ASTContext &C) const {
-  return new (C) HidingAttr(getLocation(), C);
-}
-
 IBActionAttr *IBActionAttr::clone(ASTContext &C) const {
   return new (C) IBActionAttr(getLocation(), C);
 }
@@ -126,11 +154,19 @@ IBOutletAttr *IBOutletAttr::clone(ASTContext &C) const {
 }
 
 IBOutletCollectionAttr *IBOutletCollectionAttr::clone(ASTContext &C) const {
-  return new (C) IBOutletCollectionAttr(getLocation(), C, interface);
+  return new (C) IBOutletCollectionAttr(getLocation(), C, interFace);
 }
 
 InitPriorityAttr *InitPriorityAttr::clone(ASTContext &C) const {
   return new (C) InitPriorityAttr(getLocation(), C, priority);
+}
+
+MBlazeInterruptHandlerAttr *MBlazeInterruptHandlerAttr::clone(ASTContext &C) const {
+  return new (C) MBlazeInterruptHandlerAttr(getLocation(), C);
+}
+
+MBlazeSaveVolatilesAttr *MBlazeSaveVolatilesAttr::clone(ASTContext &C) const {
+  return new (C) MBlazeSaveVolatilesAttr(getLocation(), C);
 }
 
 MSP430InterruptAttr *MSP430InterruptAttr::clone(ASTContext &C) const {
@@ -145,12 +181,40 @@ MaxFieldAlignmentAttr *MaxFieldAlignmentAttr::clone(ASTContext &C) const {
   return new (C) MaxFieldAlignmentAttr(getLocation(), C, alignment);
 }
 
+MayAliasAttr *MayAliasAttr::clone(ASTContext &C) const {
+  return new (C) MayAliasAttr(getLocation(), C);
+}
+
+MsStructAttr *MsStructAttr::clone(ASTContext &C) const {
+  return new (C) MsStructAttr(getLocation(), C);
+}
+
+NSConsumedAttr *NSConsumedAttr::clone(ASTContext &C) const {
+  return new (C) NSConsumedAttr(getLocation(), C);
+}
+
+NSConsumesSelfAttr *NSConsumesSelfAttr::clone(ASTContext &C) const {
+  return new (C) NSConsumesSelfAttr(getLocation(), C);
+}
+
+NSReturnsAutoreleasedAttr *NSReturnsAutoreleasedAttr::clone(ASTContext &C) const {
+  return new (C) NSReturnsAutoreleasedAttr(getLocation(), C);
+}
+
 NSReturnsNotRetainedAttr *NSReturnsNotRetainedAttr::clone(ASTContext &C) const {
   return new (C) NSReturnsNotRetainedAttr(getLocation(), C);
 }
 
 NSReturnsRetainedAttr *NSReturnsRetainedAttr::clone(ASTContext &C) const {
   return new (C) NSReturnsRetainedAttr(getLocation(), C);
+}
+
+NakedAttr *NakedAttr::clone(ASTContext &C) const {
+  return new (C) NakedAttr(getLocation(), C);
+}
+
+NoCommonAttr *NoCommonAttr::clone(ASTContext &C) const {
+  return new (C) NoCommonAttr(getLocation(), C);
 }
 
 NoDebugAttr *NoDebugAttr::clone(ASTContext &C) const {
@@ -181,8 +245,16 @@ ObjCExceptionAttr *ObjCExceptionAttr::clone(ASTContext &C) const {
   return new (C) ObjCExceptionAttr(getLocation(), C);
 }
 
+ObjCMethodFamilyAttr *ObjCMethodFamilyAttr::clone(ASTContext &C) const {
+  return new (C) ObjCMethodFamilyAttr(getLocation(), C, family);
+}
+
 ObjCNSObjectAttr *ObjCNSObjectAttr::clone(ASTContext &C) const {
   return new (C) ObjCNSObjectAttr(getLocation(), C);
+}
+
+OpenCLKernelAttr *OpenCLKernelAttr::clone(ASTContext &C) const {
+  return new (C) OpenCLKernelAttr(getLocation(), C);
 }
 
 OverloadableAttr *OverloadableAttr::clone(ASTContext &C) const {
@@ -203,6 +275,10 @@ PackedAttr *PackedAttr::clone(ASTContext &C) const {
 
 PascalAttr *PascalAttr::clone(ASTContext &C) const {
   return new (C) PascalAttr(getLocation(), C);
+}
+
+PcsAttr *PcsAttr::clone(ASTContext &C) const {
+  return new (C) PcsAttr(getLocation(), C, pCS);
 }
 
 PureAttr *PureAttr::clone(ASTContext &C) const {
@@ -238,7 +314,7 @@ TransparentUnionAttr *TransparentUnionAttr::clone(ASTContext &C) const {
 }
 
 UnavailableAttr *UnavailableAttr::clone(ASTContext &C) const {
-  return new (C) UnavailableAttr(getLocation(), C);
+  return new (C) UnavailableAttr(getLocation(), C, getMessage());
 }
 
 UnusedAttr *UnusedAttr::clone(ASTContext &C) const {
@@ -247,6 +323,10 @@ UnusedAttr *UnusedAttr::clone(ASTContext &C) const {
 
 UsedAttr *UsedAttr::clone(ASTContext &C) const {
   return new (C) UsedAttr(getLocation(), C);
+}
+
+UuidAttr *UuidAttr::clone(ASTContext &C) const {
+  return new (C) UuidAttr(getLocation(), C, getGuid());
 }
 
 VecReturnAttr *VecReturnAttr::clone(ASTContext &C) const {

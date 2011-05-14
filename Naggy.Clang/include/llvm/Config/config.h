@@ -1,4 +1,3 @@
-
 /**************************************
 ** Created by Kevin from config.h.in **
 ***************************************/
@@ -6,50 +5,35 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-/* Define if dlopen(0) will open the symbols of the program */
-#undef CAN_DLOPEN_SELF
-
 /* Define if CBE is enabled for printf %a output */
-#undef ENABLE_CBE_PRINTF_A
-
-/* Directories clang will search for headers */
-#define C_INCLUDE_DIRS ""
-
-/* Directory clang will search for libstdc++ headers */
-#define CXX_INCLUDE_ROOT ""
-
-/* Architecture of libstdc++ headers */
-#define CXX_INCLUDE_ARCH ""
-
-/* 32 bit multilib directory */
-#define CXX_INCLUDE_32BIT_DIR ""
-
-/* 64 bit multilib directory */
-#define CXX_INCLUDE_64BIT_DIR ""
+#define ENABLE_CBE_PRINTF_A 1
 
 /* Define if position independent code is enabled */
-/* #undef ENABLE_PIC */
+#define ENABLE_PIC
 
 /* Define if threads enabled */
 #define ENABLE_THREADS 1
 
+/* Define if timestamp information (e.g., __DATE___) is allowed */
+#define ENABLE_TIMESTAMPS 1
+
 /* Define to 1 if you have the `argz_append' function. */
-#undef HAVE_ARGZ_APPEND
+/* #undef HAVE_ARGZ_APPEND */
 
 /* Define to 1 if you have the `argz_create_sep' function. */
-#undef HAVE_ARGZ_CREATE_SEP
+/* #undef HAVE_ARGZ_CREATE_SEP */
 
 /* Define to 1 if you have the <argz.h> header file. */
 /* #undef HAVE_ARGZ_H */
 
 /* Define to 1 if you have the `argz_insert' function. */
-#undef HAVE_ARGZ_INSERT
+/* #undef HAVE_ARGZ_INSERT */
 
 /* Define to 1 if you have the `argz_next' function. */
-#undef HAVE_ARGZ_NEXT
+/* #undef HAVE_ARGZ_NEXT */
 
 /* Define to 1 if you have the `argz_stringify' function. */
-#undef HAVE_ARGZ_STRINGIFY
+/* #undef HAVE_ARGZ_STRINGIFY */
 
 /* Define to 1 if you have the <assert.h> header file. */
 #define HAVE_ASSERT_H 1
@@ -60,9 +44,6 @@
 /* Define to 1 if you have the `bcopy' function. */
 #undef HAVE_BCOPY
 
-/* Does not have bi-directional iterator */
-#undef HAVE_BI_ITERATOR
-
 /* Define to 1 if you have the `ceilf' function. */
 #define HAVE_CEILF 1
 
@@ -70,10 +51,20 @@
 /* #undef HAVE_CIRCO */
 
 /* Define to 1 if you have the `closedir' function. */
-#undef HAVE_CLOSEDIR
+/* #undef HAVE_CLOSEDIR */
+
+/* Define to 1 if you have the <CrashReporterClient.h> header file. */
+#undef HAVE_CRASHREPORTERCLIENT_H
+
+/* Define if __crashreporter_info__ exists. */
+#undef HAVE_CRASHREPORTER_INFO
 
 /* Define to 1 if you have the <ctype.h> header file. */
-#undef HAVE_CTYPE_H
+#define HAVE_CTYPE_H 1
+
+/* Define to 1 if you have the declaration of `strerror_s', and to 0 if you
+   don't. */
+#define HAVE_DECL_STRERROR_S 1
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
@@ -86,13 +77,13 @@
 /* #undef HAVE_DLD_H */
 
 /* Define to 1 if you have the `dlerror' function. */
-#undef HAVE_DLERROR
+/* #undef HAVE_DLERROR */
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 /* #undef HAVE_DLFCN_H */
 
 /* Define if dlopen() is available on this platform. */
-#undef HAVE_DLOPEN
+/* #undef HAVE_DLOPEN */
 
 /* Define to 1 if you have the <dl.h> header file. */
 /* #undef HAVE_DL_H */
@@ -110,7 +101,7 @@
 #define HAVE_ERRNO_H 1
 
 /* Define to 1 if the system has the type `error_t'. */
-#undef HAVE_ERROR_T
+/* #undef HAVE_ERROR_T */
 
 /* Define to 1 if you have the <execinfo.h> header file. */
 /* #undef HAVE_EXECINFO_H */
@@ -121,41 +112,41 @@
 /* Define if the neat program is available */
 /* #undef HAVE_FDP */
 
+/* Define to 1 if you have the <fenv.h> header file. */
+/* #undef HAVE_FENV_H */
+
+/* Define if libffi is available on this platform. */
+/* #undef HAVE_FFI_CALL */
+
+/* Define to 1 if you have the <ffi/ffi.h> header file. */
+/* #undef HAVE_FFI_FFI_H */
+
+/* Define to 1 if you have the <ffi.h> header file. */
+/* #undef HAVE_FFI_H */
+
 /* Set to 1 if the finite function is found in <ieeefp.h> */
 /* #undef HAVE_FINITE_IN_IEEEFP_H */
 
 /* Define to 1 if you have the `floorf' function. */
 #define HAVE_FLOORF 1
 
-/* Does not have forward iterator */
-#undef HAVE_FWD_ITERATOR
+/* Define to 1 if you have the `fmodf' function. */
+#define HAVE_FMODF 1
 
 /* Define to 1 if you have the `getcwd' function. */
-#undef HAVE_GETCWD
+/* #undef HAVE_GETCWD */
 
 /* Define to 1 if you have the `getpagesize' function. */
 /* #undef HAVE_GETPAGESIZE */
 
 /* Define to 1 if you have the `getrlimit' function. */
-#undef HAVE_GETRLIMIT
+/* #undef HAVE_GETRLIMIT */
 
 /* Define to 1 if you have the `getrusage' function. */
 /* #undef HAVE_GETRUSAGE */
 
 /* Define to 1 if you have the `gettimeofday' function. */
-#undef HAVE_GETTIMEOFDAY
-
-/* Does not have <hash_map> */
-#undef HAVE_GLOBAL_HASH_MAP
-
-/* Does not have hash_set in global namespace */
-#undef HAVE_GLOBAL_HASH_SET
-
-/* Does not have ext/hash_map */
-#undef HAVE_GNU_EXT_HASH_MAP
-
-/* Does not have hash_set in gnu namespace */
-#undef HAVE_GNU_EXT_HASH_SET
+/* #undef HAVE_GETTIMEOFDAY */
 
 /* Define if the Graphviz program is available */
 #undef HAVE_GRAPHVIZ
@@ -164,10 +155,10 @@
 /* #undef HAVE_GV */
 
 /* Define to 1 if you have the `index' function. */
-#undef HAVE_INDEX
+/* #undef HAVE_INDEX */
 
 /* Define to 1 if the system has the type `int64_t'. */
-#undef HAVE_INT64_T
+#define HAVE_INT64_T 1
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 /* #undef HAVE_INTTYPES_H */
@@ -188,7 +179,7 @@
 /* #undef HAVE_ISNAN_IN_MATH_H */
 
 /* Define if you have the libdl library or equivalent. */
-#undef HAVE_LIBDL
+/* #undef HAVE_LIBDL */
 
 /* Define to 1 if you have the `imagehlp' library (-limagehlp). */
 /* #undef HAVE_LIBIMAGEHLP */
@@ -208,6 +199,9 @@
 /* Define to 1 if you have the <limits.h> header file. */
 #define HAVE_LIMITS_H 1
 
+/* Define if you can use -Wl,-export-dynamic. */
+#define HAVE_LINK_EXPORT_DYNAMIC 1
+
 /* Define to 1 if you have the <link.h> header file. */
 /* #undef HAVE_LINK_H */
 
@@ -216,13 +210,13 @@
 #undef HAVE_LINK_R
 
 /* Define to 1 if you have the `longjmp' function. */
-#undef HAVE_LONGJMP
+#define HAVE_LONGJMP 1
 
 /* Define to 1 if you have the <mach/mach.h> header file. */
-#undef HAVE_MACH_MACH_H
+/* #undef HAVE_MACH_MACH_H */
 
 /* Define to 1 if you have the <mach-o/dyld.h> header file. */
-#undef HAVE_MACH_O_DYLD_H
+/* #undef HAVE_MACH_O_DYLD_H */
 
 /* Define if mallinfo() is available on this platform. */
 /* #undef HAVE_MALLINFO */
@@ -237,10 +231,10 @@
 /* #undef HAVE_MALLOC_ZONE_STATISTICS */
 
 /* Define to 1 if you have the `memcpy' function. */
-#undef HAVE_MEMCPY
+#define HAVE_MEMCPY 1
 
 /* Define to 1 if you have the `memmove' function. */
-#undef HAVE_MEMMOVE
+#define HAVE_MEMMOVE 1
 
 /* Define to 1 if you have the <memory.h> header file. */
 #define HAVE_MEMORY_H 1
@@ -264,9 +258,6 @@
 /* Define if mmap() can map files into memory */
 #undef HAVE_MMAP_FILE
 
-/* define if the compiler implements namespaces */
-#undef HAVE_NAMESPACES
-
 /* Define to 1 if you have the <ndir.h> header file, and it defines `DIR'. */
 /* #undef HAVE_NDIR_H */
 
@@ -277,7 +268,13 @@
 /* #undef HAVE_NEATO */
 
 /* Define to 1 if you have the `opendir' function. */
-#undef HAVE_OPENDIR
+/* #undef HAVE_OPENDIR */
+
+/* Define to 1 if you have the `posix_spawn' function. */
+/* #undef HAVE_POSIX_SPAWN */
+
+/* Define to 1 if you have the `powf' function. */
+/* #undef HAVE_POWF */
 
 /* Define if libtool can extract symbol lists from object files. */
 #undef HAVE_PRELOADED_SYMBOLS
@@ -285,7 +282,10 @@
 /* Define to have the %a format string */
 #undef HAVE_PRINTF_A
 
-/* Have pthread.h */
+/* Have pthread_getspecific */
+/* #undef HAVE_PTHREAD_GETSPECIFIC */
+
+/* Define to 1 if you have the <pthread.h> header file. */
 /* #undef HAVE_PTHREAD_H */
 
 /* Have pthread_mutex_lock */
@@ -294,29 +294,26 @@
 /* Have pthread_rwlock_init */
 /* #undef HAVE_PTHREAD_RWLOCK_INIT */
 
-/* Have pthread_getspecific */
-/* #undef HAVE_PTHREAD_GETSPECIFIC */
-
 /* Define to 1 if srand48/lrand48/drand48 exist in <stdlib.h> */
-#undef HAVE_RAND48
+/* #undef HAVE_RAND48 */
 
 /* Define to 1 if you have the `readdir' function. */
-#undef HAVE_READDIR
+/* #undef HAVE_READDIR */
 
 /* Define to 1 if you have the `realpath' function. */
 #undef HAVE_REALPATH
 
 /* Define to 1 if you have the `rindex' function. */
-#undef HAVE_RINDEX
+/* #undef HAVE_RINDEX */
 
 /* Define to 1 if you have the `rintf' function. */
 #undef HAVE_RINTF
 
-/* Define to 1 if you have the `roundf' function. */
-#undef HAVE_ROUNDF
-
 /* Define to 1 if you have the `round' function. */
 /* #undef HAVE_ROUND */
+
+/* Define to 1 if you have the `roundf' function. */
+#undef HAVE_ROUNDF
 
 /* Define to 1 if you have the `sbrk' function. */
 /* #undef HAVE_SBRK */
@@ -325,7 +322,7 @@
 /* #undef HAVE_SETENV */
 
 /* Define to 1 if you have the `setjmp' function. */
-#undef HAVE_SETJMP
+#define HAVE_SETJMP 1
 
 /* Define to 1 if you have the <setjmp.h> header file. */
 #define HAVE_SETJMP_H 1
@@ -337,13 +334,13 @@
 #undef HAVE_SHL_LOAD
 
 /* Define to 1 if you have the `siglongjmp' function. */
-#undef HAVE_SIGLONGJMP
+/* #undef HAVE_SIGLONGJMP */
 
 /* Define to 1 if you have the <signal.h> header file. */
 #define HAVE_SIGNAL_H 1
 
 /* Define to 1 if you have the `sigsetjmp' function. */
-#undef HAVE_SIGSETJMP
+/* #undef HAVE_SIGSETJMP */
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
@@ -354,29 +351,20 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #define HAVE_STDLIB_H 1
 
-/* Does not have ext/hash_map> */
-#undef HAVE_STD_EXT_HASH_MAP
-
-/* Does not have hash_set in std namespace */
-#undef HAVE_STD_EXT_HASH_SET
-
 /* Set to 1 if the std::isinf function is found in <cmath> */
 #undef HAVE_STD_ISINF_IN_CMATH
 
 /* Set to 1 if the std::isnan function is found in <cmath> */
 #undef HAVE_STD_ISNAN_IN_CMATH
 
-/* Does not have std namespace iterator */
-#undef HAVE_STD_ITERATOR
-
 /* Define to 1 if you have the `strchr' function. */
-#undef HAVE_STRCHR
+#define HAVE_STRCHR 1
 
 /* Define to 1 if you have the `strcmp' function. */
-#undef HAVE_STRCMP
+#define HAVE_STRCMP 1
 
 /* Define to 1 if you have the `strdup' function. */
-#undef HAVE_STRDUP
+#define HAVE_STRDUP 1
 
 /* Define to 1 if you have the `strerror' function. */
 #define HAVE_STRERROR 1
@@ -384,23 +372,23 @@
 /* Define to 1 if you have the `strerror_r' function. */
 /* #undef HAVE_STRERROR_R */
 
-/* Define to 1 if you have the `strerror_s' function. */
-#define HAVE_STRERROR_S 1
-
 /* Define to 1 if you have the <strings.h> header file. */
-#undef HAVE_STRINGS_H
+/* #undef HAVE_STRINGS_H */
 
 /* Define to 1 if you have the <string.h> header file. */
 #define HAVE_STRING_H 1
 
 /* Define to 1 if you have the `strrchr' function. */
-#undef HAVE_STRRCHR
+#define HAVE_STRRCHR 1
+
+/* Define to 1 if you have the `strtof' function. */
+/* #undef HAVE_STRTOF */
 
 /* Define to 1 if you have the `strtoll' function. */
 #define HAVE_STRTOLL 1
 
 /* Define to 1 if you have the `strtoq' function. */
-#undef HAVE_STRTOQ
+/* #undef HAVE_STRTOQ */
 
 /* Define to 1 if you have the `sysconf' function. */
 #undef HAVE_SYSCONF
@@ -437,14 +425,11 @@
 /* Define to 1 if you have the <sys/types.h> header file. */
 #define HAVE_SYS_TYPES_H 1
 
+/* Define to 1 if you have the <sys/uio.h> header file. */
+/* #undef HAVE_SYS_UIO_H */
+
 /* Define to 1 if you have <sys/wait.h> that is POSIX.1 compatible. */
 /* #undef HAVE_SYS_WAIT_H */
-
-/* Define if the neat program is available */
-/* #undef HAVE_TWOPI */
-
-/* Define to 1 if the system has the type `uint64_t'. */
-#undef HAVE_UINT64_T
 
 /* Define to 1 if you have the <termios.h> header file. */
 /* #undef HAVE_TERMIOS_H */
@@ -456,13 +441,73 @@
 /* #undef HAVE_UTIME_H */
 
 /* Define to 1 if the system has the type `u_int64_t'. */
-#undef HAVE_U_INT64_T
+/* #undef HAVE_U_INT64_T */
 
 /* Define to 1 if you have the <valgrind/valgrind.h> header file. */
 /* #undef HAVE_VALGRIND_VALGRIND_H */
 
 /* Define to 1 if you have the <windows.h> header file. */
 #define HAVE_WINDOWS_H 1
+
+/* Define to 1 if you have the `writev' function. */
+/* #undef HAVE_WRITEV */
+
+/* Define if the xdot.py program is available */
+/* #undef HAVE_XDOT_PY */
+
+/* Have host's _alloca */
+/* #undef HAVE__ALLOCA */
+
+/* Have host's __alloca */
+/* #undef HAVE___ALLOCA */
+
+/* Have host's __ashldi3 */
+/* #undef HAVE___ASHLDI3 */
+
+/* Have host's __ashrdi3 */
+/* #undef HAVE___ASHRDI3 */
+
+/* Have host's __chkstk */
+/* #undef HAVE___CHKSTK */
+
+/* Have host's __cmpdi2 */
+/* #undef HAVE___CMPDI2 */
+
+/* Have host's __divdi3 */
+/* #undef HAVE___DIVDI3 */
+
+/* Define to 1 if you have the `__dso_handle' function. */
+#undef HAVE___DSO_HANDLE
+
+/* Have host's __fixdfdi */
+/* #undef HAVE___FIXDFDI */
+
+/* Have host's __fixsfdi */
+/* #undef HAVE___FIXSFDI */
+
+/* Have host's __floatdidf */
+/* #undef HAVE___FLOATDIDF */
+
+/* Have host's __lshrdi3 */
+/* #undef HAVE___LSHRDI3 */
+
+/* Have host's __main */
+/* #undef HAVE___MAIN */
+
+/* Have host's __moddi3 */
+/* #undef HAVE___MODDI3 */
+
+/* Have host's __udivdi3 */
+/* #undef HAVE___UDIVDI3 */
+
+/* Have host's __umoddi3 */
+/* #undef HAVE___UMODDI3 */
+
+/* Have host's ___chkstk */
+/* #undef HAVE____CHKSTK */
+
+/* Linker version detected at compile time. */
+#undef HOST_LINK_VERSION
 
 /* Installation directory for binary executables */
 #undef LLVM_BINDIR
@@ -472,6 +517,9 @@
 
 /* Installation directory for documentation */
 #undef LLVM_DATADIR
+
+/* Installation directory for documentation */
+#undef LLVM_DOCSDIR
 
 /* Installation directory for config files */
 #undef LLVM_ETCDIR
@@ -494,14 +542,23 @@
 /* Build multithreading support into LLVM */
 #define LLVM_MULTITHREADED 1
 
+/* LLVM architecture name for the native architecture, if available */
+#define LLVM_NATIVE_ARCH X86
+
+/* LLVM name for the native AsmPrinter init function, if available */
+#define LLVM_NATIVE_ASMPRINTER LLVMInitializeX86AsmPrinter
+
+/* LLVM name for the native Target init function, if available */
+#define LLVM_NATIVE_TARGET LLVMInitializeX86Target
+
+/* LLVM name for the native TargetInfo init function, if available */
+#define LLVM_NATIVE_TARGETINFO LLVMInitializeX86TargetInfo
+
 /* Define if this is Unixish platform */
 /* #undef LLVM_ON_UNIX */
 
 /* Define if this is Win32ish platform */
 #define LLVM_ON_WIN32 1
-
-/* Added by Kevin -- Maximum path length */
-#define MAXPATHLEN 160
 
 /* Define to path to circo program if found or 'echo circo' otherwise */
 /* #undef LLVM_PATH_CIRCO */
@@ -527,8 +584,11 @@
 /* Define to path to twopi program if found or 'echo twopi' otherwise */
 /* #undef LLVM_PATH_TWOPI */
 
+/* Define to path to xdot.py program if found or 'echo xdot.py' otherwise */
+/* #undef LLVM_PATH_XDOT_PY */
+
 /* Installation prefix directory */
-#define LLVM_PREFIX "C:/Program Files/LLVM"
+#define LLVM_PREFIX "C:/Program Files (x86)/LLVM"
 
 /* Define if the OS needs help to load dependent libraries for dlopen(). */
 #define LTDL_DLOPEN_DEPLIBS 1
@@ -561,16 +621,19 @@
 #define PACKAGE_NAME "llvm"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "llvm 2.8"
+#define PACKAGE_STRING "llvm 3.0"
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.8"
+#define PACKAGE_VERSION "3.0"
 
 /* Define as the return type of signal handlers (`int' or `void'). */
 #define RETSIGTYPE void
+
+/* Define to 1 if the `S_IS*' macros in <sys/stat.h> do not work properly. */
+#undef STAT_MACROS_BROKEN
 
 /* If using the C implementation of alloca, define if you know the
    direction of stack growth for your system; otherwise it will be
@@ -592,12 +655,11 @@
 /* Define to 1 if your <sys/time.h> declares `struct tm'. */
 #undef TM_IN_SYS_TIME
 
+/* Define if we have the oprofile JIT-support library */
+#undef USE_OPROFILE
+
 /* Define if use udis86 library */
 #undef USE_UDIS86
-
-/* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
-   `char[]'. */
-#undef YYTEXT_POINTER
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
@@ -605,14 +667,24 @@
 /* Define to a type to use for `error_t' if it is not otherwise available. */
 #define error_t int
 
-/* Define to a type to use for `mode_t' if it is not otherwise available. */
-#define mode_t unsigned short
-
 /* Define to `int' if <sys/types.h> does not define. */
 #undef pid_t
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 #undef size_t
+
+/* Define if the neat program is available */
+/* #undef HAVE_TWOPI */
+
+/* Define to 1 if the system has the type `uint64_t'. */
+#define HAVE_UINT64_T 1
+
+/* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
+   `char[]'. */
+#undef YYTEXT_POINTER
+
+/* Define to a type to use for `mode_t' if it is not otherwise available. */
+#define mode_t unsigned short
 
 /* Define to a function replacing strtoll */
 #define strtoll _strtoi64
@@ -626,16 +698,40 @@
 /* Define to a function implementing strdup */
 #define strdup _strdup
 
-/* LLVM architecture name for the native architecture, if available */
-#define LLVM_NATIVE_ARCH X86
-  
-/* LLVM name for the native Target init function, if available */
-#define LLVM_NATIVE_TARGET LLVMInitializeX86Target
- 
-/* LLVM name for the native TargetInfo init function, if available */
-#define LLVM_NATIVE_TARGETINFO LLVMInitializeX86TargetInfo
- 
-/* LLVM name for the native AsmPrinter init function, if available */
-#define LLVM_NATIVE_ASMPRINTER LLVMInitializeX86AsmPrinter
+/* Define to 1 if you have the `_chsize_s' function. */
+#define HAVE__CHSIZE_S 1
+
+/* define if the compiler implements namespaces */
+#undef HAVE_NAMESPACES
+
+/* Does not have std namespace iterator */
+#undef HAVE_STD_ITERATOR
+
+/* Does not have forward iterator */
+#undef HAVE_FWD_ITERATOR
+
+/* Does not have bi-directional iterator */
+#undef HAVE_BI_ITERATOR
+
+/* Does not have <hash_map> */
+#undef HAVE_GLOBAL_HASH_MAP
+
+/* Does not have hash_set in global namespace */
+#undef HAVE_GLOBAL_HASH_SET
+
+/* Does not have ext/hash_map */
+#undef HAVE_GNU_EXT_HASH_MAP
+
+/* Does not have hash_set in gnu namespace */
+#undef HAVE_GNU_EXT_HASH_SET
+
+/* Does not have ext/hash_map> */
+#undef HAVE_STD_EXT_HASH_MAP
+
+/* Does not have hash_set in std namespace */
+#undef HAVE_STD_EXT_HASH_SET
+
+/* Added by Kevin -- Maximum path length */
+#define MAXPATHLEN 160
 
 #endif

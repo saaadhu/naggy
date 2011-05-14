@@ -21,7 +21,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/System/Path.h"
+#include "llvm/Support/Path.h"
 
 #include <cassert>
 #include <string>
@@ -40,7 +40,7 @@ namespace llvmc {
   };
 
   /// Edge - Represents an edge of the compilation graph.
-  class Edge : public llvm::RefCountedBaseVPTR<Edge> {
+  class Edge : public llvm::RefCountedBaseVPTR {
   public:
     Edge(const std::string& T) : ToolName_(T) {}
     virtual ~Edge() {}

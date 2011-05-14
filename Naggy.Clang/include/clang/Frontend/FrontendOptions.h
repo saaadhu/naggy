@@ -21,8 +21,8 @@ namespace clang {
 namespace frontend {
   enum ActionKind {
     ASTDump,                ///< Parse ASTs and dump them.
+    ASTDumpXML,             ///< Parse ASTs and dump them in XML.
     ASTPrint,               ///< Parse ASTs and print them.
-    ASTPrintXML,            ///< Parse ASTs and print them in XML.
     ASTView,                ///< Parse ASTs and view them in Graphviz.
     BoostCon,               ///< BoostCon mode.
     CreateModule,           ///< Create module definition
@@ -38,7 +38,6 @@ namespace frontend {
     FixIt,                  ///< Parse and apply any fixits to the source.
     GeneratePCH,            ///< Generate pre-compiled header.
     GeneratePTH,            ///< Generate pre-tokenized header.
-    InheritanceView,        ///< View C++ inheritance for a specified class.
     InitOnly,               ///< Only execute frontend initialization.
     ParseSyntaxOnly,        ///< Parse and perform semantic analysis.
     PluginAction,           ///< Run a plugin action, \see ActionName.
@@ -56,8 +55,6 @@ namespace frontend {
 /// FrontendOptions - Options for controlling the behavior of the frontend.
 class FrontendOptions {
 public:
-  unsigned DebugCodeCompletionPrinter : 1; ///< Use the debug printer for code
-                                           /// completion results.
   unsigned DisableFree : 1;                ///< Disable memory freeing on exit.
   unsigned RelocatablePCH : 1;             ///< When generating PCH files,
                                            /// instruct the AST writer to create
@@ -86,9 +83,6 @@ public:
   /// The output file, if any.
   std::string OutputFile;
 
-  /// If given, the name for a C++ class to view the inheritance of.
-  std::string ViewClassInheritance;
-
   /// If given, the new suffix for fix-it rewritten files.
   std::string FixItSuffix;
 
@@ -101,8 +95,14 @@ public:
   /// The name of the action to run when using a plugin action.
   std::string ActionName;
 
-  /// Arg to pass to the plugin
+  /// Args to pass to the plugin
   std::vector<std::string> PluginArgs;
+
+  /// The list of plugin actions to run in addition to the normal action.
+  std::vector<std::string> AddPluginActions;
+
+  /// Args to pass to the additional plugins
+  std::vector<std::vector<std::string> > AddPluginArgs;
 
   /// The list of plugins to load.
   std::vector<std::string> Plugins;
@@ -119,7 +119,6 @@ public:
 
 public:
   FrontendOptions() {
-    DebugCodeCompletionPrinter = 1;
     DisableFree = 0;
     ProgramAction = frontend::ParseSyntaxOnly;
     ActionName = "";
