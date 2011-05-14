@@ -70,6 +70,9 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, Lis
 	char **args = new char*[argsCount];
 
 	int index = 0;
+
+	args[index++] = "-fspell-checking";
+
 	for each(String^ path in includePaths)
 	{
 		args[index++] = (char*)ToCString("-I" + path);
@@ -78,8 +81,6 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, Lis
 	{
 		args[index++] = (char*)ToCString("-D" + symbol);
 	}
-
-	args[index++] = "-fspell-checking";
 
 	m_filePath = (char *) ToCString(filePath);
 	m_translationUnit = clang_createTranslationUnitFromSourceFile(idx, m_filePath, argsCount, args, 0, NULL);

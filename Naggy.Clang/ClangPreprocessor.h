@@ -35,8 +35,8 @@ namespace NaggyClang
 		clang::LangOptions lang_opts;
 		clang::TargetOptions to;
 		clang::TargetInfo *target_info;
-		clang::SourceManager sm;
 		clang::FileManager fm;
+		clang::SourceManager sm;
 		clang::HeaderSearch hs;
 		clang::Preprocessor *m_pPreprocessor;
 	};

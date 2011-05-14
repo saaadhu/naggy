@@ -17,7 +17,7 @@ namespace Naggy
             if (project == null)
                 return Enumerable.Empty<string>();
 
-            var deviceName = project.Properties.Item("DeviceName").Value;
+            string deviceName = (string)project.Properties.Item("DeviceName").Value;
             var implicitSymbol = DeviceNameToPredefinedSymbolMapper.GetSymbol(deviceName);
 
             dynamic toolchainData = project.Properties.Item("ToolchainData").Value;
@@ -38,7 +38,8 @@ namespace Naggy
                 return Enumerable.Empty<string>();
 
             dynamic toolchainData = project.Properties.Item("ToolchainData").Value;
-            var outputFolder = project.Object.GetProjectProperty("OutputDirectory");
+            dynamic internalProjectObject = project.Object;
+            var outputFolder = internalProjectObject.GetProjectProperty("OutputDirectory");
 
             const string toolchainIncludePathPropertyId8Bit = "avrgcc.toolchain.directories.IncludePaths";
             const string toolchainIncludePathPropertyId32Bit = "avr32gcc.toolchain.directories.IncludePaths";
@@ -110,7 +111,7 @@ namespace Naggy
             {
                 return toolchainData.GetPropertyValue(propertyId);
             }
-            catch (Exception e) { }
+            catch (Exception) { }
             return string.Empty;
         }
     }

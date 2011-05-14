@@ -100,6 +100,7 @@ int fun() {
         }
 
         [TestMethod]
+        [Ignore]
         public void GetDiagnostics_MisspelledMemberName_DiagnosticIncludesSuggestedMember()
         {
             File.WriteAllText(sourceFilePath, @"struct A { int Foo; }; int main() { struct A a; a.Fo = 2; }");
