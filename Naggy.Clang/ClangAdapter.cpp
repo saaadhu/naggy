@@ -2,27 +2,12 @@
 
 #include "stdafx.h"
 #include "ClangAdapter.h"
-
-#include "clang/Basic/Diagnostic.h"
+#include "StringUtilities.h"
 
 using namespace System::Runtime::InteropServices;
 using namespace System::Collections::Generic;
 using namespace NaggyClang;
 using namespace std;
-
-const char* ToCString(String ^str)
-{
-	System::IntPtr ptr = Marshal::StringToHGlobalAnsi(str);
-	return (const char *)ptr.ToPointer();
-}
-
-String^ ToManagedString(const CXString &str)
-{
-	const char* strData = clang_getCString(str);
-	
-	String^ managedString = Marshal::PtrToStringAnsi(System::IntPtr((int)strData));
-	return managedString;
-}
 
 Diagnostic^ ToDiagnostic(const CXDiagnostic &diag)
 {
@@ -98,4 +83,12 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, Lis
 
 	m_filePath = (char *) ToCString(filePath);
 	m_translationUnit = clang_createTranslationUnitFromSourceFile(idx, m_filePath, argsCount, args, 0, NULL);
+}
+
+PreprocessorAdapter^ ClangAdapter::GetPreprocessor()
+{
+	PreprocessorAdapter^ prep = gcnew PreprocessorAdapter(m_filePath);
+	prep->Preprocess();
+	
+	return prep;
 }

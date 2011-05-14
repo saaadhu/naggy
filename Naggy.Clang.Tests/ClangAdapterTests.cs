@@ -109,6 +109,20 @@ int fun() {
             StringAssert.Contains(diags.First().Message, "did you mean 'Foo'?");
         }
 
+        [TestMethod]
+        public void ExpandMacro_MacroDefinitionIncludesAnotherMacro_ExpansionExpandsInnerMacro()
+        {
+            File.WriteAllText(sourceFilePath, @"
+#define x 2
+#define foo x*y
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            using (var preprocessor = adapter.GetPreprocessor())
+            {
+                Assert.AreEqual("2*y", preprocessor.ExpandMacro("foo"));
+            }
+        }
+
         [TestInitialize]
         public void Setup()
         {

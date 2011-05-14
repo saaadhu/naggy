@@ -3,7 +3,7 @@
 #pragma once
 
 #include "clang-c\Index.h"
-
+#include "PreprocessorAdapter.h"
 using namespace System;
 using namespace System::Collections::Generic;
 
@@ -30,6 +30,7 @@ namespace NaggyClang {
 		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols) { Initialize(fileName, includePaths, symbols); }
 		List<Diagnostic^> ^GetDiagnostics(String ^contents);
 		List<Diagnostic^> ^GetDiagnostics();
+		PreprocessorAdapter^ GetPreprocessor();
 
 	private:
 		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols);
