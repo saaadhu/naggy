@@ -40,15 +40,16 @@ namespace Naggy
             dynamic toolchainData = project.Properties.Item("ToolchainData").Value;
             var outputFolder = project.Object.GetProjectProperty("OutputDirectory");
 
-            const string toolchainIncludePathPropertyId = "avr32gcc.toolchain.directories.ToolchainDeviceFiles";
+            const string toolchainIncludePathPropertyId8Bit = "avrgcc.toolchain.directories.IncludePaths";
+            const string toolchainIncludePathPropertyId32Bit = "avr32gcc.toolchain.directories.IncludePaths";
 
-            // The property queried is actually the device header file, so we need to go two directories up to go to the include directory
-            var toolchainIncludeFolder = Path.GetDirectoryName(Path.GetDirectoryName(toolchainData.GetPropertyValue(toolchainIncludePathPropertyId)));
+            string toolchainIncludeFolders = toolchainData.GetPropertyValue(toolchainIncludePathPropertyId8Bit);
+            toolchainIncludeFolders += (";" + toolchainData.GetPropertyValue(toolchainIncludePathPropertyId32Bit));
 
             var splitPaths = GetCompilerIncludePaths(toolchainData, outputFolder);
 
             var allPaths = new List<string>();
-            allPaths.Add(toolchainIncludeFolder);
+            allPaths.AddRange(toolchainIncludeFolders.Split(new char[] {';'}, StringSplitOptions.RemoveEmptyEntries));
             allPaths.AddRange(splitPaths);
 
             return allPaths;
