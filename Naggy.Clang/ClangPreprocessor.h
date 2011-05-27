@@ -10,6 +10,7 @@
 #include "clang\Lex\Preprocessor.h"
 #include "clang\Basic\TargetInfo.h"
 #include <string>
+#include <vector>
 
 namespace NaggyClang
 {
@@ -26,6 +27,11 @@ namespace NaggyClang
 			delete target_info;
 		}
 
+		typedef std::vector<std::pair<unsigned int, unsigned int>>::const_iterator skipped_blocks_iterator;
+	
+		skipped_blocks_iterator skipped_blocks_begin() { return m_skippedBlocks.begin(); }
+		skipped_blocks_iterator skipped_blocks_end() { return m_skippedBlocks.end(); }
+
 	private:
 
 		bool Expand(const char* macroName, std::string &expansion);
@@ -39,5 +45,6 @@ namespace NaggyClang
 		clang::SourceManager sm;
 		clang::HeaderSearch hs;
 		clang::Preprocessor *m_pPreprocessor;
+		std::vector<std::pair<unsigned int, unsigned int>> m_skippedBlocks;
 	};
 }

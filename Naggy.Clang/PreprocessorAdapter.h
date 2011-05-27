@@ -17,6 +17,7 @@ namespace NaggyClang
 
 	public:
 		String^ ExpandMacro(String ^macroName);
+		array<Tuple<int, int>^> ^GetSkippedBlockLineNumbers();
 
 		~PreprocessorAdapter()
 		{

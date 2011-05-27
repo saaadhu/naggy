@@ -8,32 +8,60 @@
 #include "clang\Basic\DiagnosticIDs.h"
 #include "llvm\ADT\IntrusiveRefCntPtr.h"
 
+#include <vector>
 using namespace NaggyClang;
 
 class Callback : public clang::PPCallbacks
 {
+	int previousConditionalStackSize;
+	std::vector<std::pair<unsigned int, unsigned int>> m_skippedBlocks;
+
+	friend class ClangPreprocessor;
 public:
-	Callback(clang::Preprocessor *pPreprocessor) : m_pPreprocessor(pPreprocessor)
+	Callback(clang::Preprocessor *pPreprocessor) : m_pPreprocessor(pPreprocessor), previousConditionalStackSize(0)
 	{
 	}
 
-	void Ifdef(const clang::Token &tok)
+	virtual void Ifdef(const clang::Token &tok)
+	{
+		if (IsSkipped())
+		{
+			clang::SourceLocation &start = tok.getLocation();
+			clang::SourceManager &sm = m_pPreprocessor->getSourceManager();
+			if (sm.isFromMainFile(start))
+			{
+				unsigned int startLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(start));
+				
+				clang::SourceLocation &end = ((clang::Lexer*)m_pPreprocessor->getCurrentLexer())->getSourceLocation();
+				unsigned int endLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(end));
+
+				m_skippedBlocks.push_back(std::pair<unsigned int, unsigned int>(startLine, endLine));
+			}
+		}
+	}
+
+	virtual void Endif()
+	{
+		clang::PreprocessorLexer *pLexer = m_pPreprocessor->getCurrentLexer();
+	}
+
+private:
+	bool IsSkipped()
+	{
+		return previousConditionalStackSize == GetConditionalStackSize();
+	}
+
+	unsigned int GetConditionalStackSize()
 	{
 		clang::PreprocessorLexer *pLexer = m_pPreprocessor->getCurrentLexer();
 		clang::PreprocessorLexer::conditional_iterator iter = pLexer->conditional_begin();
 
-		if (iter->WasSkipping)
-		{
-			iter;
-		}
+		unsigned int size = 0;
+		for(; iter != pLexer->conditional_end(); ++iter)
+			size++;
+
+		return size;
 	}
-
-	void Endif()
-	{
-
-	}
-
-private:
 	clang::Preprocessor *m_pPreprocessor;
 };
 
@@ -64,6 +92,8 @@ void ClangPreprocessor::Process()
 		m_pPreprocessor->Lex(token);
 
 	}while (token.isNot(clang::tok::eof));
+
+	m_skippedBlocks = callback.m_skippedBlocks;
 }
 
 bool ClangPreprocessor::Expand(const char* macroName, std::string &expansion)

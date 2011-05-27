@@ -124,6 +124,22 @@ int fun() {
             }
         }
 
+        [TestMethod]
+        public void GetSkippedBlocks_IfDefDirectiveWithoutDefinition_SkippedBlockIncludesIfdefBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#ifdef x
+#define foo x*y
+#endif
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            using (var preprocessor = adapter.GetPreprocessor())
+            {
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
+                Assert.AreEqual(1, skippedBlock.Item1);
+                Assert.AreEqual(3, skippedBlock.Item2);
+            }
+        }
         [TestInitialize]
         public void Setup()
         {
