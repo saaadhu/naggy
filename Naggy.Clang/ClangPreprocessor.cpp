@@ -24,9 +24,19 @@ public:
 
 	virtual void Ifdef(const clang::Token &tok)
 	{
+		HandleConditionalBlock(tok.getLocation());
+	}
+
+	virtual void If(clang::SourceRange range)
+	{
+		HandleConditionalBlock(range.getBegin());
+	}
+
+private:
+	void HandleConditionalBlock(const clang::SourceLocation &start)
+	{
 		if (IsSkipped())
 		{
-			clang::SourceLocation &start = tok.getLocation();
 			clang::SourceManager &sm = m_pPreprocessor->getSourceManager();
 			if (sm.isFromMainFile(start))
 			{
@@ -40,12 +50,6 @@ public:
 		}
 	}
 
-	virtual void Endif()
-	{
-		clang::PreprocessorLexer *pLexer = m_pPreprocessor->getCurrentLexer();
-	}
-
-private:
 	bool IsSkipped()
 	{
 		return previousConditionalStackSize == GetConditionalStackSize();
