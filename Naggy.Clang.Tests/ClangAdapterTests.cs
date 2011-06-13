@@ -16,8 +16,9 @@ namespace Naggy.Clang.Tests
         [TestMethod]
         public void GetDiagnostics_EmptyCFile_NoDiagnosticsReturned()
         {
+            File.WriteAllText(sourceFilePath, "");
             var adapter = new ClangAdapter(sourceFilePath);
-            var diags = adapter.GetDiagnostics(string.Empty);
+            var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(0, diags.Count);
         }
@@ -28,7 +29,8 @@ namespace Naggy.Clang.Tests
             var sourceText =  "int func(){}";
             File.WriteAllText(sourceFilePath, sourceText);
             var adapter = new ClangAdapter(sourceFilePath);
-            var diags = adapter.GetDiagnostics(sourceText);
+            
+            var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(1, diags.Count);
         }
@@ -41,7 +43,8 @@ namespace Naggy.Clang.Tests
 
             File.WriteAllText(sourceFilePath, sourceInFile);
             var adapter = new ClangAdapter(sourceFilePath);
-            var diags = adapter.GetDiagnostics(sourceInEditor);
+            adapter.Process(sourceInEditor);
+            var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(1, diags.Count);
         }
@@ -54,7 +57,8 @@ namespace Naggy.Clang.Tests
 
             File.WriteAllText(sourceFilePath, sourceInFile);
             var adapter = new ClangAdapter(sourceFilePath);
-            var diags = adapter.GetDiagnostics(sourceInEditor);
+            adapter.Process(sourceInEditor);
+            var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(0, diags.Count);
         }
@@ -68,10 +72,15 @@ namespace Naggy.Clang.Tests
 
             File.WriteAllText(sourceFilePath, sourceInFile);
             var adapter = new ClangAdapter(sourceFilePath);
-            var diags = adapter.GetDiagnostics(initialSourceInEditor);
+            var diags = adapter.GetDiagnostics();
+            Assert.AreEqual(0, diags.Count);
+
+            adapter.Process(initialSourceInEditor);
+            diags = adapter.GetDiagnostics();
             Assert.AreEqual(1, diags.Count);
 
-            diags = adapter.GetDiagnostics(currentSourceInEditor);
+            adapter.Process(currentSourceInEditor);
+            diags = adapter.GetDiagnostics();
             Assert.AreEqual(0, diags.Count);
         }
 
@@ -83,7 +92,8 @@ namespace Naggy.Clang.Tests
 int fun() {
 }
 ");
-            var diag = new ClangAdapter(sourceFilePath).GetDiagnostics().Single();
+            var adapter = new ClangAdapter(sourceFilePath);
+            var diag = adapter.GetDiagnostics().Single();
             Assert.AreEqual(sourceFilePath, diag.FilePath);
             Assert.AreEqual(4, diag.StartLine);
             Assert.AreEqual(1, diag.StartColumn);
@@ -118,7 +128,7 @@ int fun() {
 #define foo x*y
 ");
             var adapter = new ClangAdapter(sourceFilePath);
-            using (var preprocessor = adapter.GetPreprocessor())
+            var preprocessor = adapter.GetPreprocessor();
             {
                 Assert.AreEqual("2*y", preprocessor.ExpandMacro("foo"));
             }
@@ -133,7 +143,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
-            using (var preprocessor = adapter.GetPreprocessor())
+            var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
                 Assert.AreEqual(1, skippedBlock.Item1);
@@ -150,11 +160,108 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
-            using (var preprocessor = adapter.GetPreprocessor())
+            var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
                 Assert.AreEqual(1, skippedBlock.Item1);
                 Assert.AreEqual(3, skippedBlock.Item2);
+            }
+        }
+
+        [TestMethod]
+        public void GetSkippedBlocks_IfSingleElifDirectiveWithIfDirectiveFalse_SkippedBlockIncludesIfBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#define X 0
+#define Y 1
+#if X 
+#define foo x*y
+#elif Y
+#define foo x/y
+#endif
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
+                Assert.AreEqual(3, skippedBlock.Item1);
+                Assert.AreEqual(4, skippedBlock.Item2);
+            }
+        }
+
+        [TestMethod]
+        public void GetSkippedBlocks_IfMultipleElifDirectiveWithIfDirectiveFalseAndFirstElifDirectiveTrue_SkippedBlockIncludesFirstElifBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#define X 0
+#define Y 1
+#define Z 2
+#if X 
+#define foo x*y
+#elif Y
+#define foo x/y
+#elif Z
+#define foo x-y
+#endif
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().First();
+                Assert.AreEqual(5, skippedBlock.Item1);
+                Assert.AreEqual(5, skippedBlock.Item2);
+
+                skippedBlock = preprocessor.GetSkippedBlockLineNumbers().ElementAt(1);
+                Assert.AreEqual(9, skippedBlock.Item1);
+                Assert.AreEqual(9, skippedBlock.Item2);
+            }
+        }
+
+        [TestMethod]
+        public void GetSkippedBlocks_IfMultipleElifDirectiveWithIfDirectiveFalseAndSecondElifDirectiveTrue_SkippedBlockIncludesSecondElifBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#define X 0
+#define Y 0
+#define Z 2
+#if X 
+#define foo x*y
+#elif Y
+#define foo x/y
+#elif Z
+#define foo x-y
+#endif
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().First();
+                Assert.AreEqual(5, skippedBlock.Item1);
+                Assert.AreEqual(5, skippedBlock.Item2);
+
+                skippedBlock = preprocessor.GetSkippedBlockLineNumbers().ElementAt(1);
+                Assert.AreEqual(7, skippedBlock.Item1);
+                Assert.AreEqual(7, skippedBlock.Item2);
+            }
+        }
+        [TestMethod]
+        public void GetSkippedBlocks_IfSingleElifDirectiveWithElifDirectiveFalse_SkippedBlockIncludesElifBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#define X 1
+#define Y 0
+#if X 
+#define foo x*y
+#elif Y
+#define foo x/y
+#endif
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
+                Assert.AreEqual(5, skippedBlock.Item1);
+                Assert.AreEqual(6, skippedBlock.Item2);
             }
         }
         [TestInitialize]

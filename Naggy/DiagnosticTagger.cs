@@ -37,7 +37,7 @@ namespace Naggy
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
         {
-            debouncer.Add(0, FindDiagnostics);
+            //debouncer.Add(0, FindDiagnostics);
         }
         private SnapshotSpan lastTotalDiagnosticsSpan;
 
@@ -46,9 +46,10 @@ namespace Naggy
             spansAndErrorMessages.Clear();
 
             int minPosition = buffer.CurrentSnapshot.Length;
-            int maxPosition = 0; 
+            int maxPosition = 0;
 
-            foreach (var diagnostic in clangAdapter.GetDiagnostics(buffer.CurrentSnapshot.GetText()))
+            clangAdapter.Process(buffer.CurrentSnapshot.GetText());
+            foreach (var diagnostic in clangAdapter.GetDiagnostics())
             {
                 // Crude check, should find a more sophisticated way to check if two paths are equal, ignoring different directory separator chars.
                 if (Path.GetFileName(diagnostic.FilePath) == Path.GetFileName(document.FilePath))

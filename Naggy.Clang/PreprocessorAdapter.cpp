@@ -3,19 +3,20 @@
 #include "StringUtilities.h"
 #include "ClangPreprocessor.h"
 #include <string>
+#include "clang\Lex\Preprocessor.h"
 
 using namespace NaggyClang;
 using namespace System;
 using namespace System::Collections::Generic;
 
-PreprocessorAdapter::PreprocessorAdapter(const char* sourceFile)
+PreprocessorAdapter::PreprocessorAdapter(clang::Preprocessor &preprocessor)
 {
-	m_pPreprocessor = new ClangPreprocessor(sourceFile);
+	m_pPreprocessor = new ClangPreprocessor(preprocessor);
 }
 
-void PreprocessorAdapter::Preprocess()
+void PreprocessorAdapter::Reset()
 {
-	m_pPreprocessor->Process();
+	m_pPreprocessor->Reset();
 }
 
 String^ PreprocessorAdapter::ExpandMacro(String^ macroName)

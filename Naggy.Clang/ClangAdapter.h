@@ -2,12 +2,20 @@
 
 #pragma once
 
-#include "clang-c\Index.h"
-#include "PreprocessorAdapter.h"
 using namespace System;
 using namespace System::Collections::Generic;
+#include <vector>
+
+namespace clang
+{
+	class CompilerInstance;
+	class CompilerInvocation;
+}
+
+class StoredDiagnosticClient;
 
 namespace NaggyClang {
+	ref class PreprocessorAdapter;
 
 	public ref class Diagnostic
 	{
@@ -22,17 +30,24 @@ namespace NaggyClang {
 
 	public ref class ClangAdapter
 	{
-		CXTranslationUnit m_translationUnit;
-		char* m_filePath;
 	public:
-		ClangAdapter(String ^fileName) {Initialize(fileName, gcnew List<String^>(), gcnew List<String^>());}
-		ClangAdapter(String ^fileName, List<String^> ^includePaths) { Initialize(fileName, includePaths, gcnew List<String^>()); }
-		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols) { Initialize(fileName, includePaths, symbols); }
-		List<Diagnostic^> ^GetDiagnostics(String ^contents);
+		ClangAdapter(String^ fileName);
+		ClangAdapter(String ^fileName, List<String^> ^includePaths);
+		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols);
+
 		List<Diagnostic^> ^GetDiagnostics();
 		PreprocessorAdapter^ GetPreprocessor();
 
+		void Process(String ^contents);
 	private:
+		void Process();
 		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols);
+
+	private:
+		clang::CompilerInvocation* m_pInvocation;
+		clang::CompilerInstance * m_pInstance;
+		StoredDiagnosticClient *m_pDiagnosticClient;
+		char* m_filePath;
+		PreprocessorAdapter ^m_preprocessorAdapter;
 	};
 }

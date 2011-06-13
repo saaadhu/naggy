@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "clang\Lex\Preprocessor.h"
 
 using namespace System;
 
@@ -11,23 +12,22 @@ namespace NaggyClang
 	public ref class PreprocessorAdapter
 	{
 
-	internal:
-		PreprocessorAdapter(const char* sourceFile);
-		void Preprocess();
-
 	public:
+		PreprocessorAdapter(clang::Preprocessor &preprocessor);
+		void Reset();
+
 		String^ ExpandMacro(String ^macroName);
 		array<Tuple<int, int>^> ^GetSkippedBlockLineNumbers();
 
-		~PreprocessorAdapter()
-		{
-			delete m_pPreprocessor;
-		}
+		//~PreprocessorAdapter()
+		//{
+		//	delete m_pPreprocessor;
+		//}
 
-		!PreprocessorAdapter()
-		{
-			delete m_pPreprocessor;
-		}
+		//!PreprocessorAdapter()
+		//{
+		//	delete m_pPreprocessor;
+		//}
 
 	private:
 		ClangPreprocessor *m_pPreprocessor;

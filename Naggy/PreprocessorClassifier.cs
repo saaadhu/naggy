@@ -48,39 +48,45 @@ namespace Naggy
             debouncer.Add(0, FindSkippedRegions);
         }
 
+        object obj = new object();
+
         void FindSkippedRegions()
         {
-            excludedSpans.Clear();
-
-            int minPosition = buffer.CurrentSnapshot.Length;
-            int maxPosition = 0;
-
-            using (var preprocessor = clangAdapter.GetPreprocessor())
+            lock (obj)
             {
-                foreach (var skippedBlock in preprocessor.GetSkippedBlockLineNumbers())
+                excludedSpans.Clear();
+
+                int minPosition = buffer.CurrentSnapshot.Length;
+                int maxPosition = 0;
+
+                clangAdapter.Process(buffer.CurrentSnapshot.GetText());
+                var preprocessor = clangAdapter.GetPreprocessor();
                 {
-                    var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(skippedBlock.Item1 - 1);
-                    var startPosition = textLine.Start.Position;
+                    foreach (var skippedBlock in preprocessor.GetSkippedBlockLineNumbers())
+                    {
+                        var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(skippedBlock.Item1 - 1);
+                        var startPosition = textLine.Start.Position;
 
-                    var endTextLine = buffer.CurrentSnapshot.GetLineFromLineNumber(skippedBlock.Item2 - 1);
-                    var endPosition = endTextLine.End.Position;
+                        var endTextLine = buffer.CurrentSnapshot.GetLineFromLineNumber(skippedBlock.Item2 - 1);
+                        var endPosition = endTextLine.End.Position;
 
-                    minPosition = Math.Min(minPosition, startPosition);
-                    maxPosition = Math.Max(maxPosition, endPosition);
+                        minPosition = Math.Min(minPosition, startPosition);
+                        maxPosition = Math.Max(maxPosition, endPosition);
 
-                    SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
-                    excludedSpans.Add(span);
+                        SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
+                        excludedSpans.Add(span);
+                    }
                 }
-            }
 
-            if (excludedSpans.Any())
-            {
-                RaiseTagsChanged(minPosition, maxPosition);
-            }
-            else
-            {
-                if (ClassificationChanged != null)
-                    ClassificationChanged(this, new ClassificationChangedEventArgs(lastSpan));
+                if (excludedSpans.Any())
+                {
+                    RaiseTagsChanged(minPosition, maxPosition);
+                }
+                else
+                {
+                    if (ClassificationChanged != null)
+                        ClassificationChanged(this, new ClassificationChangedEventArgs(lastSpan));
+                }
             }
         }
 
