@@ -81,6 +81,7 @@
   <ItemGroup>
     <ClInclude Include="ClangAdapter.h" />
     <ClInclude Include="ClangPreprocessor.h" />
+    <ClInclude Include="IfBuilder.h" />
     <ClInclude Include="PreprocessorAdapter.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Stdafx.h" />
@@ -90,6 +91,7 @@
     <ClCompile Include="AssemblyInfo.cpp" />
     <ClCompile Include="ClangAdapter.cpp" />
     <ClCompile Include="ClangPreprocessor.cpp" />
+    <ClCompile Include="IfBuilder.cpp" />
     <ClCompile Include="PreprocessorAdapter.cpp" />
     <ClCompile Include="Stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

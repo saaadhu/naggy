@@ -45,6 +45,7 @@ namespace Naggy
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
         {
+            FindSkippedRegions();
             debouncer.Add(0, FindSkippedRegions);
         }
 

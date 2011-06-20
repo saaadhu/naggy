@@ -11,6 +11,7 @@
 #include "clang\Basic\TargetInfo.h"
 #include <string>
 #include <vector>
+#include "IfBuilder.h"
 
 namespace NaggyClang
 {
@@ -47,86 +48,97 @@ namespace NaggyClang
 		int previousConditionalStackSize;
 		bool elifSeen;
 		clang::SourceRange firstElifSourceRange;
-		std::vector<std::pair<unsigned int, unsigned int>> &m_skippedBlocks;
+		clang::SourceRange previousElifStart;
+		clang::SourceLocation lastEndIfStart;
+		IfBuilder ifBuilder;
 
 	public:
-		Callback(clang::Preprocessor *pPreprocessor, std::vector<std::pair<unsigned int, unsigned int>> &skippedBlocks) : m_pPreprocessor(pPreprocessor), m_skippedBlocks(skippedBlocks), previousConditionalStackSize(0),
+		Callback(clang::Preprocessor *pPreprocessor, std::vector<std::pair<unsigned int, unsigned int>> &skippedBlocks) : m_pPreprocessor(pPreprocessor), ifBuilder(skippedBlocks), previousConditionalStackSize(0),
 			elifSeen(false)
 		{ }
 
-		virtual void Ifdef(const clang::Token &tok)
+		virtual void Ifdef(const clang::Token &tok, bool entering)
 		{
-			if (IfBlockSkipped())
-				AddSkippedBlock(tok.getLocation(), GetCurrentLocation());
+			ifBuilder.AddBlockStart(GetLine(tok.getLocation()), entering);
 		}
 
-		virtual void If(clang::SourceRange range)
+		virtual void If(clang::SourceRange range, bool entering)
 		{
-			if (elifSeen || IfBlockSkipped())
-				AddSkippedBlock(range.getBegin(), elifSeen ? firstElifSourceRange.getBegin() : GetCurrentLocation());
-
-			elifSeen = false;
+			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
 		}
 
-		virtual void Elif(clang::SourceRange range)
+		virtual void Elif(clang::SourceRange range, bool entering)
 		{
-			if (!elifSeen)
-				firstElifSourceRange = range;
+			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
 
-			elifSeen = true;
-			
-			if (FoundNonSkip())
-				AddSkippedBlock(range.getBegin(), GetCurrentLocation());
+			//if (previousElifStart.isValid())
+			//{
+			//	AddSkippedBlock(previousElifStart.getBegin(), range.getBegin());
+			//	previousElifStart = clang::SourceRange();
+			//}	
+
+			//
+			//if (!entering)
+			//{
+			//	previousElifStart = range;
+
+			//	if (firstElifSourceRange.isValid())
+			//	{
+			//		AddSkippedBlock(range.getBegin(), firstElifSourceRange.getBegin());
+			//	}
+			//}
+
+			//if (!elifSeen)
+			//	firstElifSourceRange = range;
+
+			//elifSeen = true;
 		}
+
+		virtual void Endif()
+		{
+			ifBuilder.AddBlockStart(GetLine(GetCurrentLocation()), false);
+			//if (previousElifStart.isValid())
+			//{
+			//	AddSkippedBlock(previousElifStart.getBegin(), GetCurrentLocation());
+			//	previousElifStart = clang::SourceRange();
+			//}	
+		}
+
 	private:
-		bool IfBlockSkipped()
-		{
-			return previousConditionalStackSize == GetConditionalStackSize();
-
-		}
-
 		const clang::SourceLocation GetCurrentLocation()
 		{
 			return ((clang::Lexer*)m_pPreprocessor->getCurrentLexer())->getSourceLocation();
 		}
 
-		void AddSkippedBlock(const clang::SourceLocation &start, const clang::SourceLocation &end)
+		const unsigned int GetLine(const clang::SourceLocation &loc)
 		{
+			unsigned int line = 0;
 			clang::SourceManager &sm = m_pPreprocessor->getSourceManager();
-			if (sm.isFromMainFile(start))
+			if (sm.isFromMainFile(loc))
 			{
-				unsigned int startLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(start));
-				unsigned int endLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(end));
-
-				startLine++;
-				endLine--;
-
-				m_skippedBlocks.push_back(std::pair<unsigned int, unsigned int>(startLine, endLine));
+				line = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(loc));
 			}
+
+			return line;
 		}
 
-		unsigned int GetConditionalStackSize()
-		{
-			clang::PreprocessorLexer *pLexer = m_pPreprocessor->getCurrentLexer();
-			clang::PreprocessorLexer::conditional_iterator iter = pLexer->conditional_begin();
+		//void AddSkippedBlock(const clang::SourceLocation &start, const clang::SourceLocation &end)
+		//{
+		//	clang::SourceManager &sm = m_pPreprocessor->getSourceManager();
+		//	if (sm.isFromMainFile(start))
+		//	{
+		//		unsigned int startLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(start));
+		//		unsigned int endLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(end));
 
-			unsigned int size = 0;
-			for(; iter != pLexer->conditional_end(); ++iter)
-				size++;
+		//		if (startLine > endLine)
+		//			return;
 
-			return size;
-		}
+		//		startLine++;
+		//		endLine--;
 
-		bool FoundNonSkip()
-		{
-			clang::PreprocessorLexer *pLexer = m_pPreprocessor->getCurrentLexer();
-			clang::PreprocessorLexer::conditional_iterator iter = pLexer->conditional_begin();
-
-			if (iter == pLexer->conditional_end())
-				return true;
-
-			return iter->FoundNonSkip;
-		}
+		//		m_skippedBlocks.push_back(std::pair<unsigned int, unsigned int>(startLine, endLine));
+		//	}
+		//}
 
 		clang::Preprocessor *m_pPreprocessor;
 	};
