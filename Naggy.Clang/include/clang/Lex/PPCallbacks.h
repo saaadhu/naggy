@@ -164,7 +164,7 @@ public:
   }
 
   /// Else -- This hook is called whenever an #else is seen.
-  virtual void Else(bool Entering=false) {
+  virtual void Else(SourceRange Range, bool Entering=false) {
   }
 
   /// Endif -- This hook is called whenever an #endif is seen.
@@ -272,9 +272,9 @@ public:
   }
 
   /// Else -- This hook is called whenever an #else is seen.
-  virtual void Else(bool Entering=false) {
-    First->Else(Entering);
-    Second->Else(Entering);
+  virtual void Else(SourceRange Range, bool Entering=false) {
+    First->Else(Range, Entering);
+    Second->Else(Range, Entering);
   }
 
   /// Endif -- This hook is called whenever an #endif is seen.

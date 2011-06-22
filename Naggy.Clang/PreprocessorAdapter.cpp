@@ -32,6 +32,8 @@ array<Tuple<int, int>^> ^PreprocessorAdapter::GetSkippedBlockLineNumbers()
 {
     List<Tuple<int, int>^> ^blocks = gcnew List<Tuple<int, int>^>();
 
+	m_pPreprocessor->SortSkippedBlocks();
+
 	ClangPreprocessor::skipped_blocks_iterator iter = m_pPreprocessor->skipped_blocks_begin();
 	for(; iter != m_pPreprocessor->skipped_blocks_end(); ++iter)
 	{

@@ -29,6 +29,11 @@ namespace NaggyClang
 			m_skippedBlocks.clear();
 		}
 
+		void SortSkippedBlocks()
+		{
+			std::sort(m_skippedBlocks.begin(), m_skippedBlocks.end());
+		}
+
 		typedef std::vector<std::pair<unsigned int, unsigned int>>::const_iterator skipped_blocks_iterator;
 
 		skipped_blocks_iterator skipped_blocks_begin() { return m_skippedBlocks.begin(); }
@@ -96,12 +101,17 @@ namespace NaggyClang
 
 		virtual void Endif()
 		{
-			ifBuilder.AddBlockStart(GetLine(GetCurrentLocation()), false);
+			ifBuilder.AddBlockStart(GetLine(GetCurrentLocation()), true);
 			//if (previousElifStart.isValid())
 			//{
 			//	AddSkippedBlock(previousElifStart.getBegin(), GetCurrentLocation());
 			//	previousElifStart = clang::SourceRange();
 			//}	
+		}
+
+		virtual void Else(clang::SourceRange range, bool entering)
+		{
+			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
 		}
 
 	private:

@@ -19,7 +19,6 @@ void IfBuilder::AddBlockStart(int line, bool entered)
 
 void IfBuilder::CreateBlocks()
 {
-	m_blocks.clear();
 	std::sort(m_blockStarts.begin(), m_blockStarts.end());
 
 	for (unsigned int i = 0; i<m_blockStarts.size(); ++i)
@@ -29,7 +28,11 @@ void IfBuilder::CreateBlocks()
 			std::pair<int, bool> currentBlockStart = m_blockStarts[i];
 
 			if (!currentBlockStart.second) // this block was NOT entered, so include in skipped blocks
-				m_blocks.push_back(std::make_pair(currentBlockStart.first + 1, m_blockStarts[i+1].first - 1));
+			{
+				const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlockStart.first + 1, m_blockStarts[i+1].first - 1);
+				if (std::find(m_blocks.begin(), m_blocks.end(), block) == m_blocks.end())
+					m_blocks.push_back(block);
+			}
 		}
 	}
 }
