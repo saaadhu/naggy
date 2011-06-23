@@ -45,7 +45,6 @@ namespace Naggy
             var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
             Func<IClassifier> preprocessorClassifierFunc = () => new PreprocessorClassifier(dte, textBuffer, classificationTypeRegistry) as IClassifier;
             return textBuffer.Properties.GetOrCreateSingletonProperty<IClassifier>(preprocessorClassifierFunc);
-            return new PreprocessorClassifier(dte, textBuffer, classificationTypeRegistry);
         }
     }
 //;

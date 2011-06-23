@@ -12,5 +12,9 @@ IfBuilder::~IfBuilder(void)
 
 void IfBuilder::AddBlockStart(int line, bool entered)
 {
+	// Invalid line, don't add
+	if (line == 0)
+		return;
+
 	m_blockStarts.push_back(std::make_pair(line, entered));
 }

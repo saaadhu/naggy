@@ -99,10 +99,14 @@ namespace Naggy
                 return null;
 
             var projectItem = dte.Solution.FindProjectItem(fileName);
-            if (projectItem == null || projectItem.ContainingProject == null || projectItem.ContainingProject.Properties == null)
+            if (projectItem != null && projectItem.ContainingProject != null && projectItem.ContainingProject.Properties != null)
+                return projectItem.ContainingProject;
+
+            Array arr = (Array)dte.ActiveSolutionProjects;
+            if (arr.Length == 0)
                 return null;
 
-            return projectItem.ContainingProject;
+            return (Project)arr.GetValue(0);
         }
 
         private static string GetPropertyValue(dynamic toolchainData, string propertyId)

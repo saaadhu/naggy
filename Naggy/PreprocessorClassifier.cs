@@ -46,7 +46,7 @@ namespace Naggy
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
         {
             FindSkippedRegions();
-            debouncer.Add(0, FindSkippedRegions);
+            //debouncer.Add(0, FindSkippedRegions);
         }
 
         object obj = new object();
@@ -86,7 +86,8 @@ namespace Naggy
                 else
                 {
                     if (ClassificationChanged != null)
-                        ClassificationChanged(this, new ClassificationChangedEventArgs(lastSpan));
+                        ClassificationChanged(this, 
+                            new ClassificationChangedEventArgs(lastSpan.IsEmpty ? new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(0, 0)) : lastSpan));
                 }
             }
         }

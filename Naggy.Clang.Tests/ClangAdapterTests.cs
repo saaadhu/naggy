@@ -415,6 +415,49 @@ int fun() {
             }
         }
 
+        [TestMethod]
+        public void GetSkippedBlocks_IfDefinedBlockWithUndefinedMacro_SkippedBlockIncludesIfDefinedBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#if defined(OOLALALA)
+#  include <avr/io.h>
+#endif");
+            var adapter = new ClangAdapter(sourceFilePath);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
+                var skippedBlock = skippedBlocks.First();
+                Assert.AreEqual(2, skippedBlock.Item1);
+                Assert.AreEqual(2, skippedBlock.Item2);
+            }
+        }
+
+        [TestMethod]
+        public void GetSkippedBlocks_IfDefinedBlockWithDefinedMacro_SkippedBlockIncludesIfDefinedBlock()
+        {
+            File.WriteAllText(sourceFilePath,
+@"#if defined(__GNUC__)
+#  include <avr/io.h>
+#elif defined(__ICCAVR__)
+#  include <ioavr.h>
+#  include <intrinsics.h>
+#else
+#  error Unsupported compiler.
+#endif");
+            var adapter = new ClangAdapter(sourceFilePath);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
+                var skippedBlock = skippedBlocks.First();
+                Assert.AreEqual(4, skippedBlock.Item1);
+                Assert.AreEqual(5, skippedBlock.Item2);
+
+                skippedBlock = skippedBlocks.ElementAt(1);
+
+                Assert.AreEqual(7, skippedBlock.Item1);
+                Assert.AreEqual(7, skippedBlock.Item2);
+            }
+        }
         [TestInitialize]
         public void Setup()
         {
