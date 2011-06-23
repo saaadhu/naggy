@@ -13,32 +13,26 @@ namespace Naggy
     class DiagnosticTagger : ITagger<ErrorTag>
     {
         private readonly ITextBuffer buffer;
-        private readonly ITextDocument document;
-        private readonly ClangAdapter clangAdapter;
         private readonly DTE dte;
+        ITextDocument document;
 
         readonly List<Tuple<SnapshotSpan, string>> spansAndErrorMessages = new List<Tuple<SnapshotSpan, string>>();
-        DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1000);
+        DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1200);
 
         public DiagnosticTagger(DTE dte, ITextBuffer buffer)
         {
             this.dte = dte;
             this.buffer = buffer;
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
-            buffer.Properties.TryGetProperty(typeof (ITextDocument), out document);
-
-            var filePath = document.FilePath;
-            var includePaths = AVRStudio.GetIncludePaths(filePath, dte);
-            var symbols = AVRStudio.GetPredefinedSymbols(filePath, dte);
-            clangAdapter = new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols));
-
+            buffer.Properties.TryGetProperty(typeof(ITextDocument), out document);
             debouncer.Add(0, FindDiagnostics);
         }
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
         {
-            //debouncer.Add(0, FindDiagnostics);
+            debouncer.Add(0, FindDiagnostics);
         }
+
         private SnapshotSpan lastTotalDiagnosticsSpan;
 
         private void FindDiagnostics()
@@ -48,8 +42,8 @@ namespace Naggy
             int minPosition = buffer.CurrentSnapshot.Length;
             int maxPosition = 0;
 
-            clangAdapter.Process(buffer.CurrentSnapshot.GetText());
-            foreach (var diagnostic in clangAdapter.GetDiagnostics())
+            ClangServices.Process(buffer);
+            foreach (var diagnostic in ClangServices.GetDiagnostics(buffer))
             {
                 // Crude check, should find a more sophisticated way to check if two paths are equal, ignoring different directory separator chars.
                 if (Path.GetFileName(diagnostic.FilePath) == Path.GetFileName(document.FilePath))

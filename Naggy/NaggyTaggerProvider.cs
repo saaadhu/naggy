@@ -21,6 +21,7 @@ namespace Naggy
         public ITagger<T> CreateTagger<T>(ITextBuffer buffer) where T : ITag
         {
             var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
+            ClangServices.Initialize(dte);
             Func<ITagger<T>> taggerFunc = () => new DiagnosticTagger(dte, buffer) as ITagger<T>;
             return buffer.Properties.GetOrCreateSingletonProperty<ITagger<T>>(taggerFunc);
         }
@@ -43,32 +44,10 @@ namespace Naggy
         public IClassifier GetClassifier(ITextBuffer textBuffer)
         {
             var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
+            ClangServices.Initialize(dte);
             Func<IClassifier> preprocessorClassifierFunc = () => new PreprocessorClassifier(dte, textBuffer, classificationTypeRegistry) as IClassifier;
             return textBuffer.Properties.GetOrCreateSingletonProperty<IClassifier>(preprocessorClassifierFunc);
         }
     }
-//;
-//    [Export(typeof(ITaggerProvider))]
-//    [TagType(typeof(ClassificationTag))]
-//    [ContentType("AVRGcc")]
-//    public sealed class PreprocessorHighlightTaggerProvider : ITaggerProvider
-//    {
-//        public ITagger<T> CreateTagger<T>(ITextBuffer buffer) where T : ITag
-//        {
-//            var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
-//            var agg = Aggregator.CreateTagAggregator<ClassificationTag>(buffer);
-//            Func<ITagger<T>> taggerFunc = () => new PreprocessorHighlighterTagger(dte, buffer, ClassificationRegistry, agg) as ITagger<T>;
-//            return buffer.Properties.GetOrCreateSingletonProperty<ITagger<T>>(taggerFunc);
-//        }
-
-//        [Import]
-//        internal IClassificationTypeRegistryService ClassificationRegistry = null;
-//        [Import]
-//        internal IBufferTagAggregatorFactoryService Aggregator = null;
-
-//        [Import]
-//        internal SVsServiceProvider ServiceProvider = null;
-
-//    }
 }
 

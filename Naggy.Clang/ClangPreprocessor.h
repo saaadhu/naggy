@@ -43,8 +43,7 @@ namespace NaggyClang
 					if (!currentBlockStart.second) // this block was NOT entered, so include in skipped blocks
 					{
 						const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlockStart.first + 1, m_blockStarts[i+1].first - 1);
-						if (std::find(m_skippedBlocks.begin(), m_skippedBlocks.end(), block) == m_skippedBlocks.end())
-							m_skippedBlocks.push_back(block);
+						m_skippedBlocks.push_back(block);
 					}
 				}
 			}

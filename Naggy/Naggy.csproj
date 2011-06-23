@@ -84,6 +84,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AVRStudio.cs" />
+    <Compile Include="ClangServices.cs" />
     <Compile Include="DelayedRequestExecutor.cs" />
     <Compile Include="DeviceNameToPredefinedSymbolMapper.cs" />
     <Compile Include="DiagnosticTagger.cs" />

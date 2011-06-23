@@ -14,14 +14,11 @@ namespace Naggy
     class PreprocessorClassifier : IClassifier
     {
         private readonly ITextBuffer buffer;
-        private readonly ITextDocument document;
-        private readonly ClangAdapter clangAdapter;
         private IClassificationType excludedCodeClassificationType;
-        private readonly DTE dte;
         private SnapshotSpan lastSpan;
 
         readonly List<SnapshotSpan> excludedSpans = new List<SnapshotSpan>();
-        DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1000);
+        DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(3000);
         IClassificationTypeRegistryService classificationRegistry;
 
         public PreprocessorClassifier(DTE dte, ITextBuffer buffer, Microsoft.VisualStudio.Text.Classification.IClassificationTypeRegistryService classificationRegistry)
@@ -30,23 +27,15 @@ namespace Naggy
 
             excludedCodeClassificationType = this.classificationRegistry.GetClassificationType(Constants.ClassificationName);
 
-            this.dte = dte;
             this.buffer = buffer;
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
-            buffer.Properties.TryGetProperty(typeof (ITextDocument), out document);
 
-            var filePath = document.FilePath;
-            var includePaths = AVRStudio.GetIncludePaths(filePath, dte);
-            var symbols = AVRStudio.GetPredefinedSymbols(filePath, dte);
-            clangAdapter = new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols));
-
-            debouncer.Add(0, FindSkippedRegions);
+            debouncer.Add(1, FindSkippedRegions);
         }
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
         {
-            FindSkippedRegions();
-            //debouncer.Add(0, FindSkippedRegions);
+            debouncer.Add(1, FindSkippedRegions);
         }
 
         object obj = new object();
@@ -60,8 +49,8 @@ namespace Naggy
                 int minPosition = buffer.CurrentSnapshot.Length;
                 int maxPosition = 0;
 
-                clangAdapter.Process(buffer.CurrentSnapshot.GetText());
-                var preprocessor = clangAdapter.GetPreprocessor();
+                ClangServices.Process(buffer);
+                var preprocessor = ClangServices.GetPreprocessorAdapter(buffer);
                 {
                     foreach (var skippedBlock in preprocessor.GetSkippedBlockLineNumbers())
                     {
