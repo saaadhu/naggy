@@ -29,9 +29,25 @@ namespace NaggyClang
 			m_skippedBlocks.clear();
 		}
 
-		void SortSkippedBlocks()
+		void CalculateSkippedBlocks()
 		{
-			std::sort(m_skippedBlocks.begin(), m_skippedBlocks.end());
+			m_skippedBlocks.clear();
+			std::sort(m_blockStarts.begin(), m_blockStarts.end());
+
+			for (unsigned int i = 0; i<m_blockStarts.size(); ++i)
+			{
+				if (i != m_blockStarts.size() - 1)
+				{
+					std::pair<int, bool> currentBlockStart = m_blockStarts[i];
+
+					if (!currentBlockStart.second) // this block was NOT entered, so include in skipped blocks
+					{
+						const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlockStart.first + 1, m_blockStarts[i+1].first - 1);
+						if (std::find(m_skippedBlocks.begin(), m_skippedBlocks.end(), block) == m_skippedBlocks.end())
+							m_skippedBlocks.push_back(block);
+					}
+				}
+			}
 		}
 
 		typedef std::vector<std::pair<unsigned int, unsigned int>>::const_iterator skipped_blocks_iterator;
@@ -45,6 +61,7 @@ namespace NaggyClang
 		Callback *m_pCallback;
 		clang::Preprocessor *m_pPreprocessor;
 
+		std::vector<std::pair<unsigned int, bool>> m_blockStarts;
 		std::vector<std::pair<unsigned int, unsigned int>> m_skippedBlocks;
 	};
 
@@ -58,7 +75,7 @@ namespace NaggyClang
 		IfBuilder ifBuilder;
 
 	public:
-		Callback(clang::Preprocessor *pPreprocessor, std::vector<std::pair<unsigned int, unsigned int>> &skippedBlocks) : m_pPreprocessor(pPreprocessor), ifBuilder(skippedBlocks), previousConditionalStackSize(0),
+		Callback(clang::Preprocessor *pPreprocessor, std::vector<std::pair<unsigned int, bool>> &blockStarts) : m_pPreprocessor(pPreprocessor), ifBuilder(blockStarts), previousConditionalStackSize(0),
 			elifSeen(false)
 		{ }
 
@@ -75,38 +92,11 @@ namespace NaggyClang
 		virtual void Elif(clang::SourceRange range, bool entering)
 		{
 			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
-
-			//if (previousElifStart.isValid())
-			//{
-			//	AddSkippedBlock(previousElifStart.getBegin(), range.getBegin());
-			//	previousElifStart = clang::SourceRange();
-			//}	
-
-			//
-			//if (!entering)
-			//{
-			//	previousElifStart = range;
-
-			//	if (firstElifSourceRange.isValid())
-			//	{
-			//		AddSkippedBlock(range.getBegin(), firstElifSourceRange.getBegin());
-			//	}
-			//}
-
-			//if (!elifSeen)
-			//	firstElifSourceRange = range;
-
-			//elifSeen = true;
 		}
 
 		virtual void Endif()
 		{
 			ifBuilder.AddBlockStart(GetLine(GetCurrentLocation()), true);
-			//if (previousElifStart.isValid())
-			//{
-			//	AddSkippedBlock(previousElifStart.getBegin(), GetCurrentLocation());
-			//	previousElifStart = clang::SourceRange();
-			//}	
 		}
 
 		virtual void Else(clang::SourceRange range, bool entering)
@@ -131,24 +121,6 @@ namespace NaggyClang
 
 			return line;
 		}
-
-		//void AddSkippedBlock(const clang::SourceLocation &start, const clang::SourceLocation &end)
-		//{
-		//	clang::SourceManager &sm = m_pPreprocessor->getSourceManager();
-		//	if (sm.isFromMainFile(start))
-		//	{
-		//		unsigned int startLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(start));
-		//		unsigned int endLine = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(end));
-
-		//		if (startLine > endLine)
-		//			return;
-
-		//		startLine++;
-		//		endLine--;
-
-		//		m_skippedBlocks.push_back(std::pair<unsigned int, unsigned int>(startLine, endLine));
-		//	}
-		//}
 
 		clang::Preprocessor *m_pPreprocessor;
 	};

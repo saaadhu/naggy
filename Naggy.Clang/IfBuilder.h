@@ -4,14 +4,11 @@
 class IfBuilder
 {
 public:
-	IfBuilder(std::vector<std::pair<unsigned int, unsigned int>> &skippedBlocks);
+	IfBuilder(std::vector<std::pair<unsigned int, bool>> &skippedBlocks);
 	~IfBuilder(void);
 
 	void AddBlockStart(int startLine, bool entered);
 private:
-	void CreateBlocks();
-
-	std::vector<std::pair<unsigned int, unsigned int>> &m_blocks;
-	std::vector<std::pair<int, bool>> m_blockStarts;
+	std::vector<std::pair<unsigned int, bool>> &m_blockStarts;
 };
 

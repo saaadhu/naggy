@@ -11,7 +11,7 @@
 #include <vector>
 using namespace NaggyClang;
 
-ClangPreprocessor::ClangPreprocessor(clang::Preprocessor &preprocessor) : m_pPreprocessor(&preprocessor), m_pCallback(new Callback(&preprocessor, m_skippedBlocks))
+ClangPreprocessor::ClangPreprocessor(clang::Preprocessor &preprocessor) : m_pPreprocessor(&preprocessor), m_pCallback(new Callback(&preprocessor, m_blockStarts))
 {
 	preprocessor.addPPCallbacks(m_pCallback);
 }
