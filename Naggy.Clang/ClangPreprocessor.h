@@ -88,6 +88,11 @@ namespace NaggyClang
 		{
 			ifBuilder.AddBlockStart(GetLine(tok.getLocation()), entering);
 		}
+		
+		virtual void Ifndef(const clang::Token &tok, bool entering)
+		{
+			ifBuilder.AddBlockStart(GetLine(tok.getLocation()), entering);
+		}
 
 		virtual void If(clang::SourceRange range, bool entering)
 		{

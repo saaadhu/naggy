@@ -192,6 +192,26 @@ int fun() {
         }
 
         [TestMethod]
+        public void GetSkippedBlocks_IfNDefDirectiveWithDefinition_SkippedBlockIncludesElseBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#define HUHU 1
+#ifndef HUHU
+#define foo x*y
+#else
+#define foo x-y
+#endif
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
+                Assert.AreEqual(3, skippedBlock.Item1);
+                Assert.AreEqual(3, skippedBlock.Item2);
+            }
+        }
+        [TestMethod]
         public void GetSkippedBlocks_IfDirectiveWithoutDefinition_SkippedBlockIncludesIfBlock()
         {
             File.WriteAllText(sourceFilePath, 
