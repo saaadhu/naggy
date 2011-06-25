@@ -135,6 +135,7 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, Lis
 	this->predefinedSymbols = predefinedSymbols;
 
 	m_filePath = (char *) ToCString(filePath);
+	m_pInstance = NULL;
 	CreateClangCompiler();
 }
 

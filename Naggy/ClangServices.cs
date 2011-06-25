@@ -21,12 +21,13 @@ namespace Naggy
 
         public static void Process(ITextBuffer buffer)
         {
-            if (lastProcessedSnapshot == buffer.CurrentSnapshot)
-                return;
-
             lock (sync)
             {
+                if (lastProcessedSnapshot == buffer.CurrentSnapshot)
+                    return;
+
                 var clangAdapter = GetClangAdapterForBuffer(buffer);
+
                 clangAdapter.Process(buffer.CurrentSnapshot.GetText());
                 lastProcessedSnapshot = buffer.CurrentSnapshot;
             }
