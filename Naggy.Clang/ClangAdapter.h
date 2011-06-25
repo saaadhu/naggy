@@ -40,14 +40,18 @@ namespace NaggyClang {
 
 		void Process(String ^contents);
 	private:
-		void Process();
 		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols);
 
+		void InitializeInvocation(clang::CompilerInvocation *pInvocation);
+		void CreateClangCompiler();
+		void DestroyClangCompiler();
+
 	private:
-		clang::CompilerInvocation* m_pInvocation;
 		clang::CompilerInstance * m_pInstance;
 		StoredDiagnosticClient *m_pDiagnosticClient;
 		char* m_filePath;
+		List<String^> ^includePaths;
+		List<String^> ^predefinedSymbols;
 		PreprocessorAdapter ^m_preprocessorAdapter;
 	};
 }

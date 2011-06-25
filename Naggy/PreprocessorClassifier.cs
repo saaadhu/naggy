@@ -75,8 +75,7 @@ namespace Naggy
                 else
                 {
                     if (ClassificationChanged != null)
-                        ClassificationChanged(this, 
-                            new ClassificationChangedEventArgs(lastSpan.IsEmpty ? new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(0, 0)) : lastSpan));
+                        ClassificationChanged(this, new ClassificationChangedEventArgs(new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(0, 0))));
                 }
             }
         }

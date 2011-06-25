@@ -70,38 +70,50 @@ ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<
 	Initialize(fileName, includePaths, symbols); 
 }
 
-void ClangAdapter::Process(String ^contents)
-{
-	const char* pContents = ToCString(contents);
-
-	m_pInvocation->getPreprocessorOpts().addRemappedFile(m_filePath, llvm::MemoryBuffer::getMemBufferCopy(pContents));
-
-	Process();
-
-	m_pInvocation->getPreprocessorOpts().clearRemappedFiles();
-	Marshal::FreeHGlobal(IntPtr((void *)pContents));
-}
-
 class PreprocessorBlockCaptureAction : public clang::SyntaxOnlyAction
 {
 public:
-	gcroot<PreprocessorAdapter^> preprocessorAdapter;
+	gcroot<PreprocessorAdapter^> m_preprocessorAdapter;
+
+	PreprocessorBlockCaptureAction(PreprocessorAdapter^ preprocessorAdapter) : m_preprocessorAdapter(preprocessorAdapter)
+	{}
 
 	virtual bool BeginSourceFileAction(clang::CompilerInstance &CI,
 		llvm::StringRef Filename) {
-			preprocessorAdapter = gcnew PreprocessorAdapter(CI.getPreprocessor());
+			if (!m_preprocessorAdapter || !m_preprocessorAdapter->IsAlreadyAttached(CI.getPreprocessor()))
+			{
+				m_preprocessorAdapter = gcnew PreprocessorAdapter(CI.getPreprocessor());
+			}
+			else
+			{
+				m_preprocessorAdapter->Reset();
+			}
 			return true;
 	}
 };
-
-void ClangAdapter::Process()
+void ClangAdapter::Process(String ^contents)
 {
-	m_pDiagnosticClient->clear();	
+	DestroyClangCompiler();
 
-	PreprocessorBlockCaptureAction action;
+	const char* pContents = ToCString(contents);
+	CreateClangCompiler();
+
+	m_pDiagnosticClient->clear();	
+	clang::CompilerInvocation *pInvocation = new clang::CompilerInvocation();
+	InitializeInvocation(pInvocation);
+
+	if (pContents)
+		pInvocation->getPreprocessorOpts().addRemappedFile(m_filePath, llvm::MemoryBuffer::getMemBufferCopy(pContents));
+
+	m_pInstance->setInvocation(pInvocation);
+
+	PreprocessorBlockCaptureAction action(m_preprocessorAdapter);
 	m_pInstance->ExecuteAction(action);
-	m_preprocessorAdapter = action.preprocessorAdapter;
+	m_preprocessorAdapter = action.m_preprocessorAdapter;
+
+	Marshal::FreeHGlobal(IntPtr((void *)pContents));
 }
+
 
 List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
 {
@@ -119,28 +131,11 @@ List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
 
 void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols)
 {
+	this->includePaths = includePaths;
+	this->predefinedSymbols = predefinedSymbols;
+
 	m_filePath = (char *) ToCString(filePath);
-
-	m_pInvocation = new clang::CompilerInvocation();
-	m_pInvocation->getPreprocessorOpts().RetainRemappedFileBuffers = true;
-	m_pInvocation->getFrontendOpts().Inputs.push_back(std::pair<clang::InputKind, std::string>(clang::IK_CXX, m_filePath));
-	m_pInvocation->getFrontendOpts().ProgramAction = clang::frontend::ParseSyntaxOnly;
-	m_pInvocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
-
-	for each(String^ path in includePaths)
-	{
-		m_pInvocation->getHeaderSearchOpts().AddPath(ToCString(path), clang::frontend::Angled, true, false, true);
-	}
-
-	for each(String^ symbol in predefinedSymbols)
-	{
-		m_pInvocation->getPreprocessorOpts().addMacroDef(ToCString(symbol));
-	}
-
-	m_pInstance = new clang::CompilerInstance();
-	m_pInstance->setInvocation(m_pInvocation);
-	m_pDiagnosticClient = new StoredDiagnosticClient();
-	m_pInstance->createDiagnostics(0, NULL, m_pDiagnosticClient);
+	CreateClangCompiler();
 
 	Process(System::IO::File::ReadAllText(filePath));
 }
@@ -148,4 +143,36 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, Lis
 PreprocessorAdapter^ ClangAdapter::GetPreprocessor()
 {
 	return m_preprocessorAdapter;
+}
+
+void ClangAdapter::CreateClangCompiler()
+{
+	m_pInstance = new clang::CompilerInstance();
+	m_pDiagnosticClient = new StoredDiagnosticClient();
+	m_pInstance->createDiagnostics(0, NULL, m_pDiagnosticClient);
+}
+
+void ClangAdapter::DestroyClangCompiler()
+{
+	if (m_pInstance)
+		delete m_pInstance;
+
+	m_pInstance = NULL;
+}
+
+void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
+{
+	pInvocation->getFrontendOpts().Inputs.push_back(std::pair<clang::InputKind, std::string>(clang::IK_CXX, m_filePath));
+	pInvocation->getFrontendOpts().ProgramAction = clang::frontend::ParseSyntaxOnly;
+	pInvocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+
+	for each(String^ path in includePaths)
+	{
+		pInvocation->getHeaderSearchOpts().AddPath(ToCString(path), clang::frontend::Angled, true, false, true);
+	}
+
+	for each(String^ symbol in predefinedSymbols)
+	{
+		pInvocation->getPreprocessorOpts().addMacroDef(ToCString(symbol));
+	}
 }

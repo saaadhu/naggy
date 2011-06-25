@@ -26,7 +26,13 @@ namespace NaggyClang
 		std::string ExpandMacro(const char* macroName);
 		void Reset()
 		{
+			m_blockStarts.clear();
 			m_skippedBlocks.clear();
+		}
+
+		clang::Preprocessor* GetPreprocessor()
+		{
+			return m_pPreprocessor;
 		}
 
 		void CalculateSkippedBlocks()
@@ -115,7 +121,7 @@ namespace NaggyClang
 			clang::SourceManager &sm = m_pPreprocessor->getSourceManager();
 			if (sm.isFromMainFile(loc))
 			{
-				line = sm.getLineNumber(sm.getMainFileID(), sm.getFileOffset(loc));
+				line = sm.getSpellingLineNumber(loc);
 			}
 
 			return line;

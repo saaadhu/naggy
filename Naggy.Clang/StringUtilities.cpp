@@ -5,6 +5,9 @@ using namespace System::Runtime::InteropServices;
 
 const char* ToCString(String ^str)
 {
+	if (!str)
+		return NULL;
+
 	System::IntPtr ptr = Marshal::StringToHGlobalAnsi(str);
 	return (const char *)ptr.ToPointer();
 }

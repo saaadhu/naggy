@@ -14,6 +14,11 @@ PreprocessorAdapter::PreprocessorAdapter(clang::Preprocessor &preprocessor)
 	m_pPreprocessor = new ClangPreprocessor(preprocessor);
 }
 
+bool PreprocessorAdapter::IsAlreadyAttached(clang::Preprocessor &preprocessor)
+{
+	return m_pPreprocessor->GetPreprocessor() == &preprocessor;
+}
+
 void PreprocessorAdapter::Reset()
 {
 	m_pPreprocessor->Reset();

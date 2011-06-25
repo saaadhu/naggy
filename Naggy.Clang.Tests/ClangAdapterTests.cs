@@ -50,6 +50,39 @@ namespace Naggy.Clang.Tests
         }
 
         [TestMethod]
+        public void GetDiagnostics_CFileInDiskHasPreprocessorCodeAndNoWarningsTextHasOneWarning_OneDiagnosticsReturned()
+        {
+            var sourceInFile =
+@"#if defined(__GNUC__)
+    int x = 20;
+#elif defined (__ICCAVR__)
+    int x = 30;
+    int y = 20;
+#else
+#error Unsupported compiler
+#endif
+";
+            var sourceInEditor =  sourceInFile + 
+@"int func(){ }
+
+int main(){}
+";
+
+            File.WriteAllText(sourceFilePath, sourceInFile);
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(sourceInFile);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count);
+
+            adapter.Process(sourceInEditor);
+            diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(1, diags.Count);
+            Assert.AreEqual(9, diags.First().StartLine);
+        }
+
+        [TestMethod]
         public void GetDiagnostics_CFileInDiskHasOneWarningTextHasNoWarning_OneDiagnosticsReturned()
         {
             var sourceInEditor =  "int func(){ return 0; }";
@@ -368,6 +401,42 @@ int fun() {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
                 Assert.IsFalse(skippedBlocks.Any());
             }
+        }
+
+        public void GetSkippedBlocks_IfElseBlockWithElseBlockExcludedAndCodeTypedBeforeBlock_SkippedBlockIncludesExcludedCode()
+        {
+            var mainCode =
+@"#if BLAH
+#define foo x+y
+#define bar x-y
+#else
+#define fal laf
+#endif";
+            File.WriteAllText(sourceFilePath, mainCode);
+            var adapter = new ClangAdapter(sourceFilePath);
+            
+            var preprocessor = adapter.GetPreprocessor();
+            adapter.Process(mainCode);
+            preprocessor = adapter.GetPreprocessor();
+
+            var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
+            var skippedBlock = skippedBlocks.First();
+            Assert.AreEqual(3, skippedBlock.Item1);
+            Assert.AreEqual(4, skippedBlock.Item2);
+
+            var initialText = "#define BLAH 0" + Environment.NewLine + mainCode;
+
+            adapter.Process(initialText);
+            skippedBlock = adapter.GetPreprocessor().GetSkippedBlockLineNumbers().First();
+            Assert.AreEqual(3, skippedBlock.Item1);
+            Assert.AreEqual(4, skippedBlock.Item2);
+
+            var laterText = "#define BLAH 2" + Environment.NewLine + mainCode;
+            adapter.Process(laterText);
+            skippedBlock = adapter.GetPreprocessor().GetSkippedBlockLineNumbers().First();
+
+            Assert.AreEqual(6, skippedBlock.Item1);
+            Assert.AreEqual(6, skippedBlock.Item2);
         }
 
         [TestMethod]

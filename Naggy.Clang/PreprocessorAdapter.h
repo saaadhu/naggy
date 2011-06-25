@@ -14,6 +14,8 @@ namespace NaggyClang
 
 	public:
 		PreprocessorAdapter(clang::Preprocessor &preprocessor);
+
+		bool IsAlreadyAttached(clang::Preprocessor &preprocessor);
 		void Reset();
 
 		String^ ExpandMacro(String ^macroName);
