@@ -136,8 +136,6 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, Lis
 
 	m_filePath = (char *) ToCString(filePath);
 	CreateClangCompiler();
-
-	Process(System::IO::File::ReadAllText(filePath));
 }
 
 PreprocessorAdapter^ ClangAdapter::GetPreprocessor()

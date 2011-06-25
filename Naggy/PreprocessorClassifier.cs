@@ -63,6 +63,12 @@ namespace Naggy
                         minPosition = Math.Min(minPosition, startPosition);
                         maxPosition = Math.Max(maxPosition, endPosition);
 
+                        if (!lastSpan.IsEmpty)
+                        {
+                            minPosition = Math.Min(minPosition, lastSpan.Start);
+                            maxPosition = Math.Max(maxPosition, lastSpan.End);
+                        }
+
                         SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
                         excludedSpans.Add(span);
                     }

@@ -25,12 +25,12 @@ namespace Naggy
             this.buffer = buffer;
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
             buffer.Properties.TryGetProperty(typeof(ITextDocument), out document);
-            //debouncer.Add(0, FindDiagnostics);
+            debouncer.Add(0, FindDiagnostics);
         }
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
         {
-            //debouncer.Add(0, FindDiagnostics);
+            debouncer.Add(0, FindDiagnostics);
         }
 
         private SnapshotSpan lastTotalDiagnosticsSpan;

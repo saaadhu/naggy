@@ -29,6 +29,8 @@ namespace Naggy.Clang.Tests
             var sourceText =  "int func(){}";
             File.WriteAllText(sourceFilePath, sourceText);
             var adapter = new ClangAdapter(sourceFilePath);
+
+            adapter.Process(null);
             
             var diags = adapter.GetDiagnostics();
 
@@ -126,6 +128,7 @@ int fun() {
 }
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var diag = adapter.GetDiagnostics().Single();
             Assert.AreEqual(sourceFilePath, diag.FilePath);
             Assert.AreEqual(4, diag.StartLine);
@@ -137,6 +140,7 @@ int fun() {
         {
             File.WriteAllText(sourceFilePath, @"int main() { return FOO; }");
             var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>() { "FOO=2" });
+            adapter.Process(null);
             var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(0, diags.Count);
@@ -148,6 +152,7 @@ int fun() {
         {
             File.WriteAllText(sourceFilePath, @"struct A { int Foo; }; int main() { struct A a; a.Fo = 2; }");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var diags = adapter.GetDiagnostics();
 
             StringAssert.Contains(diags.First().Message, "did you mean 'Foo'?");
@@ -161,6 +166,7 @@ int fun() {
 #define foo x*y
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 Assert.AreEqual("2*y", preprocessor.ExpandMacro("foo"));
@@ -176,6 +182,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
@@ -193,6 +200,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
@@ -212,6 +220,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
@@ -231,6 +240,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
@@ -252,6 +262,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
@@ -281,6 +292,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
@@ -305,6 +317,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().First();
@@ -333,6 +346,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().First();
@@ -363,6 +377,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
@@ -396,6 +411,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
@@ -450,6 +466,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
@@ -471,6 +488,7 @@ int fun() {
 #endif
 ");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
@@ -492,6 +510,7 @@ int fun() {
 #  include <avr/io.h>
 #endif");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
@@ -514,6 +533,7 @@ int fun() {
 #  error Unsupported compiler.
 #endif");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();

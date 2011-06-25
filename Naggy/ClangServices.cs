@@ -21,8 +21,8 @@ namespace Naggy
 
         public static void Process(ITextBuffer buffer)
         {
-            //if (lastProcessedSnapshot == buffer.CurrentSnapshot)
-            //    return;
+            if (lastProcessedSnapshot == buffer.CurrentSnapshot)
+                return;
 
             lock (sync)
             {
