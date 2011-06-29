@@ -168,7 +168,7 @@ public:
   }
 
   /// Endif -- This hook is called whenever an #endif is seen.
-  virtual void Endif() {
+  virtual void Endif(bool Entering=false) {
   }
 };
 
@@ -278,9 +278,9 @@ public:
   }
 
   /// Endif -- This hook is called whenever an #endif is seen.
-  virtual void Endif() {
-    First->Endif();
-    Second->Endif();
+  virtual void Endif(bool Entering=false) {
+    First->Endif(Entering);
+    Second->Endif(Entering);
   }
 };
 

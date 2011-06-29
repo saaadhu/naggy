@@ -40,17 +40,22 @@ namespace NaggyClang
 			m_skippedBlocks.clear();
 			std::sort(m_blockStarts.begin(), m_blockStarts.end());
 
-			for (unsigned int i = 0; i<m_blockStarts.size(); ++i)
+			for (unsigned int i = 0; i<m_blockStarts.size() - 1; ++i)
 			{
-				if (i != m_blockStarts.size() - 1)
-				{
-					std::pair<int, bool> currentBlockStart = m_blockStarts[i];
+				std::pair<int, bool> currentBlockStart = m_blockStarts[i];
 
-					if (!currentBlockStart.second) // this block was NOT entered, so include in skipped blocks
+				if (!currentBlockStart.second) // this block was NOT entered, so include in skipped blocks
+				{
+					for (unsigned int j = i + 1; j<m_blockStarts.size(); ++j)
 					{
-						const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlockStart.first + 1, m_blockStarts[i+1].first - 1);
-						m_skippedBlocks.push_back(block);
+						if (m_blockStarts[j].second)
+						{
+							i = j;
+							break;
+						}
 					}
+					const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlockStart.first + 1, m_blockStarts[i].first - 1);
+					m_skippedBlocks.push_back(block);
 				}
 			}
 		}
@@ -104,9 +109,9 @@ namespace NaggyClang
 			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
 		}
 
-		virtual void Endif()
+		virtual void Endif(bool entering)
 		{
-			ifBuilder.AddBlockStart(GetLine(GetCurrentLocation()), true);
+			ifBuilder.AddBlockStart(GetLine(GetCurrentLocation()), entering);
 		}
 
 		virtual void Else(clang::SourceRange range, bool entering)
@@ -115,6 +120,18 @@ namespace NaggyClang
 		}
 
 	private:
+		bool IsSkipping()
+		{
+			clang::PreprocessorLexer *pLexer = m_pPreprocessor->getCurrentLexer();
+			auto start = pLexer->conditional_begin();
+			auto end = pLexer->conditional_end();
+
+			if (start == end)
+				return false;
+
+			auto last = --end;
+			return last->WasSkipping;
+		}
 		const clang::SourceLocation GetCurrentLocation()
 		{
 			return ((clang::Lexer*)m_pPreprocessor->getCurrentLexer())->getSourceLocation();

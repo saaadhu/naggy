@@ -192,6 +192,26 @@ int fun() {
         }
 
         [TestMethod]
+        public void GetSkippedBlocks_NestedIfDefDirectiveWithOuterBlockSkipped_SkippedBlockIncludesEntireOuterBlock()
+        {
+            File.WriteAllText(sourceFilePath, 
+@"#if 0
+#ifdef x
+#define foo x*y
+#endif
+#define blah
+#endif
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var preprocessor = adapter.GetPreprocessor();
+            {
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
+                Assert.AreEqual(2, skippedBlock.Item1);
+                Assert.AreEqual(5, skippedBlock.Item2);
+            }
+        }
+        [TestMethod]
         public void GetSkippedBlocks_IfNDefDirectiveWithDefinition_SkippedBlockIncludesElseBlock()
         {
             File.WriteAllText(sourceFilePath, 
@@ -369,12 +389,8 @@ int fun() {
             adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
-                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().First();
+                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
                 Assert.AreEqual(5, skippedBlock.Item1);
-                Assert.AreEqual(5, skippedBlock.Item2);
-
-                skippedBlock = preprocessor.GetSkippedBlockLineNumbers().ElementAt(1);
-                Assert.AreEqual(7, skippedBlock.Item1);
                 Assert.AreEqual(7, skippedBlock.Item2);
             }
         }
@@ -401,16 +417,8 @@ int fun() {
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
-                var skippedBlock = skippedBlocks.First();
+                var skippedBlock = skippedBlocks.Single();
                 Assert.AreEqual(7, skippedBlock.Item1);
-                Assert.AreEqual(7, skippedBlock.Item2);
-
-                skippedBlock = skippedBlocks.ElementAt(1);
-                Assert.AreEqual(9, skippedBlock.Item1);
-                Assert.AreEqual(9, skippedBlock.Item2);
-
-                skippedBlock = skippedBlocks.ElementAt(2);
-                Assert.AreEqual(11, skippedBlock.Item1);
                 Assert.AreEqual(11, skippedBlock.Item2);
             }
         }
@@ -424,6 +432,7 @@ int fun() {
 #define fat boo
 #define fal laf
 #endif
+int x = 20;
 #if 1
 #define foo x+y
 #define fat boo
@@ -557,13 +566,8 @@ int fun() {
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
-                var skippedBlock = skippedBlocks.First();
+                var skippedBlock = skippedBlocks.Single();
                 Assert.AreEqual(4, skippedBlock.Item1);
-                Assert.AreEqual(5, skippedBlock.Item2);
-
-                skippedBlock = skippedBlocks.ElementAt(1);
-
-                Assert.AreEqual(7, skippedBlock.Item1);
                 Assert.AreEqual(7, skippedBlock.Item2);
             }
         }
