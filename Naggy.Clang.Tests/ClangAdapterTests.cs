@@ -196,8 +196,12 @@ int fun() {
         {
             File.WriteAllText(sourceFilePath, 
 @"#if 0
-#ifdef x
+#if 0
 #define foo x*y
+#elif 0
+#define foo x/y
+#else
+#define blah x-y
 #endif
 #define blah
 #endif
@@ -208,7 +212,7 @@ int fun() {
             {
                 var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
                 Assert.AreEqual(2, skippedBlock.Item1);
-                Assert.AreEqual(5, skippedBlock.Item2);
+                Assert.AreEqual(9, skippedBlock.Item2);
             }
         }
         [TestMethod]
@@ -389,8 +393,13 @@ int fun() {
             adapter.Process(null);
             var preprocessor = adapter.GetPreprocessor();
             {
-                var skippedBlock = preprocessor.GetSkippedBlockLineNumbers().Single();
+                var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
+                var skippedBlock = skippedBlocks.First();
                 Assert.AreEqual(5, skippedBlock.Item1);
+                Assert.AreEqual(5, skippedBlock.Item2);
+
+                skippedBlock = skippedBlocks.ElementAt(1);
+                Assert.AreEqual(7, skippedBlock.Item1);
                 Assert.AreEqual(7, skippedBlock.Item2);
             }
         }
@@ -417,8 +426,17 @@ int fun() {
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
-                var skippedBlock = skippedBlocks.Single();
+
+                var skippedBlock = skippedBlocks.First();
                 Assert.AreEqual(7, skippedBlock.Item1);
+                Assert.AreEqual(7, skippedBlock.Item2);
+
+                skippedBlock = skippedBlocks.ElementAt(1);
+                Assert.AreEqual(9, skippedBlock.Item1);
+                Assert.AreEqual(9, skippedBlock.Item2);
+
+                skippedBlock = skippedBlocks.ElementAt(2);
+                Assert.AreEqual(11, skippedBlock.Item1);
                 Assert.AreEqual(11, skippedBlock.Item2);
             }
         }
@@ -566,9 +584,14 @@ int x = 20;
             var preprocessor = adapter.GetPreprocessor();
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
-                var skippedBlock = skippedBlocks.Single();
+                var skippedBlock = skippedBlocks.First();
                 Assert.AreEqual(4, skippedBlock.Item1);
+                Assert.AreEqual(5, skippedBlock.Item2);
+
+                skippedBlock = skippedBlocks.ElementAt(1);
+                Assert.AreEqual(7, skippedBlock.Item1);
                 Assert.AreEqual(7, skippedBlock.Item2);
+
             }
         }
         [TestInitialize]

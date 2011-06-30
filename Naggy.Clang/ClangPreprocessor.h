@@ -28,6 +28,7 @@ namespace NaggyClang
 		{
 			m_blockStarts.clear();
 			m_skippedBlocks.clear();
+			m_conditionalStack.clear();
 		}
 
 		clang::Preprocessor* GetPreprocessor()
@@ -38,24 +39,26 @@ namespace NaggyClang
 		void CalculateSkippedBlocks()
 		{
 			m_skippedBlocks.clear();
-			std::sort(m_blockStarts.begin(), m_blockStarts.end());
+			m_conditionalStack.clear();
 
-			for (unsigned int i = 0; i<m_blockStarts.size() - 1; ++i)
+			std::sort(m_blockStarts.begin(), m_blockStarts.end(), CompareBlocks);
+
+			for (unsigned int i = 0; i<m_blockStarts.size() - 1;)
 			{
-				std::pair<int, bool> currentBlockStart = m_blockStarts[i];
+				auto currentBlock = m_blockStarts[i];
 
-				if (!currentBlockStart.second) // this block was NOT entered, so include in skipped blocks
+				if (!currentBlock.WasEntered())
 				{
-					for (unsigned int j = i + 1; j<m_blockStarts.size(); ++j)
-					{
-						if (m_blockStarts[j].second)
-						{
-							i = j;
-							break;
-						}
-					}
-					const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlockStart.first + 1, m_blockStarts[i].first - 1);
+					int nextBranchIndex = FindNextBranchIndex(i);
+
+					const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlock.GetStartLine() + 1, m_blockStarts[nextBranchIndex].GetStartLine() - 1);
 					m_skippedBlocks.push_back(block);
+
+					i = nextBranchIndex;
+				}
+				else
+				{
+					++i;
 				}
 			}
 		}
@@ -71,8 +74,38 @@ namespace NaggyClang
 		Callback *m_pCallback;
 		clang::Preprocessor *m_pPreprocessor;
 
-		std::vector<std::pair<unsigned int, bool>> m_blockStarts;
+		std::vector<Block> m_blockStarts;
 		std::vector<std::pair<unsigned int, unsigned int>> m_skippedBlocks;
+		std::vector<Block> m_conditionalStack;
+
+		static bool CompareBlocks(const Block &b1, const Block &b2)
+		{
+			return b1.GetStartLine() < b2.GetStartLine();
+		}
+
+		int FindNextBranchIndex(int blockStartIndex)
+		{
+			std::vector<Block> stack;
+
+			for (unsigned int i = blockStartIndex + 1; i<m_blockStarts.size(); ++i)
+			{
+				auto currentBlock = m_blockStarts[i];
+				if (!currentBlock.IsStartOfNewCondition())
+				{
+					if (stack.empty())
+						return i;
+
+					if (currentBlock.IsEndOfCondition())
+						stack.pop_back();
+				}
+				else
+				{
+					stack.push_back(currentBlock);
+				}
+			}
+
+			return m_blockStarts.size() - 1; // Stack did not empty - Say that the branch ends at the end of all blocks
+		}
 	};
 
 	class Callback : public clang::PPCallbacks
@@ -85,53 +118,41 @@ namespace NaggyClang
 		IfBuilder ifBuilder;
 
 	public:
-		Callback(clang::Preprocessor *pPreprocessor, std::vector<std::pair<unsigned int, bool>> &blockStarts) : m_pPreprocessor(pPreprocessor), ifBuilder(blockStarts), previousConditionalStackSize(0),
+		Callback(clang::Preprocessor *pPreprocessor, std::vector<Block> &blockStarts) : m_pPreprocessor(pPreprocessor), ifBuilder(blockStarts), previousConditionalStackSize(0),
 			elifSeen(false)
 		{ }
 
 		virtual void Ifdef(const clang::Token &tok, bool entering)
 		{
-			ifBuilder.AddBlockStart(GetLine(tok.getLocation()), entering);
+			ifBuilder.AddBlockStart(BlockType::Ifdef, GetLine(tok.getLocation()), entering);
 		}
 		
 		virtual void Ifndef(const clang::Token &tok, bool entering)
 		{
-			ifBuilder.AddBlockStart(GetLine(tok.getLocation()), entering);
+			ifBuilder.AddBlockStart(BlockType::Ifndef, GetLine(tok.getLocation()), entering);
 		}
 
 		virtual void If(clang::SourceRange range, bool entering)
 		{
-			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
+			ifBuilder.AddBlockStart(BlockType::If, GetLine(range.getBegin()), entering);
 		}
 
 		virtual void Elif(clang::SourceRange range, bool entering)
 		{
-			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
+			ifBuilder.AddBlockStart(BlockType::Elif, GetLine(range.getBegin()), entering);
 		}
 
 		virtual void Endif(bool entering)
 		{
-			ifBuilder.AddBlockStart(GetLine(GetCurrentLocation()), entering);
+			ifBuilder.AddBlockStart(BlockType::Endif, GetLine(GetCurrentLocation()), entering);
 		}
 
 		virtual void Else(clang::SourceRange range, bool entering)
 		{
-			ifBuilder.AddBlockStart(GetLine(range.getBegin()), entering);
+			ifBuilder.AddBlockStart(BlockType::Else, GetLine(range.getBegin()), entering);
 		}
 
 	private:
-		bool IsSkipping()
-		{
-			clang::PreprocessorLexer *pLexer = m_pPreprocessor->getCurrentLexer();
-			auto start = pLexer->conditional_begin();
-			auto end = pLexer->conditional_end();
-
-			if (start == end)
-				return false;
-
-			auto last = --end;
-			return last->WasSkipping;
-		}
 		const clang::SourceLocation GetCurrentLocation()
 		{
 			return ((clang::Lexer*)m_pPreprocessor->getCurrentLexer())->getSourceLocation();
