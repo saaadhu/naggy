@@ -75,6 +75,9 @@ namespace Naggy
                     }
                 }
 
+                minPosition = Math.Max(minPosition, 0);
+                maxPosition = Math.Min(maxPosition, buffer.CurrentSnapshot.Length);
+
                 if (excludedSpans.Any())
                 {
                     RaiseTagsChanged(minPosition, maxPosition);
@@ -82,7 +85,7 @@ namespace Naggy
                 else
                 {
                     if (ClassificationChanged != null)
-                        ClassificationChanged(this, new ClassificationChangedEventArgs(new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(0, 0))));
+                        ClassificationChanged(this, new ClassificationChangedEventArgs(new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(0, buffer.CurrentSnapshot.Length))));
                 }
             }
         }
