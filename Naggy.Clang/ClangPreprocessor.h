@@ -42,8 +42,12 @@ namespace NaggyClang
 			m_conditionalStack.clear();
 
 			std::sort(m_blockStarts.begin(), m_blockStarts.end(), CompareBlocks);
+			int numBlocks = m_blockStarts.size();
 
-			for (unsigned int i = 0; i<m_blockStarts.size() - 1;)
+			if (numBlocks == 0)
+				return;
+
+			for (unsigned int i = 0; i<m_blockStarts.size();)
 			{
 				auto currentBlock = m_blockStarts[i];
 
@@ -51,7 +55,18 @@ namespace NaggyClang
 				{
 					int nextBranchIndex = FindNextBranchIndex(i);
 
-					const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlock.GetStartLine() + 1, m_blockStarts[nextBranchIndex].GetStartLine() - 1);
+					unsigned int endLine = 0;
+					if (nextBranchIndex == -1) // No branch found
+					{
+						nextBranchIndex = numBlocks;
+						endLine = 0;
+					}
+					else
+					{
+						endLine =  m_blockStarts[nextBranchIndex].GetStartLine() - 1;
+					}
+
+					const std::pair<unsigned int, unsigned int> block = std::make_pair(currentBlock.GetStartLine() + 1, endLine);
 					m_skippedBlocks.push_back(block);
 
 					i = nextBranchIndex;
@@ -104,7 +119,7 @@ namespace NaggyClang
 				}
 			}
 
-			return m_blockStarts.size() - 1; // Stack did not empty - Say that the branch ends at the end of all blocks
+			return -1;
 		}
 	};
 

@@ -45,6 +45,7 @@
     </CodeAnalysisDependentAssemblyPaths>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ConditionalLowlightingTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ClangAdapterTests.cs" />
   </ItemGroup>

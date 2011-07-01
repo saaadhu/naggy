@@ -57,7 +57,8 @@ namespace Naggy
                         var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(skippedBlock.Item1 - 1);
                         var startPosition = textLine.Start.Position;
 
-                        var endTextLine = buffer.CurrentSnapshot.GetLineFromLineNumber(skippedBlock.Item2 - 1);
+                        int endLineNumber = skippedBlock.Item2 == 0 ? buffer.CurrentSnapshot.LineCount : skippedBlock.Item2;
+                        var endTextLine = buffer.CurrentSnapshot.GetLineFromLineNumber(endLineNumber - 1);
                         var endPosition = endTextLine.End.Position;
 
                         minPosition = Math.Min(minPosition, startPosition);
