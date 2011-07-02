@@ -289,26 +289,24 @@ int x = 20;
             
             var preprocessor = adapter.GetPreprocessor();
             adapter.Process(mainCode);
-            preprocessor = adapter.GetPreprocessor();
-
-            var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
-            var skippedBlock = skippedBlocks.First();
-            Assert.AreEqual(3, skippedBlock.Item1);
-            Assert.AreEqual(4, skippedBlock.Item2);
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 4) });
 
             var initialText = "#define BLAH 0" + Environment.NewLine + mainCode;
-
             adapter.Process(initialText);
-            skippedBlock = adapter.GetPreprocessor().GetSkippedBlockLineNumbers().First();
-            Assert.AreEqual(3, skippedBlock.Item1);
-            Assert.AreEqual(4, skippedBlock.Item2);
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 4) });
 
             var laterText = "#define BLAH 2" + Environment.NewLine + mainCode;
             adapter.Process(laterText);
-            skippedBlock = adapter.GetPreprocessor().GetSkippedBlockLineNumbers().First();
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(6, 6) });
 
-            Assert.AreEqual(6, skippedBlock.Item1);
-            Assert.AreEqual(6, skippedBlock.Item2);
+            adapter.Process(initialText);
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 4) });
+
+            adapter.Process(laterText);
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(6, 6) });
+
+            adapter.Process(initialText);
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 4) });
         }
 
         [TestMethod]

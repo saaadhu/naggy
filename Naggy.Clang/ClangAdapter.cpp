@@ -80,14 +80,7 @@ public:
 
 	virtual bool BeginSourceFileAction(clang::CompilerInstance &CI,
 		llvm::StringRef Filename) {
-			if (!m_preprocessorAdapter || !m_preprocessorAdapter->IsAlreadyAttached(CI.getPreprocessor()))
-			{
 				m_preprocessorAdapter = gcnew PreprocessorAdapter(CI.getPreprocessor());
-			}
-			else
-			{
-				m_preprocessorAdapter->Reset();
-			}
 			return true;
 	}
 };
