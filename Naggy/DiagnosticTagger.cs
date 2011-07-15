@@ -45,21 +45,24 @@ namespace Naggy
             ClangServices.Process(buffer);
             foreach (var diagnostic in ClangServices.GetDiagnostics(buffer))
             {
-                // Crude check, should find a more sophisticated way to check if two paths are equal, ignoring different directory separator chars.
-                if (Path.GetFileName(diagnostic.FilePath) == Path.GetFileName(document.FilePath))
+                if (!diagnostic.FilePath.Any(c => Path.GetInvalidPathChars().Contains(c)))
                 {
-                    if (diagnostic.StartLine != 0)
-                        diagnostic.StartLine--;
+                    // Crude check, should find a more sophisticated way to check if two paths are equal, ignoring different directory separator chars.
+                    if (Path.GetFileName(diagnostic.FilePath) == Path.GetFileName(document.FilePath))
+                    {
+                        if (diagnostic.StartLine != 0)
+                            diagnostic.StartLine--;
 
-                    var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
-                    var startPosition = textLine.Start.Position;
-                    var endPosition = textLine.End.Position;
+                        var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
+                        var startPosition = textLine.Start.Position;
+                        var endPosition = textLine.End.Position;
 
-                    minPosition = Math.Min(minPosition, startPosition);
-                    maxPosition = Math.Max(maxPosition, endPosition);
+                        minPosition = Math.Min(minPosition, startPosition);
+                        maxPosition = Math.Max(maxPosition, endPosition);
 
-                    SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
-                    spansAndErrorMessages.Add(Tuple.Create(span, diagnostic.Message));
+                        SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
+                        spansAndErrorMessages.Add(Tuple.Create(span, diagnostic.Message));
+                    }
                 }
             }
 

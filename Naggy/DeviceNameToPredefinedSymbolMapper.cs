@@ -1296,6 +1296,16 @@ namespace Naggy
         {
             string text;
             map.TryGetValue(deviceName.ToLowerInvariant(), out text);
+
+            if (string.IsNullOrEmpty(text) == false)
+                return text;
+
+            if (deviceName.Length < 4)
+                return string.Empty;
+
+            deviceName = deviceName.Substring(4); //strip out the AT32 and retry
+
+            map.TryGetValue(deviceName.ToLowerInvariant(), out text);
             return text ?? string.Empty;
         }
     }
