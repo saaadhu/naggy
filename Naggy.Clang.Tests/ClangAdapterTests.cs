@@ -159,6 +159,52 @@ int fun() {
         }
 
         [TestMethod]
+        public void GetDiagnostics_AVRGCCSpecificBuiltin_NoDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"void fun() { __builtin_csrf(1); }");
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+        [TestMethod]
+        public void GetDiagnostics_InlineKeyword_NoDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"static inline void Foo(){}");
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_asmExtension_NoDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @" #define barrier()  asm volatile("""" ::: ""memory"")
+   int main() { barrier(); }");
+
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_bookKeywordAndUint8_t_NoDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @" bool test = true; void fun(uint8_t v) {}");
+
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
         public void ExpandMacro_MacroDefinitionIncludesAnotherMacro_ExpansionExpandsInnerMacro()
         {
             File.WriteAllText(sourceFilePath, @"

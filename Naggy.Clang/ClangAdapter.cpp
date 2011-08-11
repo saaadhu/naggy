@@ -167,4 +167,8 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 	{
 		pInvocation->getPreprocessorOpts().addMacroDef(ToCString(symbol));
 	}
+
+	//pInvocation->getLangOpts().C99 = 1;
+	pInvocation->getLangOpts().GNUMode = 1;
+	pInvocation->getLangOpts().GNUKeywords = 1;
 }

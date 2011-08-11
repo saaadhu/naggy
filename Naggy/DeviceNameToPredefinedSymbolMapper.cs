@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+
 namespace Naggy
 {
     internal static class DeviceNameToPredefinedSymbolMapper
@@ -1292,21 +1294,26 @@ namespace Naggy
 				"__AVR32_MXT768E__"
 			}
 		};
-        public static string GetSymbol(string deviceName)
+        public static IEnumerable<string> GetSymbol(string deviceName)
         {
             string text;
             map.TryGetValue(deviceName.ToLowerInvariant(), out text);
 
             if (string.IsNullOrEmpty(text) == false)
-                return text;
+                return new[] { text, Get8Or32BitImplicitSymbol(text) };
 
             if (deviceName.Length < 4)
-                return string.Empty;
+                return Enumerable.Empty<string>();
 
             deviceName = deviceName.Substring(4); //strip out the AT32 and retry
 
             map.TryGetValue(deviceName.ToLowerInvariant(), out text);
-            return text ?? string.Empty;
+            return string.IsNullOrEmpty(text) ? Enumerable.Empty<string>() : new [] {text, Get8Or32BitImplicitSymbol(text)};
+        }
+
+        private static string Get8Or32BitImplicitSymbol(string define)
+        {
+            return define.StartsWith("__AVR32_") ? "__AVR32__" : "__AVR__";
         }
     }
 }

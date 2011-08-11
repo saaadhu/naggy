@@ -24,7 +24,7 @@ namespace Naggy
             var symbolsInProject = GetPredefinedSymbols(toolchainData);
 
             var predefinedSymbols = new List<string>();
-            predefinedSymbols.Add(implicitSymbol);
+            predefinedSymbols.AddRange(implicitSymbol);
 
             predefinedSymbols.AddRange(symbolsInProject);
             return predefinedSymbols;
