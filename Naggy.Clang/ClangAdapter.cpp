@@ -171,4 +171,5 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 	//pInvocation->getLangOpts().C99 = 1;
 	pInvocation->getLangOpts().GNUMode = 1;
 	pInvocation->getLangOpts().GNUKeywords = 1;
+	pInvocation->getLangOpts().Bool = 1;
 }

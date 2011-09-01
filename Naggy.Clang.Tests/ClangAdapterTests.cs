@@ -193,9 +193,9 @@ int fun() {
         }
 
         [TestMethod]
-        public void GetDiagnostics_bookKeywordAndUint8_t_NoDiagnosticsReported()
+        public void GetDiagnostics_boolKeyword_NoDiagnosticsReported()
         {
-            File.WriteAllText(sourceFilePath, @" bool test = true; void fun(uint8_t v) {}");
+            File.WriteAllText(sourceFilePath, @" bool test = true;");
 
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);

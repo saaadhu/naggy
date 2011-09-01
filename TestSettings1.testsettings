@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <TestSettings name="TestSettings" id="5182b0d6-874f-49a4-9584-11aef7f5cb56" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
   <Description>These are default test settings for a local test run.</Description>
-  <Deployment enabled="false">
+  <Deployment>
     <DeploymentItem filename="Naggy\libclang.dll" />
   </Deployment>
   <Execution>
