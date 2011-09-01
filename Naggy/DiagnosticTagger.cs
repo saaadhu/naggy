@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.Text;
+using Microsoft.VisualStudio.Text.Adornments;
 using Microsoft.VisualStudio.Text.Tagging;
 using NaggyClang;
 using System.IO;
@@ -16,7 +17,7 @@ namespace Naggy
         private readonly DTE dte;
         ITextDocument document;
 
-        readonly List<Tuple<SnapshotSpan, string>> spansAndErrorMessages = new List<Tuple<SnapshotSpan, string>>();
+        readonly List<Tuple<SnapshotSpan, Diagnostic>> spansAndDiagnostics = new List<Tuple<SnapshotSpan, Diagnostic>>();
         DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1200);
 
         public DiagnosticTagger(DTE dte, ITextBuffer buffer)
@@ -37,7 +38,7 @@ namespace Naggy
 
         private void FindDiagnostics()
         {
-            spansAndErrorMessages.Clear();
+            spansAndDiagnostics.Clear();
 
             int minPosition = buffer.CurrentSnapshot.Length;
             int maxPosition = 0;
@@ -61,12 +62,12 @@ namespace Naggy
                         maxPosition = Math.Max(maxPosition, endPosition);
 
                         SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
-                        spansAndErrorMessages.Add(Tuple.Create(span, diagnostic.Message));
+                        spansAndDiagnostics.Add(Tuple.Create(span, diagnostic));
                     }
                 }
             }
 
-            if (spansAndErrorMessages.Any())
+            if (spansAndDiagnostics.Any())
             {
                 RaiseTagsChanged(minPosition, maxPosition);
             }
@@ -90,8 +91,24 @@ namespace Naggy
 
         public IEnumerable<ITagSpan<ErrorTag>> GetTags(NormalizedSnapshotSpanCollection spans)
         {
-            foreach(var spanAndErrorMessage in spansAndErrorMessages)
-                yield return new TagSpan<ErrorTag>(spanAndErrorMessage.Item1, new ErrorTag("SyntaxError", spanAndErrorMessage.Item2));
+            foreach(var spanAndDiagnostic in spansAndDiagnostics)
+                yield return new TagSpan<ErrorTag>(spanAndDiagnostic.Item1,
+                    new ErrorTag(
+                        GetErrorType(spanAndDiagnostic.Item2),
+                        spanAndDiagnostic.Item2.Message));
+        }
+
+        private string GetErrorType(Diagnostic diag)
+        {
+            switch(diag.Level)
+            {
+                case DiagnosticLevel.Error:
+                    return PredefinedErrorTypeNames.SyntaxError;
+                case DiagnosticLevel.Warning:
+                    return PredefinedErrorTypeNames.Warning;
+                default:
+                    throw new InvalidOperationException("Unknown diag level: " + diag.Level.ToString());
+            }
         }
 
         public event EventHandler<SnapshotSpanEventArgs> TagsChanged;

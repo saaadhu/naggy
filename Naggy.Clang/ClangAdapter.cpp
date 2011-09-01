@@ -52,6 +52,18 @@ static NaggyClang::Diagnostic^ ToDiagnostic(clang::StoredDiagnostic& diag)
 	managedDiag->StartColumn = loc.getColumn();
 	managedDiag->FilePath = ToManagedString(loc.getFilename());
 
+	switch(diag.getLevel())
+	{
+	case clang::Diagnostic::Level::Warning:
+	case clang::Diagnostic::Level::Note:
+	case clang::Diagnostic::Level::Ignored:
+		managedDiag->Level = DiagnosticLevel::Warning;
+		break;
+	default:
+		managedDiag->Level = DiagnosticLevel::Error;
+		break;
+	}
+
 	return managedDiag;
 }
 

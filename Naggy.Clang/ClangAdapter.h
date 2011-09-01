@@ -17,6 +17,12 @@ class StoredDiagnosticClient;
 namespace NaggyClang {
 	ref class PreprocessorAdapter;
 
+	public enum class DiagnosticLevel
+	{
+		Error,
+		Warning
+	};
+
 	public ref class Diagnostic
 	{
 	public:
@@ -26,8 +32,8 @@ namespace NaggyClang {
 		int StartColumn;
 		int EndLine;
 		int EndColumn;
+		DiagnosticLevel Level;
 	};
-
 	public ref class ClangAdapter
 	{
 	public:

@@ -193,6 +193,35 @@ int fun() {
         }
 
         [TestMethod]
+        public void GetDiagnostics_FunctionWithNoReturnType_WarningReported()
+        {
+            File.WriteAllText(sourceFilePath, @"func() { return 0; }");
+
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics().ToList();
+
+            Assert.AreEqual(1, diags.Count());
+            var diag = diags[0];
+
+            Assert.AreEqual(DiagnosticLevel.Warning, diag.Level);
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_UnknownAttribute_WarningReported()
+        {
+            File.WriteAllText(sourceFilePath, @"__attribute__((__interrupt__)) void rtc() {}");
+
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics().ToList();
+
+            Assert.AreEqual(1, diags.Count());
+            var diag = diags[0];
+
+            Assert.AreEqual(DiagnosticLevel.Warning, diag.Level);
+        }
+        [TestMethod]
         public void GetDiagnostics_boolKeyword_NoDiagnosticsReported()
         {
             File.WriteAllText(sourceFilePath, @" bool test = true;");
