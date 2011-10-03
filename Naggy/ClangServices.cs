@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Windows.Threading;
+using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using EnvDTE;
 using NaggyClang;
@@ -51,17 +53,23 @@ namespace Naggy
 
         private static ClangAdapter GetClangAdapterForBuffer(ITextBuffer buffer)
         {
-            var clangAdapter = buffer.Properties.GetOrCreateSingletonProperty<ClangAdapter>(() =>
-            {
-                ITextDocument document;
-                buffer.Properties.TryGetProperty(typeof(ITextDocument), out document);
-
-                var filePath = document.FilePath;
-                var includePaths = AVRStudio.GetIncludePaths(filePath, dte);
-                var symbols = AVRStudio.GetPredefinedSymbols(filePath, dte);
-                return new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols));
-            });
+            ClangAdapter clangAdapter = null;
+            ThreadHelper.Generic.Invoke(new Action(()=>
+                               {
+                                   clangAdapter = buffer.Properties.GetOrCreateSingletonProperty <ClangAdapter>( () => CreateClangAdapter(buffer));
+                               }));
             return clangAdapter;
+        }
+
+        private static ClangAdapter CreateClangAdapter(ITextBuffer buffer)
+        {
+            ITextDocument document;
+            buffer.Properties.TryGetProperty(typeof (ITextDocument), out document);
+
+            var filePath = document.FilePath;
+            var includePaths = AVRStudio.GetIncludePaths(filePath, dte);
+            var symbols = AVRStudio.GetPredefinedSymbols(filePath, dte);
+            return new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols));
         }
     }
 }
