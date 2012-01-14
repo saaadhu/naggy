@@ -130,7 +130,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v10.0\VSSDK\Microsoft.VsSDK.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy "$(TargetDir)*" "$(LocalAppData)\Atmel\AvrStudio\5.0\Extensions\Senthil Kumar Selvaraj\Naggy\0.2.4" /I /Y /D</PostBuildEvent>
+    <PostBuildEvent>xcopy "$(TargetDir)*" "$(LocalAppData)\Atmel\AvrStudio\5.1\Extensions\Senthil Kumar Selvaraj\Naggy\0.2.4" /I /Y /D</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
