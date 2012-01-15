@@ -37,16 +37,34 @@ namespace Naggy
             if (project == null)
                 return Enumerable.Empty<string>();
 
-            dynamic toolchainProperties = project.Properties.Item("ToolchainOptions").Value;
-            var cCompilerOptions = toolchainProperties.CCompiler;
+            return Is32BitProject(project) ?
+            new List<string>
+                       {
+                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.3\include",
+                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.3\include-fixed",
+                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr32\include",
+                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.4\include",
+                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.3\include-fixed",
+                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr32\include"
+                       }
+                       :
+            new List<string>
+                       {
+                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include",
+                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include-fixed",
+                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr\include",
+                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include",
+                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include-fixed",
+                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr\include"
+                       };
+        }
 
-            var allPaths = new List<string>();
-            allPaths.AddRange(cCompilerOptions.IncludePaths);
+        static bool Is32BitProject(dynamic project)
+        {
+            dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
+            System.Type type = toolchainOptions.GetType();
 
-            IEnumerable<string> defaultIncludePaths = cCompilerOptions.DefaultIncludePaths;
-            allPaths.AddRange(defaultIncludePaths.Select(path => path.Replace(@"\bin", "")));
-
-            return allPaths;
+            return type.FullName.Contains("32");
         }
 
         private static string[] GetPredefinedSymbols(dynamic toolchainOptions)
