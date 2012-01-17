@@ -37,34 +37,11 @@ namespace Naggy
             if (project == null)
                 return Enumerable.Empty<string>();
 
-            return Is32BitProject(project) ?
-            new List<string>
-                       {
-                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.3\include",
-                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.3\include-fixed",
-                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr32\include",
-                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.4\include",
-                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr32\4.4.3\include-fixed",
-                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr32\include"
-                       }
-                       :
-            new List<string>
-                       {
-                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include",
-                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include-fixed",
-                           @"C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr\include",
-                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include",
-                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\lib\gcc\avr\4.5.1\include-fixed",
-                           @"C:\Program Files\Atmel\AVR Studio 5.1\extensions\Atmel\AVRGCC\3.3.1\AVRToolchain\avr\include"
-                       };
-        }
-
-        static bool Is32BitProject(dynamic project)
-        {
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
-            System.Type type = toolchainOptions.GetType();
+            IEnumerable<string> defaultIncludePaths = toolchainOptions.CCompiler.DefaultIncludePaths;
 
-            return type.FullName.Contains("32");
+            IEnumerable<string> adjustedDefaultIncludePaths = defaultIncludePaths.Select(p => p.Replace("bin\\", string.Empty));
+            return adjustedDefaultIncludePaths.Concat((IEnumerable<string>)toolchainOptions.CCompiler.IncludePaths);
         }
 
         private static string[] GetPredefinedSymbols(dynamic toolchainOptions)
