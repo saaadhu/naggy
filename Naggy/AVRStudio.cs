@@ -40,8 +40,14 @@ namespace Naggy
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
             IEnumerable<string> defaultIncludePaths = toolchainOptions.CCompiler.DefaultIncludePaths;
 
-            IEnumerable<string> adjustedDefaultIncludePaths = defaultIncludePaths.Select(p => p.Replace("bin\\", string.Empty));
-            return adjustedDefaultIncludePaths.Concat((IEnumerable<string>)toolchainOptions.CCompiler.IncludePaths);
+            var adjustedDefaultIncludePaths = defaultIncludePaths.Select(p => p.Replace("bin\\", string.Empty));
+
+            IEnumerable<string> projectSpecificIncludePaths = toolchainOptions.CCompiler.IncludePaths;
+            string outputFolder = ((dynamic)project.Object).GetProjectProperty("OutputDirectory");
+            var absoluteProjectSpecificFolderPaths =
+                projectSpecificIncludePaths.Select(p => Path.IsPathRooted(p) ? p : Path.Combine(outputFolder, p));
+            
+            return adjustedDefaultIncludePaths.Concat(absoluteProjectSpecificFolderPaths);
         }
 
         private static string[] GetPredefinedSymbols(dynamic toolchainOptions)
