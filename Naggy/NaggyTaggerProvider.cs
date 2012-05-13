@@ -15,7 +15,7 @@ namespace Naggy
 {
     [Export(typeof(ITaggerProvider))]
     [TagType(typeof(ErrorTag))]
-    [ContentType("AVRGcc")]
+    [ContentType("GCC")]
     public sealed class DiagnosticTaggerProvider : ITaggerProvider
     {
         public ITagger<T> CreateTagger<T>(ITextBuffer buffer) where T : ITag
@@ -31,7 +31,7 @@ namespace Naggy
 
     }
     [Export(typeof(IClassifierProvider))]
-    [ContentType("AVRGcc")]
+    [ContentType("GCC")]
     [Name("Preprocessor Classifier")]
     internal class ClassifierProvider : IClassifierProvider
     {
