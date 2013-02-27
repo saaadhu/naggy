@@ -17,17 +17,14 @@
 #define LLVM_CODEGEN_ASMPRINTER_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace llvm {
   class BlockAddress;
   class GCStrategy;
   class Constant;
-  class ConstantArray;
-  class ConstantFP;
-  class ConstantInt;
-  class ConstantStruct;
-  class ConstantVector;
   class GCMetadataPrinter;
   class GlobalValue;
   class GlobalVariable;
@@ -37,14 +34,11 @@ namespace llvm {
   class MachineLocation;
   class MachineLoopInfo;
   class MachineLoop;
-  class MachineConstantPool;
-  class MachineConstantPoolEntry;
   class MachineConstantPoolValue;
   class MachineJumpTableInfo;
   class MachineModuleInfo;
   class MachineMove;
   class MCAsmInfo;
-  class MCInst;
   class MCContext;
   class MCSection;
   class MCStreamer;
@@ -54,10 +48,8 @@ namespace llvm {
   class DwarfException;
   class Mangler;
   class TargetLoweringObjectFile;
-  class TargetData;
+  class DataLayout;
   class TargetMachine;
-  class Twine;
-  class Type;
 
   /// AsmPrinter - This class is intended to be used as a driving class for all
   /// asm writers.
@@ -97,6 +89,11 @@ namespace llvm {
     ///
     MCSymbol *CurrentFnSym;
 
+    /// The symbol used to represent the start of the current function for the
+    /// purpose of calculating its size (e.g. using the .size directive). By
+    /// default, this is equal to CurrentFnSym.
+    MCSymbol *CurrentFnSymForSize;
+
   private:
     // GCMetadataPrinters - The garbage collection metadata printer table.
     void *GCMetadataPrinters;  // Really a DenseMap.
@@ -134,8 +131,8 @@ namespace llvm {
     /// getObjFileLowering - Return information about object file lowering.
     const TargetLoweringObjectFile &getObjFileLowering() const;
 
-    /// getTargetData - Return information about data layout.
-    const TargetData &getTargetData() const;
+    /// getDataLayout - Return information about data layout.
+    const DataLayout &getDataLayout() const;
 
     /// getCurrentSection() - Return the current section we are emitting to.
     const MCSection *getCurrentSection() const;
@@ -185,7 +182,19 @@ namespace llvm {
 
     void emitPrologLabel(const MachineInstr &MI);
 
-    bool needsCFIMoves();
+    enum CFIMoveType {
+      CFI_M_None,
+      CFI_M_EH,
+      CFI_M_Debug
+    };
+    CFIMoveType needsCFIMoves();
+
+    bool needsSEHMoves();
+
+    /// needsRelocationsForDwarfStringPool - Specifies whether the object format
+    /// expects to use relocations to refer to debug entries. Alternatively we
+    /// emit section offsets in bytes from the start of the string pool.
+    bool needsRelocationsForDwarfStringPool() const;
 
     /// EmitConstantPool - Print to the current output stream assembly
     /// representations of the constants in the constant pool MCP. This is
@@ -249,12 +258,19 @@ namespace llvm {
 
     /// EmitInstruction - Targets should implement this to emit instructions.
     virtual void EmitInstruction(const MachineInstr *) {
-      assert(0 && "EmitInstruction not implemented");
+      llvm_unreachable("EmitInstruction not implemented");
     }
 
     virtual void EmitFunctionEntryLabel();
 
     virtual void EmitMachineConstantPoolValue(MachineConstantPoolValue *MCPV);
+
+    /// EmitXXStructor - Targets can override this to change how global
+    /// constants that are part of a C++ static/global constructor list are
+    /// emitted.
+    virtual void EmitXXStructor(const Constant *CV) {
+      EmitGlobalConstant(CV);
+    }
 
     /// isBlockOnlyReachableByFallthough - Return true if the basic block has
     /// exactly one predecessor and the control transfer mechanism between
@@ -339,6 +355,13 @@ namespace llvm {
     void EmitLabelPlusOffset(const MCSymbol *Label, uint64_t Offset,
                                    unsigned Size) const;
 
+    /// EmitLabelReference - Emit something like ".long Label"
+    /// where the size in bytes of the directive is specified by Size and Label
+    /// specifies the label.
+    void EmitLabelReference(const MCSymbol *Label, unsigned Size) const {
+      EmitLabelPlusOffset(Label, 0, Size);
+    }
+
     //===------------------------------------------------------------------===//
     // Dwarf Emission Helper Routines
     //===------------------------------------------------------------------===//
@@ -362,10 +385,8 @@ namespace llvm {
     /// GetSizeOfEncodedValue - Return the size of the encoding in bytes.
     unsigned GetSizeOfEncodedValue(unsigned Encoding) const;
 
-    /// EmitReference - Emit a reference to a label with a specified encoding.
-    ///
-    void EmitReference(const MCSymbol *Sym, unsigned Encoding) const;
-    void EmitReference(const GlobalValue *GV, unsigned Encoding) const;
+    /// EmitReference - Emit reference to a ttype global with a specified encoding.
+    void EmitTTypeReference(const GlobalValue *GV, unsigned Encoding) const;
 
     /// EmitSectionOffset - Emit the 4-byte offset of Label from the start of
     /// its section.  This can be done with a special directive if the target
@@ -381,10 +402,6 @@ namespace llvm {
     /// operands.
     virtual MachineLocation getDebugValueLocation(const MachineInstr *MI) const;
 
-    /// getDwarfRegOpSize - get size required to emit given machine location
-    /// using dwarf encoding.
-    virtual unsigned getDwarfRegOpSize(const MachineLocation &MLoc) const;
-
     /// getISAEncoding - Get the value for DW_AT_APPLE_isa. Zero if no isa
     /// encoding specified.
     virtual unsigned getISAEncoding() { return 0; }
@@ -396,12 +413,9 @@ namespace llvm {
     // Dwarf Lowering Routines
     //===------------------------------------------------------------------===//
 
-    /// EmitFrameMoves - Emit frame instructions to describe the layout of the
+    /// EmitCFIFrameMove - Emit frame instruction to describe the layout of the
     /// frame.
-    void EmitFrameMoves(const std::vector<MachineMove> &Moves,
-                        MCSymbol *BaseLabel, bool isEH) const;
     void EmitCFIFrameMove(const MachineMove &Move) const;
-    void EmitCFIFrameMoves(const std::vector<MachineMove> &Moves) const;
 
     //===------------------------------------------------------------------===//
     // Inline Asm Support
@@ -445,7 +459,8 @@ namespace llvm {
     mutable unsigned SetCounter;
 
     /// EmitInlineAsm - Emit a blob of inline asm to the output streamer.
-    void EmitInlineAsm(StringRef Str, const MDNode *LocMDNode = 0) const;
+    void EmitInlineAsm(StringRef Str, const MDNode *LocMDNode = 0,
+                    InlineAsm::AsmDialect AsmDialect = InlineAsm::AD_ATT) const;
 
     /// EmitInlineAsm - This method formats and emits the specified machine
     /// instruction that is an inline asm.
@@ -465,8 +480,8 @@ namespace llvm {
     void EmitJumpTableEntry(const MachineJumpTableInfo *MJTI,
                             const MachineBasicBlock *MBB,
                             unsigned uid) const;
-    void EmitLLVMUsedList(Constant *List);
-    void EmitXXStructorList(Constant *List);
+    void EmitLLVMUsedList(const Constant *List);
+    void EmitXXStructorList(const Constant *List, bool isCtor);
     GCMetadataPrinter *GetOrCreateGCPrinter(GCStrategy *C);
   };
 }

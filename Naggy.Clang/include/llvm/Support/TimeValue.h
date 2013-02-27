@@ -11,11 +11,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef LLVM_SUPPORT_TIMEVALUE_H
+#define LLVM_SUPPORT_TIMEVALUE_H
+
 #include "llvm/Support/DataTypes.h"
 #include <string>
-
-#ifndef LLVM_SYSTEM_TIMEVALUE_H
-#define LLVM_SYSTEM_TIMEVALUE_H
 
 namespace llvm {
 namespace sys {
@@ -82,6 +82,9 @@ namespace sys {
   /// @name Constructors
   /// @{
   public:
+    /// \brief Default construct a time value, initializing to ZeroTime.
+    TimeValue() : seconds_(0), nanos_(0) {}
+
     /// Caller provides the exact value in seconds and nanoseconds. The
     /// \p nanos argument defaults to zero for convenience.
     /// @brief Explicit constructor
@@ -153,7 +156,6 @@ namespace sys {
 
     /// Determine if \p this is greater than or equal to \p that.
     /// @returns True iff *this >= that.
-    /// @brief True if this >= that.
     int operator >= (const TimeValue &that) const {
       if ( this->seconds_ > that.seconds_ ) {
           return 1;
@@ -164,8 +166,7 @@ namespace sys {
     }
 
     /// Determines if two TimeValue objects represent the same moment in time.
-    /// @brief True iff *this == that.
-    /// @brief True if this == that.
+    /// @returns True iff *this == that.
     int operator == (const TimeValue &that) const {
       return (this->seconds_ == that.seconds_) &&
              (this->nanos_ == that.nanos_);
@@ -173,8 +174,7 @@ namespace sys {
 
     /// Determines if two TimeValue objects represent times that are not the
     /// same.
-    /// @return True iff *this != that.
-    /// @brief True if this != that.
+    /// @returns True iff *this != that.
     int operator != (const TimeValue &that) const { return !(*this == that); }
 
     /// Adds two TimeValue objects together.

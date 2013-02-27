@@ -22,7 +22,7 @@ namespace clang {
   class Token;
   class MacroArgs;
 
-/// TokenLexer - This implements a lexer that returns token from a macro body
+/// TokenLexer - This implements a lexer that returns tokens from a macro body
 /// or token stream instead of lexing from a character buffer.  This is used for
 /// macro expansion and _Pragma handling, for example.
 ///
@@ -43,10 +43,13 @@ class TokenLexer {
   /// Tokens - This is the pointer to an array of tokens that the macro is
   /// defined to, with arguments expanded for function-like macros.  If this is
   /// a token stream, these are the tokens we are returning.  This points into
-  /// the macro definition we are lexing from, a scratch buffer allocated from
-  /// the preprocessor's bump pointer allocator, or some other buffer that we
-  /// may or may not own (depending on OwnsTokens).
+  /// the macro definition we are lexing from, a cache buffer that is owned by
+  /// the preprocessor, or some other buffer that we may or may not own
+  /// (depending on OwnsTokens).
+  /// Note that if it points into Preprocessor's cache buffer, the Preprocessor
+  /// may update the pointer as needed.
   const Token *Tokens;
+  friend class Preprocessor;
 
   /// NumTokens - This is the length of the Tokens array.
   ///
@@ -56,9 +59,22 @@ class TokenLexer {
   ///
   unsigned CurToken;
 
-  /// InstantiateLocStart/End - The source location range where this macro was
-  /// instantiated.
-  SourceLocation InstantiateLocStart, InstantiateLocEnd;
+  /// ExpandLocStart/End - The source location range where this macro was
+  /// expanded.
+  SourceLocation ExpandLocStart, ExpandLocEnd;
+
+  /// \brief Source location pointing at the source location entry chunk that
+  /// was reserved for the current macro expansion.
+  SourceLocation MacroExpansionStart;
+  
+  /// \brief The offset of the macro expansion in the
+  /// "source location address space".
+  unsigned MacroStartSLocOffset;
+
+  /// \brief Location of the macro definition.
+  SourceLocation MacroDefStart;
+  /// \brief Length of the macro definition.
+  unsigned MacroDefLength;
 
   /// Lexical information about the expansion point of the macro: the identifier
   /// that the macro expanded from had these properties.
@@ -75,24 +91,25 @@ class TokenLexer {
   /// should not be subject to further macro expansion.
   bool DisableMacroExpansion : 1;
 
-  TokenLexer(const TokenLexer&);  // DO NOT IMPLEMENT
-  void operator=(const TokenLexer&); // DO NOT IMPLEMENT
+  TokenLexer(const TokenLexer &) LLVM_DELETED_FUNCTION;
+  void operator=(const TokenLexer &) LLVM_DELETED_FUNCTION;
 public:
   /// Create a TokenLexer for the specified macro with the specified actual
   /// arguments.  Note that this ctor takes ownership of the ActualArgs pointer.
   /// ILEnd specifies the location of the ')' for a function-like macro or the
   /// identifier for an object-like macro.
-  TokenLexer(Token &Tok, SourceLocation ILEnd, MacroArgs *ActualArgs,
-             Preprocessor &pp)
+  TokenLexer(Token &Tok, SourceLocation ILEnd, MacroInfo *MI,
+             MacroArgs *ActualArgs, Preprocessor &pp)
     : Macro(0), ActualArgs(0), PP(pp), OwnsTokens(false) {
-    Init(Tok, ILEnd, ActualArgs);
+    Init(Tok, ILEnd, MI, ActualArgs);
   }
 
   /// Init - Initialize this TokenLexer to expand from the specified macro
   /// with the specified argument information.  Note that this ctor takes
   /// ownership of the ActualArgs pointer.  ILEnd specifies the location of the
   /// ')' for a function-like macro or the identifier for an object-like macro.
-  void Init(Token &Tok, SourceLocation ILEnd, MacroArgs *ActualArgs);
+  void Init(Token &Tok, SourceLocation ILEnd, MacroInfo *MI,
+            MacroArgs *ActualArgs);
 
   /// Create a TokenLexer for the specified token stream.  If 'OwnsTokens' is
   /// specified, this takes ownership of the tokens and delete[]'s them when
@@ -148,9 +165,22 @@ private:
   /// HandleMicrosoftCommentPaste - In microsoft compatibility mode, /##/ pastes
   /// together to form a comment that comments out everything in the current
   /// macro, other active macros, and anything left on the current physical
-  /// source line of the instantiated buffer.  Handle this by returning the
+  /// source line of the expanded buffer.  Handle this by returning the
   /// first token on the next line.
   void HandleMicrosoftCommentPaste(Token &Tok);
+
+  /// \brief If \p loc is a FileID and points inside the current macro
+  /// definition, returns the appropriate source location pointing at the
+  /// macro expansion source location entry.
+  SourceLocation getExpansionLocForMacroDefLoc(SourceLocation loc) const;
+
+  /// \brief Creates SLocEntries and updates the locations of macro argument
+  /// tokens to their new expanded locations.
+  ///
+  /// \param ArgIdSpellLoc the location of the macro argument id inside the
+  /// macro definition.
+  void updateLocForMacroArgTokens(SourceLocation ArgIdSpellLoc,
+                                  Token *begin_tokens, Token *end_tokens);
 };
 
 }  // end namespace clang

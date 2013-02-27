@@ -16,23 +16,20 @@
 #define LLVM_MC_MCDWARF_H
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/CodeGen/MachineLocation.h" // FIXME
-#include "llvm/MC/MCObjectWriter.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Dwarf.h"
+#include "llvm/Support/raw_ostream.h"
+#include <map>
 #include <vector>
 
 namespace llvm {
-  class TargetAsmInfo;
-  class MachineMove;
   class MCContext;
-  class MCExpr;
+  class MCObjectWriter;
   class MCSection;
-  class MCSectionData;
   class MCStreamer;
   class MCSymbol;
-  class MCObjectStreamer;
-  class raw_ostream;
+  class SourceMgr;
+  class SMLoc;
 
   /// MCDwarfFile - Instances of this class represent the name of the dwarf
   /// .file directive and its associated dwarf file number in the MC file,
@@ -52,8 +49,8 @@ namespace llvm {
     MCDwarfFile(StringRef name, unsigned dirIndex)
       : Name(name), DirIndex(dirIndex) {}
 
-    MCDwarfFile(const MCDwarfFile&);       // DO NOT IMPLEMENT
-    void operator=(const MCDwarfFile&); // DO NOT IMPLEMENT
+    MCDwarfFile(const MCDwarfFile&) LLVM_DELETED_FUNCTION;
+    void operator=(const MCDwarfFile&) LLVM_DELETED_FUNCTION;
   public:
     /// getName - Get the base name of this MCDwarfFile.
     StringRef getName() const { return Name; }
@@ -62,7 +59,7 @@ namespace llvm {
     unsigned getDirIndex() const { return DirIndex; }
 
 
-    /// print - Print the value to the stream \arg OS.
+    /// print - Print the value to the stream \p OS.
     void print(raw_ostream &OS) const;
 
     /// dump - Print the value to stderr.
@@ -181,8 +178,8 @@ namespace llvm {
   class MCLineSection {
 
   private:
-    MCLineSection(const MCLineSection&);  // DO NOT IMPLEMENT
-    void operator=(const MCLineSection&); // DO NOT IMPLEMENT
+    MCLineSection(const MCLineSection&) LLVM_DELETED_FUNCTION;
+    void operator=(const MCLineSection&) LLVM_DELETED_FUNCTION;
 
   public:
     // Constructor to create an MCLineSection with an empty MCLineEntries
@@ -190,29 +187,43 @@ namespace llvm {
     MCLineSection() {}
 
     // addLineEntry - adds an entry to this MCLineSection's line entries
-    void addLineEntry(const MCLineEntry &LineEntry) {
-      MCLineEntries.push_back(LineEntry);
+    void addLineEntry(const MCLineEntry &LineEntry, unsigned CUID) {
+      MCLineDivisions[CUID].push_back(LineEntry);
     }
 
     typedef std::vector<MCLineEntry> MCLineEntryCollection;
     typedef MCLineEntryCollection::iterator iterator;
     typedef MCLineEntryCollection::const_iterator const_iterator;
+    typedef std::map<unsigned, MCLineEntryCollection> MCLineDivisionMap;
 
   private:
-    MCLineEntryCollection MCLineEntries;
+    // A collection of MCLineEntry for each Compile Unit ID.
+    MCLineDivisionMap MCLineDivisions;
 
   public:
-    const MCLineEntryCollection *getMCLineEntries() const {
-      return &MCLineEntries;
+    // Returns whether MCLineSection contains entries for a given Compile
+    // Unit ID.
+    bool containEntriesForID(unsigned CUID) const {
+      return MCLineDivisions.count(CUID);
+    }
+    // Returns the collection of MCLineEntry for a given Compile Unit ID.
+    const MCLineEntryCollection &getMCLineEntries(unsigned CUID) const {
+      MCLineDivisionMap::const_iterator CIter = MCLineDivisions.find(CUID);
+      assert(CIter != MCLineDivisions.end());
+      return CIter->second;
     }
   };
 
   class MCDwarfFileTable {
   public:
     //
-    // This emits the Dwarf file and the line tables.
+    // This emits the Dwarf file and the line tables for all Compile Units.
     //
-    static void Emit(MCStreamer *MCOS);
+    static const MCSymbol *Emit(MCStreamer *MCOS);
+    //
+    // This emits the Dwarf file and the line tables for a given Compile Unit.
+    //
+    static const MCSymbol *EmitCU(MCStreamer *MCOS, unsigned ID);
   };
 
   class MCDwarfLineAddr {
@@ -229,43 +240,164 @@ namespace llvm {
                       int64_t LineDelta, uint64_t AddrDelta);
   };
 
+  class MCGenDwarfInfo {
+  public:
+    //
+    // When generating dwarf for assembly source files this emits the Dwarf
+    // sections.
+    //
+    static void Emit(MCStreamer *MCOS, const MCSymbol *LineSectionSymbol);
+  };
+
+  // When generating dwarf for assembly source files this is the info that is
+  // needed to be gathered for each symbol that will have a dwarf label.
+  class MCGenDwarfLabelEntry {
+  private:
+    // Name of the symbol without a leading underbar, if any.
+    StringRef Name;
+    // The dwarf file number this symbol is in.
+    unsigned FileNumber;
+    // The line number this symbol is at.
+    unsigned LineNumber;
+    // The low_pc for the dwarf label is taken from this symbol.
+    MCSymbol *Label;
+
+  public:
+    MCGenDwarfLabelEntry(StringRef name, unsigned fileNumber,
+                         unsigned lineNumber, MCSymbol *label) :
+      Name(name), FileNumber(fileNumber), LineNumber(lineNumber), Label(label){}
+
+    StringRef getName() const { return Name; }
+    unsigned getFileNumber() const { return FileNumber; }
+    unsigned getLineNumber() const { return LineNumber; }
+    MCSymbol *getLabel() const { return Label; }
+
+    // This is called when label is created when we are generating dwarf for
+    // assembly source files.
+    static void Make(MCSymbol *Symbol, MCStreamer *MCOS, SourceMgr &SrcMgr,
+                     SMLoc &Loc);
+  };
+
   class MCCFIInstruction {
   public:
-    enum OpType { SameValue, Remember, Restore, Move, RelMove };
+    enum OpType { OpSameValue, OpRememberState, OpRestoreState, OpOffset,
+                  OpDefCfaRegister, OpDefCfaOffset, OpDefCfa, OpRelOffset,
+                  OpAdjustCfaOffset, OpEscape, OpRestore, OpUndefined,
+                  OpRegister };
   private:
     OpType Operation;
     MCSymbol *Label;
-    // Move to & from location.
-    MachineLocation Destination;
-    MachineLocation Source;
+    unsigned Register;
+    union {
+      int Offset;
+      unsigned Register2;
+    };
+    std::vector<char> Values;
+
+    MCCFIInstruction(OpType Op, MCSymbol *L, unsigned R, int O, StringRef V) :
+      Operation(Op), Label(L), Register(R), Offset(O),
+      Values(V.begin(), V.end()) {
+      assert(Op != OpRegister);
+    }
+
+    MCCFIInstruction(OpType Op, MCSymbol *L, unsigned R1, unsigned R2) :
+      Operation(Op), Label(L), Register(R1), Register2(R2) {
+      assert(Op == OpRegister);
+    }
+
   public:
-    MCCFIInstruction(OpType Op, MCSymbol *L)
-      : Operation(Op), Label(L) {
-      assert(Op == Remember || Op == Restore);
+    static MCCFIInstruction
+    createOffset(MCSymbol *L, unsigned Register, int Offset) {
+      return MCCFIInstruction(OpOffset, L, Register, Offset, "");
     }
-    MCCFIInstruction(OpType Op, MCSymbol *L, unsigned Register)
-      : Operation(Op), Label(L), Destination(Register) {
-      assert(Op == SameValue);
+
+    static MCCFIInstruction
+    createDefCfaRegister(MCSymbol *L, unsigned Register) {
+      return MCCFIInstruction(OpDefCfaRegister, L, Register, 0, "");
     }
-    MCCFIInstruction(MCSymbol *L, const MachineLocation &D,
-                     const MachineLocation &S)
-      : Operation(Move), Label(L), Destination(D), Source(S) {
+
+    static MCCFIInstruction createDefCfaOffset(MCSymbol *L, int Offset) {
+      return MCCFIInstruction(OpDefCfaOffset, L, 0, -Offset, "");
     }
-    MCCFIInstruction(OpType Op, MCSymbol *L, const MachineLocation &D,
-                     const MachineLocation &S)
-      : Operation(Op), Label(L), Destination(D), Source(S) {
-      assert(Op == RelMove);
+
+    static MCCFIInstruction
+    createDefCfa(MCSymbol *L, unsigned Register, int Offset) {
+      return MCCFIInstruction(OpDefCfa, L, Register, -Offset, "");
     }
+
+    static MCCFIInstruction createUndefined(MCSymbol *L, unsigned Register) {
+      return MCCFIInstruction(OpUndefined, L, Register, 0, "");
+    }
+
+    static MCCFIInstruction createRestore(MCSymbol *L, unsigned Register) {
+      return MCCFIInstruction(OpRestore, L, Register, 0, "");
+    }
+
+    static MCCFIInstruction createSameValue(MCSymbol *L, unsigned Register) {
+      return MCCFIInstruction(OpSameValue, L, Register, 0, "");
+    }
+
+    static MCCFIInstruction createRestoreState(MCSymbol *L) {
+      return MCCFIInstruction(OpRestoreState, L, 0, 0, "");
+    }
+
+    static MCCFIInstruction createRememberState(MCSymbol *L) {
+      return MCCFIInstruction(OpRememberState, L, 0, 0, "");
+    }
+
+    static MCCFIInstruction
+    createRelOffset(MCSymbol *L, unsigned Register, int Offset) {
+      return MCCFIInstruction(OpRelOffset, L, Register, Offset, "");
+    }
+
+    static MCCFIInstruction
+    createAdjustCfaOffset(MCSymbol *L, int Adjustment) {
+      return MCCFIInstruction(OpAdjustCfaOffset, L, 0, Adjustment, "");
+    }
+
+    static MCCFIInstruction createEscape(MCSymbol *L, StringRef Vals) {
+      return MCCFIInstruction(OpEscape, L, 0, 0, Vals);
+    }
+
+   static MCCFIInstruction
+   createRegister(MCSymbol *L, unsigned Register1, unsigned Register2) {
+      return MCCFIInstruction(OpRegister, L, Register1, Register2);
+    }
+
     OpType getOperation() const { return Operation; }
     MCSymbol *getLabel() const { return Label; }
-    const MachineLocation &getDestination() const { return Destination; }
-    const MachineLocation &getSource() const { return Source; }
+
+    unsigned getRegister() const {
+      assert(Operation == OpDefCfa || Operation == OpOffset ||
+             Operation == OpRestore || Operation == OpUndefined ||
+             Operation == OpSameValue || Operation == OpDefCfaRegister ||
+             Operation == OpRelOffset || Operation == OpRegister);
+      return Register;
+    }
+
+    unsigned getRegister2() const {
+      assert(Operation == OpRegister);
+      return Register2;
+    }
+
+    int getOffset() const {
+      assert(Operation == OpDefCfa || Operation == OpOffset ||
+             Operation == OpRelOffset || Operation == OpDefCfaOffset ||
+             Operation == OpAdjustCfaOffset);
+      return Offset;
+    }
+
+    const StringRef getValues() const {
+      assert(Operation == OpEscape);
+      return StringRef(&Values[0], Values.size());
+    }
   };
 
   struct MCDwarfFrameInfo {
     MCDwarfFrameInfo() : Begin(0), End(0), Personality(0), Lsda(0),
                          Function(0), Instructions(), PersonalityEncoding(),
-                         LsdaEncoding(0) {}
+                         LsdaEncoding(0), CompactUnwindEncoding(0),
+                         IsSignalFrame(false) {}
     MCSymbol *Begin;
     MCSymbol *End;
     const MCSymbol *Personality;
@@ -274,6 +406,8 @@ namespace llvm {
     std::vector<MCCFIInstruction> Instructions;
     unsigned PersonalityEncoding;
     unsigned LsdaEncoding;
+    uint32_t CompactUnwindEncoding;
+    bool IsSignalFrame;
   };
 
   class MCDwarfFrameEmitter {
@@ -281,11 +415,10 @@ namespace llvm {
     //
     // This emits the frame info section.
     //
-    static void Emit(MCStreamer &streamer);
-    static void EmitDarwin(MCStreamer &streamer);
+    static void Emit(MCStreamer &streamer, bool usingCFI,
+                     bool isEH);
     static void EmitAdvanceLoc(MCStreamer &Streamer, uint64_t AddrDelta);
-    static void EncodeAdvanceLoc(uint64_t AddrDelta, raw_ostream &OS,
-                                 const TargetAsmInfo &AsmInfo);
+    static void EncodeAdvanceLoc(uint64_t AddrDelta, raw_ostream &OS);
   };
 } // end namespace llvm
 

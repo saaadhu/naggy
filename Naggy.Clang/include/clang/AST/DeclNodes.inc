@@ -1,3 +1,11 @@
+/*===- TableGen'erated file -------------------------------------*- C++ -*-===*\
+|*                                                                            *|
+|*List of AST nodes of a particular kind                                      *|
+|*                                                                            *|
+|* Automatically generated file, do not edit!                                 *|
+|*                                                                            *|
+\*===----------------------------------------------------------------------===*/
+
 #ifndef ABSTRACT_DECL
 #  define ABSTRACT_DECL(Type) Type
 #endif
@@ -21,6 +29,12 @@ ACCESSSPEC(AccessSpec, Decl)
 BLOCK(Block, Decl)
 #undef BLOCK
 
+#ifndef CLASSSCOPEFUNCTIONSPECIALIZATION
+#  define CLASSSCOPEFUNCTIONSPECIALIZATION(Type, Base) DECL(Type, Base)
+#endif
+CLASSSCOPEFUNCTIONSPECIALIZATION(ClassScopeFunctionSpecialization, Decl)
+#undef CLASSSCOPEFUNCTIONSPECIALIZATION
+
 #ifndef FILESCOPEASM
 #  define FILESCOPEASM(Type, Base) DECL(Type, Base)
 #endif
@@ -38,6 +52,12 @@ FRIEND(Friend, Decl)
 #endif
 FRIENDTEMPLATE(FriendTemplate, Decl)
 #undef FRIENDTEMPLATE
+
+#ifndef IMPORT
+#  define IMPORT(Type, Base) DECL(Type, Base)
+#endif
+IMPORT(Import, Decl)
+#undef IMPORT
 
 #ifndef LINKAGESPEC
 #  define LINKAGESPEC(Type, Base) DECL(Type, Base)
@@ -151,7 +171,13 @@ CLASSTEMPLATE(ClassTemplate, RedeclarableTemplateDecl)
 FUNCTIONTEMPLATE(FunctionTemplate, RedeclarableTemplateDecl)
 #undef FUNCTIONTEMPLATE
 
-DECL_RANGE(RedeclarableTemplate, ClassTemplate, FunctionTemplate)
+#ifndef TYPEALIASTEMPLATE
+#  define TYPEALIASTEMPLATE(Type, Base) REDECLARABLETEMPLATE(Type, Base)
+#endif
+TYPEALIASTEMPLATE(TypeAliasTemplate, RedeclarableTemplateDecl)
+#undef TYPEALIASTEMPLATE
+
+DECL_RANGE(RedeclarableTemplate, ClassTemplate, TypeAliasTemplate)
 
 #undef REDECLARABLETEMPLATE
 
@@ -385,18 +411,6 @@ DECL_RANGE(Named, Label, UnresolvedUsingValue)
 
 #undef NAMED
 
-#ifndef OBJCCLASS
-#  define OBJCCLASS(Type, Base) DECL(Type, Base)
-#endif
-OBJCCLASS(ObjCClass, Decl)
-#undef OBJCCLASS
-
-#ifndef OBJCFORWARDPROTOCOL
-#  define OBJCFORWARDPROTOCOL(Type, Base) DECL(Type, Base)
-#endif
-OBJCFORWARDPROTOCOL(ObjCForwardProtocol, Decl)
-#undef OBJCFORWARDPROTOCOL
-
 #ifndef OBJCPROPERTYIMPL
 #  define OBJCPROPERTYIMPL(Type, Base) DECL(Type, Base)
 #endif
@@ -421,6 +435,14 @@ LAST_DECL_RANGE(Decl, AccessSpec, TranslationUnit)
 #undef DECL_RANGE
 #undef LAST_DECL_RANGE
 #undef ABSTRACT_DECL
+/*===- TableGen'erated file -------------------------------------*- C++ -*-===*\
+|*                                                                            *|
+|*List of AST Decl nodes                                                      *|
+|*                                                                            *|
+|* Automatically generated file, do not edit!                                 *|
+|*                                                                            *|
+\*===----------------------------------------------------------------------===*/
+
 #ifndef DECL_CONTEXT
 #  define DECL_CONTEXT(DECL)
 #endif

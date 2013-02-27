@@ -16,10 +16,11 @@
 #ifndef LLVM_CODEGEN_VALUETYPES_H
 #define LLVM_CODEGEN_VALUETYPES_H
 
+#include "llvm/Support/DataTypes.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 #include <cassert>
 #include <string>
-#include "llvm/Support/DataTypes.h"
-#include "llvm/Support/MathExtras.h"
 
 namespace llvm {
   class Type;
@@ -32,6 +33,10 @@ namespace llvm {
   class MVT {
   public:
     enum SimpleValueType {
+      // INVALID_SIMPLE_VALUE_TYPE - Simple value types less than zero are
+      // considered extended value types.
+      INVALID_SIMPLE_VALUE_TYPE = -1,
+
       // If you change this numbering, you must change the values in
       // ValueTypes.td as well!
       Other          =   0,   // This is a non-standard value
@@ -45,45 +50,75 @@ namespace llvm {
       FIRST_INTEGER_VALUETYPE = i1,
       LAST_INTEGER_VALUETYPE  = i128,
 
-      f32            =   7,   // This is a 32 bit floating point value
-      f64            =   8,   // This is a 64 bit floating point value
-      f80            =   9,   // This is a 80 bit floating point value
-      f128           =  10,   // This is a 128 bit floating point value
-      ppcf128        =  11,   // This is a PPC 128-bit floating point value
+      f16            =   7,   // This is a 16 bit floating point value
+      f32            =   8,   // This is a 32 bit floating point value
+      f64            =   9,   // This is a 64 bit floating point value
+      f80            =  10,   // This is a 80 bit floating point value
+      f128           =  11,   // This is a 128 bit floating point value
+      ppcf128        =  12,   // This is a PPC 128-bit floating point value
 
-      v2i8           =  12,   //  2 x i8
-      v4i8           =  13,   //  4 x i8
-      v8i8           =  14,   //  8 x i8
-      v16i8          =  15,   // 16 x i8
-      v32i8          =  16,   // 32 x i8
-      v2i16          =  17,   //  2 x i16
-      v4i16          =  18,   //  4 x i16
-      v8i16          =  19,   //  8 x i16
-      v16i16         =  20,   // 16 x i16
-      v2i32          =  21,   //  2 x i32
-      v4i32          =  22,   //  4 x i32
-      v8i32          =  23,   //  8 x i32
-      v1i64          =  24,   //  1 x i64
-      v2i64          =  25,   //  2 x i64
-      v4i64          =  26,   //  4 x i64
-      v8i64          =  27,   //  8 x i64
+      FIRST_FP_VALUETYPE = f16,
+      LAST_FP_VALUETYPE  = ppcf128,
 
-      v2f32          =  28,   //  2 x f32
-      v4f32          =  29,   //  4 x f32
-      v8f32          =  30,   //  8 x f32
-      v2f64          =  31,   //  2 x f64
-      v4f64          =  32,   //  4 x f64
+      v2i1           =  13,   //  2 x i1
+      v4i1           =  14,   //  4 x i1
+      v8i1           =  15,   //  8 x i1
+      v16i1          =  16,   // 16 x i1
+      v32i1          =  17,   // 32 x i1
+      v64i1          =  18,   // 64 x i1
 
-      FIRST_VECTOR_VALUETYPE = v2i8,
-      LAST_VECTOR_VALUETYPE  = v4f64,
+      v2i8           =  19,   //  2 x i8
+      v4i8           =  20,   //  4 x i8
+      v8i8           =  21,   //  8 x i8
+      v16i8          =  22,   // 16 x i8
+      v32i8          =  23,   // 32 x i8
+      v64i8          =  24,   // 64 x i8
+      v1i16          =  25,   //  1 x i16
+      v2i16          =  26,   //  2 x i16
+      v4i16          =  27,   //  4 x i16
+      v8i16          =  28,   //  8 x i16
+      v16i16         =  29,   // 16 x i16
+      v32i16         =  30,   // 32 x i16
+      v1i32          =  31,   //  1 x i32
+      v2i32          =  32,   //  2 x i32
+      v4i32          =  33,   //  4 x i32
+      v8i32          =  34,   //  8 x i32
+      v16i32         =  35,   // 16 x i32
+      v1i64          =  36,   //  1 x i64
+      v2i64          =  37,   //  2 x i64
+      v4i64          =  38,   //  4 x i64
+      v8i64          =  39,   //  8 x i64
+      v16i64         =  40,   // 16 x i64
 
-      x86mmx         =  33,   // This is an X86 MMX value
+      FIRST_INTEGER_VECTOR_VALUETYPE = v2i1,
+      LAST_INTEGER_VECTOR_VALUETYPE = v16i64,
 
-      Glue           =  34,   // This glues nodes together during pre-RA sched
+      v2f16          =  41,   //  2 x f16
+      v2f32          =  42,   //  2 x f32
+      v4f32          =  43,   //  4 x f32
+      v8f32          =  44,   //  8 x f32
+      v16f32         =  45,   // 16 x f32
+      v2f64          =  46,   //  2 x f64
+      v4f64          =  47,   //  4 x f64
+      v8f64          =  48,   //  8 x f64
 
-      isVoid         =  35,   // This has no value
+      FIRST_FP_VECTOR_VALUETYPE = v2f16,
+      LAST_FP_VECTOR_VALUETYPE = v8f64,
 
-      LAST_VALUETYPE =  36,   // This always remains at the end of the list.
+      FIRST_VECTOR_VALUETYPE = v2i1,
+      LAST_VECTOR_VALUETYPE  = v8f64,
+
+      x86mmx         =  49,   // This is an X86 MMX value
+
+      Glue           =  50,   // This glues nodes together during pre-RA sched
+
+      isVoid         =  51,   // This has no value
+
+      Untyped        =  52,   // This value takes a register, but has
+                              // unspecified type.  The register class
+                              // will be determined by the opcode.
+
+      LAST_VALUETYPE =  53,   // This always remains at the end of the list.
 
       // This is the current maximum for LAST_VALUETYPE.
       // MVT::MAX_ALLOWED_VALUETYPE is used for asserts and to size bit vectors
@@ -115,14 +150,7 @@ namespace llvm {
 
       // iPTR - An int value the size of the pointer of the current
       // target.  This should only be used internal to tblgen!
-      iPTR           = 255,
-
-      // LastSimpleValueType - The greatest valid SimpleValueType value.
-      LastSimpleValueType = 255,
-
-      // INVALID_SIMPLE_VALUE_TYPE - Simple value types greater than or equal
-      // to this are considered extended value types.
-      INVALID_SIMPLE_VALUE_TYPE = LastSimpleValueType + 1
+      iPTR           = 255
     };
 
     SimpleValueType SimpleTy;
@@ -139,21 +167,69 @@ namespace llvm {
 
     /// isFloatingPoint - Return true if this is a FP, or a vector FP type.
     bool isFloatingPoint() const {
-      return ((SimpleTy >= MVT::f32 && SimpleTy <= MVT::ppcf128) ||
-        (SimpleTy >= MVT::v2f32 && SimpleTy <= MVT::v4f64));
+      return ((SimpleTy >= MVT::FIRST_FP_VALUETYPE &&
+               SimpleTy <= MVT::LAST_FP_VALUETYPE) ||
+              (SimpleTy >= MVT::FIRST_FP_VECTOR_VALUETYPE &&
+               SimpleTy <= MVT::LAST_FP_VECTOR_VALUETYPE));
     }
 
     /// isInteger - Return true if this is an integer, or a vector integer type.
     bool isInteger() const {
       return ((SimpleTy >= MVT::FIRST_INTEGER_VALUETYPE &&
                SimpleTy <= MVT::LAST_INTEGER_VALUETYPE) ||
-               (SimpleTy >= MVT::v2i8 && SimpleTy <= MVT::v8i64));
+              (SimpleTy >= MVT::FIRST_INTEGER_VECTOR_VALUETYPE &&
+               SimpleTy <= MVT::LAST_INTEGER_VECTOR_VALUETYPE));
     }
 
     /// isVector - Return true if this is a vector value type.
     bool isVector() const {
       return (SimpleTy >= MVT::FIRST_VECTOR_VALUETYPE &&
               SimpleTy <= MVT::LAST_VECTOR_VALUETYPE);
+    }
+
+    /// is16BitVector - Return true if this is a 16-bit vector type.
+    bool is16BitVector() const {
+      return (SimpleTy == MVT::v2i8  || SimpleTy == MVT::v1i16 ||
+              SimpleTy == MVT::v16i1);
+    }
+
+    /// is32BitVector - Return true if this is a 32-bit vector type.
+    bool is32BitVector() const {
+      return (SimpleTy == MVT::v4i8  || SimpleTy == MVT::v2i16 ||
+              SimpleTy == MVT::v1i32);
+    }
+
+    /// is64BitVector - Return true if this is a 64-bit vector type.
+    bool is64BitVector() const {
+      return (SimpleTy == MVT::v8i8  || SimpleTy == MVT::v4i16 ||
+              SimpleTy == MVT::v2i32 || SimpleTy == MVT::v1i64 ||
+              SimpleTy == MVT::v2f32);
+    }
+
+    /// is128BitVector - Return true if this is a 128-bit vector type.
+    bool is128BitVector() const {
+      return (SimpleTy == MVT::v16i8 || SimpleTy == MVT::v8i16 ||
+              SimpleTy == MVT::v4i32 || SimpleTy == MVT::v2i64 ||
+              SimpleTy == MVT::v4f32 || SimpleTy == MVT::v2f64);
+    }
+
+    /// is256BitVector - Return true if this is a 256-bit vector type.
+    bool is256BitVector() const {
+      return (SimpleTy == MVT::v8f32 || SimpleTy == MVT::v4f64  ||
+              SimpleTy == MVT::v32i8 || SimpleTy == MVT::v16i16 ||
+              SimpleTy == MVT::v8i32 || SimpleTy == MVT::v4i64);
+    }
+
+    /// is512BitVector - Return true if this is a 512-bit vector type.
+    bool is512BitVector() const {
+      return (SimpleTy == MVT::v8f64 || SimpleTy == MVT::v16f32 ||
+              SimpleTy == MVT::v64i8 || SimpleTy == MVT::v32i16 ||
+              SimpleTy == MVT::v8i64 || SimpleTy == MVT::v16i32);
+    }
+
+    /// is1024BitVector - Return true if this is a 1024-bit vector type.
+    bool is1024BitVector() const {
+      return (SimpleTy == MVT::v16i64);
     }
 
     /// isPow2VectorType - Returns true if the given vector is a power of 2.
@@ -182,55 +258,85 @@ namespace llvm {
     MVT getVectorElementType() const {
       switch (SimpleTy) {
       default:
-        return (MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE);
+        llvm_unreachable("Not a vector MVT!");
+      case v2i1 :
+      case v4i1 :
+      case v8i1 :
+      case v16i1 :
+      case v32i1 :
+      case v64i1: return i1;
       case v2i8 :
       case v4i8 :
       case v8i8 :
       case v16i8:
-      case v32i8: return i8;
+      case v32i8:
+      case v64i8: return i8;
+      case v1i16:
       case v2i16:
       case v4i16:
       case v8i16:
-      case v16i16: return i16;
+      case v16i16:
+      case v32i16: return i16;
+      case v1i32:
       case v2i32:
       case v4i32:
-      case v8i32: return i32;
+      case v8i32:
+      case v16i32: return i32;
       case v1i64:
       case v2i64:
       case v4i64:
-      case v8i64: return i64;
+      case v8i64:
+      case v16i64: return i64;
+      case v2f16: return f16;
       case v2f32:
       case v4f32:
-      case v8f32: return f32;
+      case v8f32:
+      case v16f32: return f32;
       case v2f64:
-      case v4f64: return f64;
+      case v4f64:
+      case v8f64: return f64;
       }
     }
 
     unsigned getVectorNumElements() const {
       switch (SimpleTy) {
       default:
-        return ~0U;
-      case v32i8: return 32;
+        llvm_unreachable("Not a vector MVT!");
+      case v32i1:
+      case v32i8:
+      case v32i16: return 32;
+      case v64i1:
+      case v64i8: return 64;
+      case v16i1:
       case v16i8:
-      case v16i16: return 16;
+      case v16i16:
+      case v16i32:
+      case v16i64:
+      case v16f32: return 16;
+      case v8i1 :
       case v8i8 :
       case v8i16:
       case v8i32:
       case v8i64:
-      case v8f32: return 8;
+      case v8f32:
+      case v8f64: return 8;
+      case v4i1:
       case v4i8:
       case v4i16:
       case v4i32:
       case v4i64:
       case v4f32:
       case v4f64: return 4;
+      case v2i1:
       case v2i8:
       case v2i16:
       case v2i32:
       case v2i64:
+      case v2f16:
       case v2f32:
       case v2f64: return 2;
+      case v1i16:
+      case v1i32:
       case v1i64: return 1;
       }
     }
@@ -238,24 +344,37 @@ namespace llvm {
     unsigned getSizeInBits() const {
       switch (SimpleTy) {
       case iPTR:
-        assert(0 && "Value type size is target-dependent. Ask TLI.");
+        llvm_unreachable("Value type size is target-dependent. Ask TLI.");
       case iPTRAny:
       case iAny:
       case fAny:
-        assert(0 && "Value type is overloaded.");
+      case vAny:
+        llvm_unreachable("Value type is overloaded.");
+      case Metadata:
+        llvm_unreachable("Value type is metadata.");
       default:
-        assert(0 && "getSizeInBits called on extended MVT.");
+        llvm_unreachable("getSizeInBits called on extended MVT.");
       case i1  :  return 1;
-      case i8  :  return 8;
+      case v2i1:  return 2;
+      case v4i1:  return 4;
+      case i8  :
+      case v8i1: return 8;
       case i16 :
-      case v2i8:  return 16;
+      case f16:
+      case v16i1:
+      case v2i8:
+      case v1i16: return 16;
       case f32 :
       case i32 :
+      case v32i1:
       case v4i8:
-      case v2i16: return 32;
+      case v2i16:
+      case v2f16:
+      case v1i32: return 32;
       case x86mmx:
       case f64 :
       case i64 :
+      case v64i1:
       case v8i8:
       case v4i16:
       case v2i32:
@@ -277,7 +396,13 @@ namespace llvm {
       case v4i64:
       case v8f32:
       case v4f64: return 256;
-      case v8i64: return 512;
+      case v64i8:
+      case v32i16:
+      case v16i32:
+      case v8i64:
+      case v16f32:
+      case v8f64: return 512;
+      case v16i64:return 1024;
       }
     }
 
@@ -293,10 +418,33 @@ namespace llvm {
       return getStoreSize() * 8;
     }
 
+    /// Return true if this has more bits than VT.
+    bool bitsGT(MVT VT) const {
+      return getSizeInBits() > VT.getSizeInBits();
+    }
+
+    /// Return true if this has no less bits than VT.
+    bool bitsGE(MVT VT) const {
+      return getSizeInBits() >= VT.getSizeInBits();
+    }
+
+    /// Return true if this has less bits than VT.
+    bool bitsLT(MVT VT) const {
+      return getSizeInBits() < VT.getSizeInBits();
+    }
+
+    /// Return true if this has no more bits than VT.
+    bool bitsLE(MVT VT) const {
+      return getSizeInBits() <= VT.getSizeInBits();
+    }
+
+
     static MVT getFloatingPointVT(unsigned BitWidth) {
       switch (BitWidth) {
       default:
-        assert(false && "Bad bit width!");
+        llvm_unreachable("Bad bit width!");
+      case 16:
+        return MVT::f16;
       case 32:
         return MVT::f32;
       case 64:
@@ -331,42 +479,67 @@ namespace llvm {
       switch (VT.SimpleTy) {
       default:
         break;
+      case MVT::i1:
+        if (NumElements == 2)  return MVT::v2i1;
+        if (NumElements == 4)  return MVT::v4i1;
+        if (NumElements == 8)  return MVT::v8i1;
+        if (NumElements == 16) return MVT::v16i1;
+        if (NumElements == 32) return MVT::v32i1;
+        if (NumElements == 64) return MVT::v64i1;
+        break;
       case MVT::i8:
         if (NumElements == 2)  return MVT::v2i8;
         if (NumElements == 4)  return MVT::v4i8;
         if (NumElements == 8)  return MVT::v8i8;
         if (NumElements == 16) return MVT::v16i8;
         if (NumElements == 32) return MVT::v32i8;
+        if (NumElements == 64) return MVT::v64i8;
         break;
       case MVT::i16:
+        if (NumElements == 1)  return MVT::v1i16;
         if (NumElements == 2)  return MVT::v2i16;
         if (NumElements == 4)  return MVT::v4i16;
         if (NumElements == 8)  return MVT::v8i16;
         if (NumElements == 16) return MVT::v16i16;
+        if (NumElements == 32) return MVT::v32i16;
         break;
       case MVT::i32:
+        if (NumElements == 1)  return MVT::v1i32;
         if (NumElements == 2)  return MVT::v2i32;
         if (NumElements == 4)  return MVT::v4i32;
         if (NumElements == 8)  return MVT::v8i32;
+        if (NumElements == 16) return MVT::v16i32;
         break;
       case MVT::i64:
         if (NumElements == 1)  return MVT::v1i64;
         if (NumElements == 2)  return MVT::v2i64;
         if (NumElements == 4)  return MVT::v4i64;
         if (NumElements == 8)  return MVT::v8i64;
+        if (NumElements == 16) return MVT::v16i64;
+        break;
+      case MVT::f16:
+        if (NumElements == 2)  return MVT::v2f16;
         break;
       case MVT::f32:
         if (NumElements == 2)  return MVT::v2f32;
         if (NumElements == 4)  return MVT::v4f32;
         if (NumElements == 8)  return MVT::v8f32;
+        if (NumElements == 16) return MVT::v16f32;
         break;
       case MVT::f64:
         if (NumElements == 2)  return MVT::v2f64;
         if (NumElements == 4)  return MVT::v4f64;
+        if (NumElements == 8)  return MVT::v8f64;
         break;
       }
       return (MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE);
     }
+
+    /// Return the value type corresponding to the specified type.  This returns
+    /// all pointers as iPTR.  If HandleUnknown is true, unknown types are
+    /// returned as Other, otherwise they are invalid.
+    static MVT getVT(Type *Ty, bool HandleUnknown = false);
+
   };
 
 
@@ -376,7 +549,7 @@ namespace llvm {
   struct EVT {
   private:
     MVT V;
-    const Type *LLVMTy;
+    Type *LLVMTy;
 
   public:
     EVT() : V((MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE)),
@@ -390,7 +563,7 @@ namespace llvm {
     bool operator!=(EVT VT) const {
       if (V.SimpleTy != VT.V.SimpleTy)
         return true;
-      if (V.SimpleTy == MVT::INVALID_SIMPLE_VALUE_TYPE)
+      if (V.SimpleTy < 0)
         return LLVMTy != VT.LLVMTy;
       return false;
     }
@@ -406,7 +579,7 @@ namespace llvm {
     /// number of bits.
     static EVT getIntegerVT(LLVMContext &Context, unsigned BitWidth) {
       MVT M = MVT::getIntegerVT(BitWidth);
-      if (M.SimpleTy != MVT::INVALID_SIMPLE_VALUE_TYPE)
+      if (M.SimpleTy >= 0)
         return M;
       return getExtendedIntegerVT(Context, BitWidth);
     }
@@ -415,29 +588,30 @@ namespace llvm {
     /// length, where each element is of type VT.
     static EVT getVectorVT(LLVMContext &Context, EVT VT, unsigned NumElements) {
       MVT M = MVT::getVectorVT(VT.V, NumElements);
-      if (M.SimpleTy != MVT::INVALID_SIMPLE_VALUE_TYPE)
+      if (M.SimpleTy >= 0)
         return M;
       return getExtendedVectorVT(Context, VT, NumElements);
     }
 
-    /// getIntVectorWithNumElements - Return any integer vector type that has
-    /// the specified number of elements.
-    static EVT getIntVectorWithNumElements(LLVMContext &C, unsigned NumElts) {
-      switch (NumElts) {
-      default: return getVectorVT(C, MVT::i8, NumElts);
-      case  1: return MVT::v1i64;
-      case  2: return MVT::v2i32;
-      case  4: return MVT::v4i16;
-      case  8: return MVT::v8i8;
-      case 16: return MVT::v16i8;
-      }
-      return MVT::INVALID_SIMPLE_VALUE_TYPE;
+    /// changeVectorElementTypeToInteger - Return a vector with the same number
+    /// of elements as this vector, but with the element type converted to an
+    /// integer type with the same bitwidth.
+    EVT changeVectorElementTypeToInteger() const {
+      if (!isSimple())
+        return changeExtendedVectorElementTypeToInteger();
+      MVT EltTy = getSimpleVT().getVectorElementType();
+      unsigned BitWidth = EltTy.getSizeInBits();
+      MVT IntTy = MVT::getIntegerVT(BitWidth);
+      MVT VecTy = MVT::getVectorVT(IntTy, getVectorNumElements());
+      assert(VecTy.SimpleTy >= 0 &&
+             "Simple vector VT not representable by simple integer vector VT!");
+      return VecTy;
     }
 
     /// isSimple - Test if the given EVT is simple (as opposed to being
     /// extended).
     bool isSimple() const {
-      return V.SimpleTy <= MVT::LastSimpleValueType;
+      return V.SimpleTy >= 0;
     }
 
     /// isExtended - Test if the given EVT is extended (as opposed to
@@ -461,34 +635,39 @@ namespace llvm {
       return isSimple() ? V.isVector() : isExtendedVector();
     }
 
+    /// is16BitVector - Return true if this is a 16-bit vector type.
+    bool is16BitVector() const {
+      return isSimple() ? V.is16BitVector() : isExtended16BitVector();
+    }
+
+    /// is32BitVector - Return true if this is a 32-bit vector type.
+    bool is32BitVector() const {
+      return isSimple() ? V.is32BitVector() : isExtended32BitVector();
+    }
+
     /// is64BitVector - Return true if this is a 64-bit vector type.
     bool is64BitVector() const {
-      if (!isSimple())
-        return isExtended64BitVector();
-
-      return (V == MVT::v8i8  || V==MVT::v4i16 || V==MVT::v2i32 ||
-              V == MVT::v1i64 || V==MVT::v2f32);
+      return isSimple() ? V.is64BitVector() : isExtended64BitVector();
     }
 
     /// is128BitVector - Return true if this is a 128-bit vector type.
     bool is128BitVector() const {
-      if (!isSimple())
-        return isExtended128BitVector();
-      return (V==MVT::v16i8 || V==MVT::v8i16 || V==MVT::v4i32 ||
-              V==MVT::v2i64 || V==MVT::v4f32 || V==MVT::v2f64);
+      return isSimple() ? V.is128BitVector() : isExtended128BitVector();
     }
 
     /// is256BitVector - Return true if this is a 256-bit vector type.
-    inline bool is256BitVector() const {
-      if (!isSimple())
-        return isExtended256BitVector();
-      return (V == MVT::v8f32  || V == MVT::v4f64 || V == MVT::v32i8 ||
-              V == MVT::v16i16 || V == MVT::v8i32 || V == MVT::v4i64);
+    bool is256BitVector() const {
+      return isSimple() ? V.is256BitVector() : isExtended256BitVector();
     }
 
     /// is512BitVector - Return true if this is a 512-bit vector type.
-    inline bool is512BitVector() const {
-      return isSimple() ? (V == MVT::v8i64) : isExtended512BitVector();
+    bool is512BitVector() const {
+      return isSimple() ? V.is512BitVector() : isExtended512BitVector();
+    }
+
+    /// is1024BitVector - Return true if this is a 1024-bit vector type.
+    bool is1024BitVector() const {
+      return isSimple() ? V.is1024BitVector() : isExtended1024BitVector();
     }
 
     /// isOverloaded - Return true if this is an overloaded type for TableGen.
@@ -641,12 +820,12 @@ namespace llvm {
     /// getTypeForEVT - This method returns an LLVM type corresponding to the
     /// specified EVT.  For integer types, this returns an unsigned type.  Note
     /// that this will abort for types that cannot be represented.
-    const Type *getTypeForEVT(LLVMContext &Context) const;
+    Type *getTypeForEVT(LLVMContext &Context) const;
 
     /// getEVT - Return the value type corresponding to the specified type.
     /// This returns all pointers as iPTR.  If HandleUnknown is true, unknown
     /// types are returned as Other, otherwise they are invalid.
-    static EVT getEVT(const Type *Ty, bool HandleUnknown = false);
+    static EVT getEVT(Type *Ty, bool HandleUnknown = false);
 
     intptr_t getRawBits() {
       if (isSimple())
@@ -670,16 +849,20 @@ namespace llvm {
     // Methods for handling the Extended-type case in functions above.
     // These are all out-of-line to prevent users of this header file
     // from having a dependency on Type.h.
+    EVT changeExtendedVectorElementTypeToInteger() const;
     static EVT getExtendedIntegerVT(LLVMContext &C, unsigned BitWidth);
     static EVT getExtendedVectorVT(LLVMContext &C, EVT VT,
                                    unsigned NumElements);
     bool isExtendedFloatingPoint() const;
     bool isExtendedInteger() const;
     bool isExtendedVector() const;
+    bool isExtended16BitVector() const;
+    bool isExtended32BitVector() const;
     bool isExtended64BitVector() const;
     bool isExtended128BitVector() const;
     bool isExtended256BitVector() const;
     bool isExtended512BitVector() const;
+    bool isExtended1024BitVector() const;
     EVT getExtendedVectorElementType() const;
     unsigned getExtendedVectorNumElements() const;
     unsigned getExtendedSizeInBits() const;

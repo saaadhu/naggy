@@ -18,14 +18,12 @@
 
 #include "llvm/CodeGen/ScheduleHazardRecognizer.h"
 #include "llvm/Support/DataTypes.h"
-
 #include <cassert>
 #include <cstring>
 
 namespace llvm {
 
 class InstrItineraryData;
-class TargetInstrDesc;
 class ScheduleDAG;
 class SUnit;
 

@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the MachineLoopInfo class that is used to identify natural 
+// This file defines the MachineLoopInfo class that is used to identify natural
 // loops and determine the loop depth of various nodes of the CFG.  Note that
 // natural loops may actually be several loops that share the same header node.
 //
@@ -27,13 +27,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CODEGEN_MACHINE_LOOP_INFO_H
-#define LLVM_CODEGEN_MACHINE_LOOP_INFO_H
+#ifndef LLVM_CODEGEN_MACHINELOOPINFO_H
+#define LLVM_CODEGEN_MACHINELOOPINFO_H
 
-#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
 
 namespace llvm {
+
+// Implementation in LoopInfoImpl.h
+#ifdef __GNUC__
+class MachineLoop;
+__extension__ extern template class LoopBase<MachineBasicBlock, MachineLoop>;
+#endif
 
 class MachineLoop : public LoopBase<MachineBasicBlock, MachineLoop> {
 public:
@@ -57,12 +63,18 @@ private:
     : LoopBase<MachineBasicBlock, MachineLoop>(MBB) {}
 };
 
+// Implementation in LoopInfoImpl.h
+#ifdef __GNUC__
+__extension__ extern template
+class LoopInfoBase<MachineBasicBlock, MachineLoop>;
+#endif
+
 class MachineLoopInfo : public MachineFunctionPass {
   LoopInfoBase<MachineBasicBlock, MachineLoop> LI;
   friend class LoopBase<MachineBasicBlock, MachineLoop>;
 
-  void operator=(const MachineLoopInfo &);  // do not implement
-  MachineLoopInfo(const MachineLoopInfo &); // do not implement
+  void operator=(const MachineLoopInfo &) LLVM_DELETED_FUNCTION;
+  MachineLoopInfo(const MachineLoopInfo &) LLVM_DELETED_FUNCTION;
 
 public:
   static char ID; // Pass identification, replacement for typeid

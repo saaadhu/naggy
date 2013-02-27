@@ -21,8 +21,10 @@
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/UnresolvedSet.h"
+#include "clang/Sema/SemaFixItUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Allocator.h"
 
 namespace clang {
   class ASTContext;
@@ -77,6 +79,8 @@ namespace clang {
     ICK_Complex_Real,          ///< Complex-real conversions (C99 6.3.1.7)
     ICK_Block_Pointer_Conversion,    ///< Block Pointer conversions 
     ICK_TransparentUnionConversion, /// Transparent Union Conversions
+    ICK_Writeback_Conversion,  ///< Objective-C ARC writeback conversion
+    ICK_Zero_Event_Conversion, ///< Zero constant to event (OpenCL1.2 6.12.10)
     ICK_Num_Conversion_Kinds   ///< The number of conversion kinds
   };
 
@@ -100,13 +104,31 @@ namespace clang {
   /// 13.3.3.1.1) and are listed such that better conversion ranks
   /// have smaller values.
   enum ImplicitConversionRank {
-    ICR_Exact_Match = 0,        ///< Exact Match
-    ICR_Promotion,              ///< Promotion
-    ICR_Conversion,             ///< Conversion
-    ICR_Complex_Real_Conversion ///< Complex <-> Real conversion
+    ICR_Exact_Match = 0,         ///< Exact Match
+    ICR_Promotion,               ///< Promotion
+    ICR_Conversion,              ///< Conversion
+    ICR_Complex_Real_Conversion, ///< Complex <-> Real conversion
+    ICR_Writeback_Conversion     ///< ObjC ARC writeback conversion
   };
 
   ImplicitConversionRank GetConversionRank(ImplicitConversionKind Kind);
+
+  /// NarrowingKind - The kind of narrowing conversion being performed by a
+  /// standard conversion sequence according to C++11 [dcl.init.list]p7.
+  enum NarrowingKind {
+    /// Not a narrowing conversion.
+    NK_Not_Narrowing,
+
+    /// A narrowing conversion by virtue of the source and destination types.
+    NK_Type_Narrowing,
+
+    /// A narrowing conversion, because a constant expression got narrowed.
+    NK_Constant_Narrowing,
+
+    /// A narrowing conversion, because a non-constant-expression variable might
+    /// have got narrowed.
+    NK_Variable_Narrowing
+  };
 
   /// StandardConversionSequence - represents a standard conversion
   /// sequence (C++ 13.3.3.1.1). A standard conversion sequence
@@ -137,6 +159,10 @@ namespace clang {
     /// (C++ 4.2p2).
     unsigned DeprecatedStringLiteralToCharPtr : 1;
 
+    /// \brief Whether the qualification conversion involves a change in the
+    /// Objective-C lifetime (for automatic reference counting).
+    unsigned QualificationIncludesObjCLifetime : 1;
+    
     /// IncompatibleObjC - Whether this is an Objective-C conversion
     /// that we should warn about (if we actually use it).
     unsigned IncompatibleObjC : 1;
@@ -162,6 +188,10 @@ namespace clang {
     /// \brief Whether this binds an implicit object argument to a 
     /// non-static member function without a ref-qualifier.
     unsigned BindsImplicitObjectArgumentWithoutRefQualifier : 1;
+    
+    /// \brief Whether this binds a reference to an object with a different
+    /// Objective-C lifetime qualifier.
+    unsigned ObjCLifetimeConversionBinding : 1;
     
     /// FromType - The type that this conversion is converting
     /// from. This is an opaque pointer that can be translated into a
@@ -202,11 +232,13 @@ namespace clang {
     void setAsIdentityConversion();
     
     bool isIdentityConversion() const {
-      return First == ICK_Identity && Second == ICK_Identity && 
-             Third == ICK_Identity;
+      return Second == ICK_Identity && Third == ICK_Identity;
     }
     
     ImplicitConversionRank getRank() const;
+    NarrowingKind getNarrowingKind(ASTContext &Context, const Expr *Converted,
+                                   APValue &ConstantValue,
+                                   QualType &ConstantType) const;
     bool isPointerConversionToBool() const;
     bool isPointerConversionToVoidPointer(ASTContext& Context) const;
     void DebugPrint() const;
@@ -215,9 +247,10 @@ namespace clang {
   /// UserDefinedConversionSequence - Represents a user-defined
   /// conversion sequence (C++ 13.3.3.1.2).
   struct UserDefinedConversionSequence {
-    /// Before - Represents the standard conversion that occurs before
-    /// the actual user-defined conversion. (C++ 13.3.3.1.2p1):
+    /// \brief Represents the standard conversion that occurs before
+    /// the actual user-defined conversion.
     ///
+    /// C++11 13.3.3.1.2p1:
     ///   If the user-defined conversion is specified by a constructor
     ///   (12.3.1), the initial standard conversion sequence converts
     ///   the source type to the type required by the argument of the
@@ -234,26 +267,32 @@ namespace clang {
     // a gcc code gen. bug which causes a crash in a test. Putting it here seems
     // to work around the crash.
     bool EllipsisConversion : 1;
-    
+
+    /// HadMultipleCandidates - When this is true, it means that the
+    /// conversion function was resolved from an overloaded set having
+    /// size greater than 1.
+    bool HadMultipleCandidates : 1;
+
     /// After - Represents the standard conversion that occurs after
     /// the actual user-defined conversion.
     StandardConversionSequence After;
 
     /// ConversionFunction - The function that will perform the
-    /// user-defined conversion.
+    /// user-defined conversion. Null if the conversion is an
+    /// aggregate initialization from an initializer list.
     FunctionDecl* ConversionFunction;
 
     /// \brief The declaration that we found via name lookup, which might be
     /// the same as \c ConversionFunction or it might be a using declaration
     /// that refers to \c ConversionFunction.
-    NamedDecl *FoundConversionFunction;
-    
+    DeclAccessPair FoundConversionFunction;
+
     void DebugPrint() const;
   };
 
   /// Represents an ambiguous user-defined conversion sequence.
   struct AmbiguousConversionSequence {
-    typedef llvm::SmallVector<FunctionDecl*, 4> ConversionSet;
+    typedef SmallVector<FunctionDecl*, 4> ConversionSet;
 
     void *FromTypePtr;
     void *ToTypePtr;
@@ -364,7 +403,14 @@ namespace clang {
     };
 
     /// ConversionKind - The kind of implicit conversion sequence.
-    unsigned ConversionKind;
+    unsigned ConversionKind : 30;
+
+    /// \brief Whether the argument is an initializer list.
+    bool ListInitializationSequence : 1;
+
+    /// \brief Whether the target is really a std::initializer_list, and the
+    /// sequence only represents the worst element conversion.
+    bool StdInitializerListElement : 1;
 
     void setKind(Kind K) {
       destruct();
@@ -394,12 +440,17 @@ namespace clang {
       BadConversionSequence Bad;
     };
 
-    ImplicitConversionSequence() : ConversionKind(Uninitialized) {}
+    ImplicitConversionSequence() 
+      : ConversionKind(Uninitialized), ListInitializationSequence(false),
+        StdInitializerListElement(false)
+    {}
     ~ImplicitConversionSequence() {
       destruct();
     }
     ImplicitConversionSequence(const ImplicitConversionSequence &Other)
-      : ConversionKind(Other.ConversionKind)
+      : ConversionKind(Other.ConversionKind), 
+        ListInitializationSequence(Other.ListInitializationSequence),
+        StdInitializerListElement(Other.StdInitializerListElement)
     {
       switch (ConversionKind) {
       case Uninitialized: break;
@@ -446,7 +497,7 @@ namespace clang {
         return 3;
       }
 
-      return 3;
+      llvm_unreachable("Invalid ImplicitConversionSequence::Kind!");
     }
 
     bool isBad() const { return getKind() == BadConversion; }
@@ -454,6 +505,7 @@ namespace clang {
     bool isEllipsis() const { return getKind() == EllipsisConversion; }
     bool isAmbiguous() const { return getKind() == AmbiguousConversion; }
     bool isUserDefined() const { return getKind() == UserDefinedConversion; }
+    bool isFailure() const { return isBad() || isAmbiguous(); }
 
     /// Determines whether this conversion sequence has been
     /// initialized.  Most operations should never need to query
@@ -481,6 +533,26 @@ namespace clang {
       if (ConversionKind == AmbiguousConversion) return;
       ConversionKind = AmbiguousConversion;
       Ambiguous.construct();
+    }
+
+    /// \brief Whether this sequence was created by the rules of
+    /// list-initialization sequences.
+    bool isListInitializationSequence() const {
+      return ListInitializationSequence;
+    }
+
+    void setListInitializationSequence() {
+      ListInitializationSequence = true;
+    }
+
+    /// \brief Whether the target is really a std::initializer_list, and the
+    /// sequence only represents the worst element conversion.
+    bool isStdInitializerListElement() const {
+      return StdInitializerListElement;
+    }
+
+    void setStdInitializerListElement(bool V = true) {
+      StdInitializerListElement = V;
     }
 
     // The result of a comparison between implicit conversion
@@ -516,7 +588,12 @@ namespace clang {
     
     /// This conversion function template specialization candidate is not 
     /// viable because the final conversion was not an exact match.
-    ovl_fail_final_conversion_not_exact
+    ovl_fail_final_conversion_not_exact,
+
+    /// (CUDA) This candidate was not viable because the callee
+    /// was not accessible from the caller's target (i.e. host->device,
+    /// global->host, device->host).
+    ovl_fail_bad_target
   };
 
   /// OverloadCandidate - A single candidate in an overload set (C++ 13.3).
@@ -544,8 +621,16 @@ namespace clang {
     CXXConversionDecl *Surrogate;
 
     /// Conversions - The conversion sequences used to convert the
-    /// function arguments to the function parameters.
-    llvm::SmallVector<ImplicitConversionSequence, 4> Conversions;
+    /// function arguments to the function parameters, the pointer points to a
+    /// fixed size array with NumConversions elements. The memory is owned by
+    /// the OverloadCandidateSet.
+    ImplicitConversionSequence *Conversions;
+
+    /// The FixIt hints which can be used to fix the Bad candidate.
+    ConversionFixItGenerator Fix;
+
+    /// NumConversions - The number of elements in the Conversions array.
+    unsigned NumConversions;
 
     /// Viable - True to indicate that this overload candidate is viable.
     bool Viable;
@@ -575,12 +660,25 @@ namespace clang {
     /// A structure used to record information about a failed
     /// template argument deduction.
     struct DeductionFailureInfo {
-      // A Sema::TemplateDeductionResult.
-      unsigned Result;
+      /// A Sema::TemplateDeductionResult.
+      unsigned Result : 8;
+
+      /// \brief Indicates whether a diagnostic is stored in Diagnostic.
+      unsigned HasDiagnostic : 1;
 
       /// \brief Opaque pointer containing additional data about
       /// this deduction failure.
       void *Data;
+
+      /// \brief A diagnostic indicating why deduction failed.
+      union {
+        void *Align;
+        char Diagnostic[sizeof(PartialDiagnosticAt)];
+      };
+
+      /// \brief Retrieve the diagnostic which caused this deduction failure,
+      /// if any.
+      PartialDiagnosticAt *getSFINAEDiagnostic();
       
       /// \brief Retrieve the template parameter this deduction failure
       /// refers to, if any.
@@ -597,6 +695,10 @@ namespace clang {
       /// \brief Return the second template argument this deduction failure
       /// refers to, if any.
       const TemplateArgument *getSecondArg();
+
+      /// \brief Return the expression this deduction failure refers to,
+      /// if any.
+      Expr *getExpr();
       
       /// \brief Free any memory associated with this deduction failure.
       void Destroy();
@@ -615,28 +717,50 @@ namespace clang {
     /// hasAmbiguousConversion - Returns whether this overload
     /// candidate requires an ambiguous conversion or not.
     bool hasAmbiguousConversion() const {
-      for (llvm::SmallVectorImpl<ImplicitConversionSequence>::const_iterator
-             I = Conversions.begin(), E = Conversions.end(); I != E; ++I) {
-        if (!I->isInitialized()) return false;
-        if (I->isAmbiguous()) return true;
+      for (unsigned i = 0, e = NumConversions; i != e; ++i) {
+        if (!Conversions[i].isInitialized()) return false;
+        if (Conversions[i].isAmbiguous()) return true;
       }
       return false;
+    }
+
+    bool TryToFixBadConversion(unsigned Idx, Sema &S) {
+      bool CanFix = Fix.tryToFixConversion(
+                      Conversions[Idx].Bad.FromExpr,
+                      Conversions[Idx].Bad.getFromType(),
+                      Conversions[Idx].Bad.getToType(), S);
+
+      // If at least one conversion fails, the candidate cannot be fixed.
+      if (!CanFix)
+        Fix.clear();
+
+      return CanFix;
     }
   };
 
   /// OverloadCandidateSet - A set of overload candidates, used in C++
   /// overload resolution (C++ 13.3).
-  class OverloadCandidateSet : public llvm::SmallVector<OverloadCandidate, 16> {
-    typedef llvm::SmallVector<OverloadCandidate, 16> inherited;
+  class OverloadCandidateSet {
+    SmallVector<OverloadCandidate, 16> Candidates;
     llvm::SmallPtrSet<Decl *, 16> Functions;
 
-    SourceLocation Loc;    
-    
-    OverloadCandidateSet(const OverloadCandidateSet &);
-    OverloadCandidateSet &operator=(const OverloadCandidateSet &);
-    
+    // Allocator for OverloadCandidate::Conversions. We store the first few
+    // elements inline to avoid allocation for small sets.
+    llvm::BumpPtrAllocator ConversionSequenceAllocator;
+
+    SourceLocation Loc;
+
+    unsigned NumInlineSequences;
+    char InlineSpace[16 * sizeof(ImplicitConversionSequence)];
+
+    OverloadCandidateSet(const OverloadCandidateSet &) LLVM_DELETED_FUNCTION;
+    void operator=(const OverloadCandidateSet &) LLVM_DELETED_FUNCTION;
+
+    void destroyCandidates();
+
   public:
-    OverloadCandidateSet(SourceLocation Loc) : Loc(Loc) {}
+    OverloadCandidateSet(SourceLocation Loc) : Loc(Loc), NumInlineSequences(0){}
+    ~OverloadCandidateSet() { destroyCandidates(); }
 
     SourceLocation getLocation() const { return Loc; }
 
@@ -649,6 +773,40 @@ namespace clang {
     /// \brief Clear out all of the candidates.
     void clear();
 
+    typedef SmallVector<OverloadCandidate, 16>::iterator iterator;
+    iterator begin() { return Candidates.begin(); }
+    iterator end() { return Candidates.end(); }
+
+    size_t size() const { return Candidates.size(); }
+    bool empty() const { return Candidates.empty(); }
+
+    /// \brief Add a new candidate with NumConversions conversion sequence slots
+    /// to the overload set.
+    OverloadCandidate &addCandidate(unsigned NumConversions = 0) {
+      Candidates.push_back(OverloadCandidate());
+      OverloadCandidate &C = Candidates.back();
+
+      // Assign space from the inline array if there are enough free slots
+      // available.
+      if (NumConversions + NumInlineSequences <= 16) {
+        ImplicitConversionSequence *I =
+          (ImplicitConversionSequence*)InlineSpace;
+        C.Conversions = &I[NumInlineSequences];
+        NumInlineSequences += NumConversions;
+      } else {
+        // Otherwise get memory from the allocator.
+        C.Conversions = ConversionSequenceAllocator
+                          .Allocate<ImplicitConversionSequence>(NumConversions);
+      }
+
+      // Construct the new objects.
+      for (unsigned i = 0; i != NumConversions; ++i)
+        new (&C.Conversions[i]) ImplicitConversionSequence();
+
+      C.NumConversions = NumConversions;
+      return C;
+    }
+
     /// Find the best viable function on this overload set, if it exists.
     OverloadingResult BestViableFunction(Sema &S, SourceLocation Loc,
                                          OverloadCandidateSet::iterator& Best,
@@ -656,8 +814,8 @@ namespace clang {
 
     void NoteCandidates(Sema &S,
                         OverloadCandidateDisplayKind OCD,
-                        Expr **Args, unsigned NumArgs,
-                        const char *Opc = 0,
+                        ArrayRef<Expr *> Args,
+                        StringRef Opc = "",
                         SourceLocation Loc = SourceLocation());
   };
 

@@ -13,15 +13,22 @@
 #ifndef LLVM_CLANG_AST_ASTMUTATIONLISTENER_H
 #define LLVM_CLANG_AST_ASTMUTATIONLISTENER_H
 
+#include "clang/Basic/SourceLocation.h"
+
 namespace clang {
-  class Decl;
-  class DeclContext;
-  class TagDecl;
   class CXXRecordDecl;
   class ClassTemplateDecl;
   class ClassTemplateSpecializationDecl;
+  class Decl;
+  class DeclContext;
   class FunctionDecl;
   class FunctionTemplateDecl;
+  class ObjCCategoryDecl;
+  class ObjCContainerDecl;
+  class ObjCInterfaceDecl;
+  class ObjCPropertyDecl;
+  class TagDecl;
+  class VarDecl;
 
 /// \brief An abstract interface that should be implemented by listeners
 /// that want to be notified when an AST entity gets modified after its
@@ -54,6 +61,25 @@ public:
 
   /// \brief A static data member was implicitly instantiated.
   virtual void StaticDataMemberInstantiated(const VarDecl *D) {}
+
+  /// \brief A new objc category class was added for an interface.
+  virtual void AddedObjCCategoryToInterface(const ObjCCategoryDecl *CatD,
+                                            const ObjCInterfaceDecl *IFD) {}
+
+  /// \brief A objc class extension redeclared or introduced a property.
+  ///
+  /// \param Prop the property in the class extension
+  ///
+  /// \param OrigProp the property from the original interface that was declared
+  /// or null if the property was introduced.
+  ///
+  /// \param ClassExt the class extension.
+  virtual void AddedObjCPropertyInClassExtension(const ObjCPropertyDecl *Prop,
+                                            const ObjCPropertyDecl *OrigProp,
+                                            const ObjCCategoryDecl *ClassExt) {}
+
+  // NOTE: If new methods are added they should also be added to
+  // MultiplexASTMutationListener.
 };
 
 } // end namespace clang

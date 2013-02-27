@@ -25,7 +25,7 @@ namespace clang {
   class ASTContext;
   class Decl;
   class DeclContext;
-  class Diagnostic;
+  class DiagnosticsEngine;
   class Expr;
   class FileManager;
   class IdentifierInfo;
@@ -48,6 +48,9 @@ namespace clang {
 
     /// \brief Whether to perform a minimal import.
     bool Minimal;
+
+    /// \brief Whether the last diagnostic came from the "from" context.
+    bool LastDiagFromFrom;
     
     /// \brief Mapping from the already-imported types in the "from" context
     /// to the corresponding types in the "to" context.
@@ -67,7 +70,7 @@ namespace clang {
     
     /// \brief Imported, anonymous tag declarations that are missing their 
     /// corresponding typedefs.
-    llvm::SmallVector<TagDecl *, 4> AnonTagsWithPendingTypedefs;
+    SmallVector<TagDecl *, 4> AnonTagsWithPendingTypedefs;
     
     /// \brief Declaration (from, to) pairs that are known not to be equivalent
     /// (which we have already complained about).
@@ -255,6 +258,12 @@ namespace clang {
     
     /// \brief Return the set of declarations that we know are not equivalent.
     NonEquivalentDeclSet &getNonEquivalentDecls() { return NonEquivalentDecls; }
+
+    /// \brief Called for ObjCInterfaceDecl, ObjCProtocolDecl, and TagDecl.
+    /// Mark the Decl as complete, filling it in as much as possible.
+    ///
+    /// \param D A declaration in the "to" context.
+    virtual void CompleteDecl(Decl* D);
     
     /// \brief Note that we have imported the "from" declaration by mapping it
     /// to the (potentially-newly-created) "to" declaration.
@@ -265,7 +274,8 @@ namespace clang {
     
     /// \brief Determine whether the given types are structurally
     /// equivalent.
-    bool IsStructurallyEquivalent(QualType From, QualType To);    
+    bool IsStructurallyEquivalent(QualType From, QualType To,
+                                  bool Complain = true);
   };
 }
 

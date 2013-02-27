@@ -20,7 +20,6 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/PBQP/Graph.h"
 #include "llvm/CodeGen/PBQP/Solution.h"
-
 #include <map>
 #include <set>
 
@@ -29,6 +28,7 @@ namespace llvm {
   class LiveIntervals;
   class MachineFunction;
   class MachineLoopInfo;
+  class TargetRegisterInfo;
 
   /// This class wraps up a PBQP instance representing a register allocation
   /// problem, plus the structures necessary to map back from the PBQP solution
@@ -94,7 +94,7 @@ namespace llvm {
     typedef std::map<PBQP::Graph::ConstNodeItr, unsigned,
                      PBQP::NodeItrComparator>  Node2VReg;
     typedef DenseMap<unsigned, PBQP::Graph::NodeItr> VReg2Node;
-    typedef std::map<unsigned, AllowedSet> AllowedSetMap;
+    typedef DenseMap<unsigned, AllowedSet> AllowedSetMap;
 
     PBQP::Graph graph;
     Node2VReg node2VReg;
@@ -109,8 +109,8 @@ namespace llvm {
   /// class to support additional constraints for your architecture.
   class PBQPBuilder {
   private:
-    PBQPBuilder(const PBQPBuilder&) {}
-    void operator=(const PBQPBuilder&) {}
+    PBQPBuilder(const PBQPBuilder&) LLVM_DELETED_FUNCTION;
+    void operator=(const PBQPBuilder&) LLVM_DELETED_FUNCTION;
   public:
 
     typedef std::set<unsigned> RegSet;
@@ -161,7 +161,8 @@ namespace llvm {
                             PBQP::PBQPNum benefit);
   };
 
-  FunctionPass* createPBQPRegisterAllocator(std::auto_ptr<PBQPBuilder> builder);
+  FunctionPass* createPBQPRegisterAllocator(std::auto_ptr<PBQPBuilder> builder,
+                                            char *customPassID=0);
 }
 
 #endif /* LLVM_CODEGEN_REGALLOCPBQP_H */

@@ -11,11 +11,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_ADT_IMLIST_H
-#define LLVM_ADT_IMLIST_H
+#ifndef LLVM_ADT_IMMUTABLELIST_H
+#define LLVM_ADT_IMMUTABLELIST_H
 
-#include "llvm/Support/Allocator.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
 #include <cassert>
 
@@ -33,9 +33,8 @@ class ImmutableListImpl : public FoldingSetNode {
 
   friend class ImmutableListFactory<T>;
 
-  // Do not implement.
-  void operator=(const ImmutableListImpl&);
-  ImmutableListImpl(const ImmutableListImpl&);
+  void operator=(const ImmutableListImpl&) LLVM_DELETED_FUNCTION;
+  ImmutableListImpl(const ImmutableListImpl&) LLVM_DELETED_FUNCTION;
 
 public:
   const T& getHead() const { return Head; }
@@ -102,6 +101,14 @@ public:
 
   /// isEmpty - Returns true if the list is empty.
   bool isEmpty() const { return !X; }
+
+  bool contains(const T& V) const {
+    for (iterator I = begin(), E = end(); I != E; ++I) {
+      if (*I == V)
+        return true;
+    }
+    return false;
+  }
 
   /// isEqual - Returns true if two lists are equal.  Because all lists created
   ///  from the same ImmutableListFactory are uniqued, this has O(1) complexity

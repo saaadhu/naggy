@@ -15,6 +15,7 @@
 #ifndef LLVM_SUPPORT_CASTING_H
 #define LLVM_SUPPORT_CASTING_H
 
+#include "llvm/Support/type_traits.h"
 #include <cassert>
 
 namespace llvm {
@@ -22,8 +23,6 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 //                          isa<x> Support Templates
 //===----------------------------------------------------------------------===//
-
-template<typename FromCl> struct isa_impl_cl;
 
 // Define a template that can be specialized by smart pointers to reflect the
 // fact that they are automatically dereferenced, and are not involved with the
@@ -43,79 +42,86 @@ template<typename From> struct simplify_type<const From> {
   }
 };
 
-
-// isa<X> - Return true if the parameter to the template is an instance of the
-// template type argument.  Used like this:
-//
-//  if (isa<Type*>(myVal)) { ... }
-//
-template <typename To, typename From>
+// The core of the implementation of isa<X> is here; To and From should be
+// the names of classes.  This template can be specialized to customize the
+// implementation of isa<> without rewriting it from scratch.
+template <typename To, typename From, typename Enabler = void>
 struct isa_impl {
   static inline bool doit(const From &Val) {
     return To::classof(&Val);
   }
 };
 
-template<typename To, typename From, typename SimpleType>
+/// \brief Always allow upcasts, and perform no dynamic check for them.
+template <typename To, typename From>
+struct isa_impl<To, From,
+                typename llvm::enable_if_c<
+                  llvm::is_base_of<To, From>::value
+                >::type
+               > {
+  static inline bool doit(const From &) { return true; }
+};
+
+template <typename To, typename From> struct isa_impl_cl {
+  static inline bool doit(const From &Val) {
+    return isa_impl<To, From>::doit(Val);
+  }
+};
+
+template <typename To, typename From> struct isa_impl_cl<To, const From> {
+  static inline bool doit(const From &Val) {
+    return isa_impl<To, From>::doit(Val);
+  }
+};
+
+template <typename To, typename From> struct isa_impl_cl<To, From*> {
+  static inline bool doit(const From *Val) {
+    assert(Val && "isa<> used on a null pointer");
+    return isa_impl<To, From>::doit(*Val);
+  }
+};
+
+template <typename To, typename From> struct isa_impl_cl<To, const From*> {
+  static inline bool doit(const From *Val) {
+    assert(Val && "isa<> used on a null pointer");
+    return isa_impl<To, From>::doit(*Val);
+  }
+};
+
+template <typename To, typename From> struct isa_impl_cl<To, const From*const> {
+  static inline bool doit(const From *Val) {
+    assert(Val && "isa<> used on a null pointer");
+    return isa_impl<To, From>::doit(*Val);
+  }
+};
+
+template<typename To, typename From, typename SimpleFrom>
 struct isa_impl_wrap {
   // When From != SimplifiedType, we can simplify the type some more by using
   // the simplify_type template.
   static bool doit(const From &Val) {
-    return isa_impl_cl<const SimpleType>::template
-                    isa<To>(simplify_type<const From>::getSimplifiedValue(Val));
+    return isa_impl_wrap<To, SimpleFrom,
+      typename simplify_type<SimpleFrom>::SimpleType>::doit(
+                          simplify_type<From>::getSimplifiedValue(Val));
   }
 };
 
 template<typename To, typename FromTy>
-struct isa_impl_wrap<To, const FromTy, const FromTy> {
+struct isa_impl_wrap<To, FromTy, FromTy> {
   // When From == SimpleType, we are as simple as we are going to get.
   static bool doit(const FromTy &Val) {
-    return isa_impl<To,FromTy>::doit(Val);
+    return isa_impl_cl<To,FromTy>::doit(Val);
   }
 };
 
-// isa_impl_cl - Use class partial specialization to transform types to a single
-// canonical form for isa_impl.
+// isa<X> - Return true if the parameter to the template is an instance of the
+// template type argument.  Used like this:
 //
-template<typename FromCl>
-struct isa_impl_cl {
-  template<class ToCl>
-  static bool isa(const FromCl &Val) {
-    return isa_impl_wrap<ToCl,const FromCl,
-                   typename simplify_type<const FromCl>::SimpleType>::doit(Val);
-  }
-};
-
-// Specialization used to strip const qualifiers off of the FromCl type...
-template<typename FromCl>
-struct isa_impl_cl<const FromCl> {
-  template<class ToCl>
-  static bool isa(const FromCl &Val) {
-    return isa_impl_cl<FromCl>::template isa<ToCl>(Val);
-  }
-};
-
-// Define pointer traits in terms of base traits...
-template<class FromCl>
-struct isa_impl_cl<FromCl*> {
-  template<class ToCl>
-  static bool isa(FromCl *Val) {
-    return isa_impl_cl<FromCl>::template isa<ToCl>(*Val);
-  }
-};
-
-// Define reference traits in terms of base traits...
-template<class FromCl>
-struct isa_impl_cl<FromCl&> {
-  template<class ToCl>
-  static bool isa(FromCl &Val) {
-    return isa_impl_cl<FromCl>::template isa<ToCl>(&Val);
-  }
-};
-
+//  if (isa<Type>(myVal)) { ... }
+//
 template <class X, class Y>
 inline bool isa(const Y &Val) {
-  return isa_impl_cl<Y>::template isa<X>(Val);
+  return isa_impl_wrap<X, Y, typename simplify_type<Y>::SimpleType>::doit(Val);
 }
 
 //===----------------------------------------------------------------------===//

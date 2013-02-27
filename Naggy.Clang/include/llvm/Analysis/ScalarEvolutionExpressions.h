@@ -11,9 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_ANALYSIS_SCALAREVOLUTION_EXPRESSIONS_H
-#define LLVM_ANALYSIS_SCALAREVOLUTION_EXPRESSIONS_H
+#ifndef LLVM_ANALYSIS_SCALAREVOLUTIONEXPRESSIONS_H
+#define LLVM_ANALYSIS_SCALAREVOLUTIONEXPRESSIONS_H
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -42,10 +43,9 @@ namespace llvm {
   public:
     ConstantInt *getValue() const { return V; }
 
-    const Type *getType() const { return V->getType(); }
+    Type *getType() const { return V->getType(); }
 
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVConstant *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scConstant;
     }
@@ -57,17 +57,16 @@ namespace llvm {
   class SCEVCastExpr : public SCEV {
   protected:
     const SCEV *Op;
-    const Type *Ty;
+    Type *Ty;
 
     SCEVCastExpr(const FoldingSetNodeIDRef ID,
-                 unsigned SCEVTy, const SCEV *op, const Type *ty);
+                 unsigned SCEVTy, const SCEV *op, Type *ty);
 
   public:
     const SCEV *getOperand() const { return Op; }
-    const Type *getType() const { return Ty; }
+    Type *getType() const { return Ty; }
 
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVCastExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scTruncate ||
              S->getSCEVType() == scZeroExtend ||
@@ -83,11 +82,10 @@ namespace llvm {
     friend class ScalarEvolution;
 
     SCEVTruncateExpr(const FoldingSetNodeIDRef ID,
-                     const SCEV *op, const Type *ty);
+                     const SCEV *op, Type *ty);
 
   public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVTruncateExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scTruncate;
     }
@@ -101,11 +99,10 @@ namespace llvm {
     friend class ScalarEvolution;
 
     SCEVZeroExtendExpr(const FoldingSetNodeIDRef ID,
-                       const SCEV *op, const Type *ty);
+                       const SCEV *op, Type *ty);
 
   public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVZeroExtendExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scZeroExtend;
     }
@@ -119,11 +116,10 @@ namespace llvm {
     friend class ScalarEvolution;
 
     SCEVSignExtendExpr(const FoldingSetNodeIDRef ID,
-                       const SCEV *op, const Type *ty);
+                       const SCEV *op, Type *ty);
 
   public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVSignExtendExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scSignExtend;
     }
@@ -158,14 +154,13 @@ namespace llvm {
     op_iterator op_begin() const { return Operands; }
     op_iterator op_end() const { return Operands + NumOperands; }
 
-    const Type *getType() const { return getOperand(0)->getType(); }
+    Type *getType() const { return getOperand(0)->getType(); }
 
     NoWrapFlags getNoWrapFlags(NoWrapFlags Mask = NoWrapMask) const {
       return (NoWrapFlags)(SubclassData & Mask);
     }
 
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVNAryExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scAddExpr ||
              S->getSCEVType() == scMulExpr ||
@@ -187,7 +182,6 @@ namespace llvm {
 
   public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVCommutativeExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scAddExpr ||
              S->getSCEVType() == scMulExpr ||
@@ -214,7 +208,7 @@ namespace llvm {
     }
 
   public:
-    const Type *getType() const {
+    Type *getType() const {
       // Use the type of the last operand, which is likely to be a pointer
       // type, if there is one. This doesn't usually matter, but it can help
       // reduce casts when the expressions are expanded.
@@ -222,7 +216,6 @@ namespace llvm {
     }
 
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVAddExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scAddExpr;
     }
@@ -241,7 +234,6 @@ namespace llvm {
 
   public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVMulExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scMulExpr;
     }
@@ -263,7 +255,7 @@ namespace llvm {
     const SCEV *getLHS() const { return LHS; }
     const SCEV *getRHS() const { return RHS; }
 
-    const Type *getType() const {
+    Type *getType() const {
       // In most cases the types of LHS and RHS will be the same, but in some
       // crazy cases one or the other may be a pointer. ScalarEvolution doesn't
       // depend on the type for correctness, but handling types carefully can
@@ -273,7 +265,6 @@ namespace llvm {
     }
 
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVUDivExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scUDivExpr;
     }
@@ -357,7 +348,6 @@ namespace llvm {
     }
 
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVAddRecExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scAddRecExpr;
     }
@@ -379,7 +369,6 @@ namespace llvm {
 
   public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVSMaxExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scSMaxExpr;
     }
@@ -401,7 +390,6 @@ namespace llvm {
 
   public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVUMaxExpr *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scUMaxExpr;
     }
@@ -441,14 +429,13 @@ namespace llvm {
     /// folded with other operations into something unrecognizable. This
     /// is mainly only useful for pretty-printing and other situations
     /// where it isn't absolutely required for these to succeed.
-    bool isSizeOf(const Type *&AllocTy) const;
-    bool isAlignOf(const Type *&AllocTy) const;
-    bool isOffsetOf(const Type *&STy, Constant *&FieldNo) const;
+    bool isSizeOf(Type *&AllocTy) const;
+    bool isAlignOf(Type *&AllocTy) const;
+    bool isOffsetOf(Type *&STy, Constant *&FieldNo) const;
 
-    const Type *getType() const { return getValPtr()->getType(); }
+    Type *getType() const { return getValPtr()->getType(); }
 
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    static inline bool classof(const SCEVUnknown *S) { return true; }
     static inline bool classof(const SCEV *S) {
       return S->getSCEVType() == scUnknown;
     }
@@ -491,9 +478,76 @@ namespace llvm {
 
     RetVal visitCouldNotCompute(const SCEVCouldNotCompute *S) {
       llvm_unreachable("Invalid use of SCEVCouldNotCompute!");
-      return RetVal();
     }
   };
+
+  /// Visit all nodes in the expression tree using worklist traversal.
+  ///
+  /// Visitor implements:
+  ///   // return true to follow this node.
+  ///   bool follow(const SCEV *S);
+  ///   // return true to terminate the search.
+  ///   bool isDone();
+  template<typename SV>
+  class SCEVTraversal {
+    SV &Visitor;
+    SmallVector<const SCEV *, 8> Worklist;
+    SmallPtrSet<const SCEV *, 8> Visited;
+
+    void push(const SCEV *S) {
+      if (Visited.insert(S) && Visitor.follow(S))
+        Worklist.push_back(S);
+    }
+  public:
+    SCEVTraversal(SV& V): Visitor(V) {}
+
+    void visitAll(const SCEV *Root) {
+      push(Root);
+      while (!Worklist.empty() && !Visitor.isDone()) {
+        const SCEV *S = Worklist.pop_back_val();
+
+        switch (S->getSCEVType()) {
+        case scConstant:
+        case scUnknown:
+          break;
+        case scTruncate:
+        case scZeroExtend:
+        case scSignExtend:
+          push(cast<SCEVCastExpr>(S)->getOperand());
+          break;
+        case scAddExpr:
+        case scMulExpr:
+        case scSMaxExpr:
+        case scUMaxExpr:
+        case scAddRecExpr: {
+          const SCEVNAryExpr *NAry = cast<SCEVNAryExpr>(S);
+          for (SCEVNAryExpr::op_iterator I = NAry->op_begin(),
+                 E = NAry->op_end(); I != E; ++I) {
+            push(*I);
+          }
+          break;
+        }
+        case scUDivExpr: {
+          const SCEVUDivExpr *UDiv = cast<SCEVUDivExpr>(S);
+          push(UDiv->getLHS());
+          push(UDiv->getRHS());
+          break;
+        }
+        case scCouldNotCompute:
+          llvm_unreachable("Attempt to use a SCEVCouldNotCompute object!");
+        default:
+          llvm_unreachable("Unknown SCEV kind!");
+        }
+      }
+    }
+  };
+
+  /// Use SCEVTraversal to visit all nodes in the givien expression tree.
+  template<typename SV>
+  void visitAll(const SCEV *Root, SV& Visitor) {
+    SCEVTraversal<SV> T(Visitor);
+    T.visitAll(Root);
+  }
 }
 
 #endif

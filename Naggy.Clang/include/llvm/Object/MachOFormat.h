@@ -61,7 +61,13 @@ namespace mach {
     CSARM_V6     = 6,
     CSARM_V5TEJ  = 7,
     CSARM_XSCALE = 8,
-    CSARM_V7     = 9
+    CSARM_V7     = 9,
+    CSARM_V7F    = 10,
+    CSARM_V7S    = 11,
+    CSARM_V7K    = 12,
+    CSARM_V6M    = 14,
+    CSARM_V7M    = 15,
+    CSARM_V7EM   = 16
   };
 
   /// \brief PowerPC Machine Subtypes.
@@ -97,7 +103,8 @@ namespace macho {
     DysymtabLoadCommandSize = 80,
     Nlist32Size = 12,
     Nlist64Size = 16,
-    RelocationInfoSize = 8
+    RelocationInfoSize = 8,
+    LinkeditLoadCommandSize = 16
   };
 
   /// \brief Constants for header magic field.
@@ -137,7 +144,12 @@ namespace macho {
     LCT_Symtab = 0x2,
     LCT_Dysymtab = 0xb,
     LCT_Segment64 = 0x19,
-    LCT_UUID = 0x1b
+    LCT_UUID = 0x1b,
+    LCT_CodeSignature = 0x1d,
+    LCT_SegmentSplitInfo = 0x1e,
+    LCT_FunctionStarts = 0x26,
+    LCT_DataInCode = 0x29,
+    LCT_LinkerOptions = 0x2D
   };
 
   /// \brief Load command structure.
@@ -218,9 +230,28 @@ namespace macho {
     uint32_t NumLocalRelocationTableEntries;
   };
 
+  struct LinkeditDataLoadCommand {
+    uint32_t Type;
+    uint32_t Size;
+    uint32_t DataOffset;
+    uint32_t DataSize;
+  };
+
+  struct LinkerOptionsLoadCommand {
+    uint32_t Type;
+    uint32_t Size;
+    uint32_t Count;
+    // Load command is followed by Count number of zero-terminated UTF8 strings,
+    // and then zero-filled to be 4-byte aligned.
+  };
+
   /// @}
   /// @name Section Data
   /// @{
+
+  enum SectionFlags {
+    SF_PureInstructions = 0x80000000
+  };
 
   struct Section {
     char Name[16];
@@ -261,12 +292,29 @@ namespace macho {
     uint16_t Flags;
     uint32_t Value;
   };
+  // Despite containing a uint64_t, this structure is only 4-byte aligned within
+  // a MachO file.
+#pragma pack(push)
+#pragma pack(4)
   struct Symbol64TableEntry {
     uint32_t StringIndex;
     uint8_t Type;
     uint8_t SectionIndex;
     uint16_t Flags;
     uint64_t Value;
+  };
+#pragma pack(pop)
+
+  /// @}
+  /// @name Data-in-code Table Entry
+  /// @{
+
+  // See <mach-o/loader.h>.
+  enum DataRegionType { Data = 1, JumpTable8, JumpTable16, JumpTable32 };
+  struct DataInCodeTableEntry {
+    uint32_t Offset;  /* from mach_header to start of data region */
+    uint16_t Length;  /* number of bytes in data region */
+    uint16_t Kind;    /* a DataRegionType value  */
   };
 
   /// @}

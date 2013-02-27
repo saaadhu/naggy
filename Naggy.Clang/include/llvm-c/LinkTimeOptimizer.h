@@ -13,12 +13,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __LTO_CAPI_H__
-#define __LTO_CAPI_H__
+#ifndef LLVM_C_LINKTIMEOPTIMIZER_H
+#define LLVM_C_LINKTIMEOPTIMIZER_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @defgroup LLVMCLinkTimeOptimizer Link Time Optimization
+ * @ingroup LLVMC
+ *
+ * @{
+ */
 
   /// This provides a dummy type for pointers to the LTO object.
   typedef void* llvm_lto_t;
@@ -50,6 +57,10 @@ extern "C" {
     (llvm_lto_t lto, const char* input_filename);
   extern llvm_lto_status_t llvm_optimize_modules
     (llvm_lto_t lto, const char* output_filename);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }

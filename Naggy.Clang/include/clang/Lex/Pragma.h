@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_PRAGMA_H
 #define LLVM_CLANG_PRAGMA_H
 
+#include "clang/Basic/LLVM.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include <cassert>
@@ -25,12 +26,12 @@ namespace clang {
   class PragmaNamespace;
 
   /**
-   * \brief Describes how the pragma was introduced, e.g., with #pragma, 
+   * \brief Describes how the pragma was introduced, e.g., with \#pragma,
    * _Pragma, or __pragma.
    */
   enum PragmaIntroducerKind {
     /**
-     * \brief The pragma was introduced via #pragma.
+     * \brief The pragma was introduced via \#pragma.
      */
     PIK_HashPragma,
     
@@ -53,16 +54,16 @@ namespace clang {
 /// pragmas the handler with a null identifier is invoked, if it exists.
 ///
 /// Note that the PragmaNamespace class can be used to subdivide pragmas, e.g.
-/// we treat "#pragma STDC" and "#pragma GCC" as namespaces that contain other
+/// we treat "\#pragma STDC" and "\#pragma GCC" as namespaces that contain other
 /// pragmas.
 class PragmaHandler {
   std::string Name;
 public:
-  explicit PragmaHandler(llvm::StringRef name) : Name(name) {}
+  explicit PragmaHandler(StringRef name) : Name(name) {}
   PragmaHandler() {}
   virtual ~PragmaHandler();
 
-  llvm::StringRef getName() const { return Name; }
+  StringRef getName() const { return Name; }
   virtual void HandlePragma(Preprocessor &PP, PragmaIntroducerKind Introducer,
                             Token &FirstToken) = 0;
 
@@ -83,22 +84,22 @@ public:
 
 /// PragmaNamespace - This PragmaHandler subdivides the namespace of pragmas,
 /// allowing hierarchical pragmas to be defined.  Common examples of namespaces
-/// are "#pragma GCC", "#pragma STDC", and "#pragma omp", but any namespaces may
-/// be (potentially recursively) defined.
+/// are "\#pragma GCC", "\#pragma STDC", and "\#pragma omp", but any namespaces
+/// may be (potentially recursively) defined.
 class PragmaNamespace : public PragmaHandler {
   /// Handlers - This is a map of the handlers in this namespace with their name
   /// as key.
   ///
   llvm::StringMap<PragmaHandler*> Handlers;
 public:
-  explicit PragmaNamespace(llvm::StringRef Name) : PragmaHandler(Name) {}
+  explicit PragmaNamespace(StringRef Name) : PragmaHandler(Name) {}
   virtual ~PragmaNamespace();
 
   /// FindHandler - Check to see if there is already a handler for the
   /// specified name.  If not, return the handler for the null name if it
   /// exists, otherwise return null.  If IgnoreNull is true (the default) then
   /// the null handler isn't returned on failure to match.
-  PragmaHandler *FindHandler(llvm::StringRef Name,
+  PragmaHandler *FindHandler(StringRef Name,
                              bool IgnoreNull = true) const;
 
   /// AddPragma - Add a pragma to this namespace.

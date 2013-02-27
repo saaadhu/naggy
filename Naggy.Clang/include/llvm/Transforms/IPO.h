@@ -15,7 +15,7 @@
 #ifndef LLVM_TRANSFORMS_IPO_H
 #define LLVM_TRANSFORMS_IPO_H
 
-#include <vector>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
 
@@ -50,13 +50,6 @@ ModulePass *createStripDebugDeclarePass();
 ModulePass *createStripDeadDebugInfoPass();
 
 //===----------------------------------------------------------------------===//
-/// createLowerSetJmpPass - This function lowers the setjmp/longjmp intrinsics
-/// to invoke/unwind instructions.  This should really be part of the C/C++
-/// front-end, but it's so much easier to write transformations in LLVM proper.
-///
-ModulePass *createLowerSetJmpPass();
-
-//===----------------------------------------------------------------------===//
 /// createConstantMergePass - This function returns a new pass that merges
 /// duplicate global constants together into a single constant that is shared.
 /// This is useful because some passes (ie TraceValues) insert a lot of string
@@ -74,13 +67,6 @@ ModulePass *createGlobalOptimizerPass();
 
 
 //===----------------------------------------------------------------------===//
-/// createDeadTypeEliminationPass - Return a new pass that eliminates symbol
-/// table entries for types that are never used.
-///
-ModulePass *createDeadTypeEliminationPass();
-
-
-//===----------------------------------------------------------------------===//
 /// createGlobalDCEPass - This transform is designed to eliminate unreachable
 /// internal globals (functions or global variables)
 ///
@@ -88,7 +74,7 @@ ModulePass *createGlobalDCEPass();
 
 
 //===----------------------------------------------------------------------===//
-/// createGVExtractionPass - If deleteFn is true, this pass deletes as
+/// createGVExtractionPass - If deleteFn is true, this pass deletes
 /// the specified global values. Otherwise, it deletes as much of the module as
 /// possible, except for the global values specified.
 ///
@@ -108,6 +94,7 @@ Pass *createFunctionInliningPass(int Threshold);
 /// createAlwaysInlinerPass - Return a new pass object that inlines only 
 /// functions that are marked as "always_inline".
 Pass *createAlwaysInlinerPass();
+Pass *createAlwaysInlinerPass(bool InsertLifetime);
 
 //===----------------------------------------------------------------------===//
 /// createPruneEHPass - Return a new pass object which transforms invoke
@@ -117,23 +104,14 @@ Pass *createPruneEHPass();
 
 //===----------------------------------------------------------------------===//
 /// createInternalizePass - This pass loops over all of the functions in the
-/// input module, internalizing all globals (functions and variables) not part
-/// of the api.  If a list of symbols is specified with the
-/// -internalize-public-api-* command line options, those symbols are not
-/// internalized and all others are.  Otherwise if AllButMain is set and the
-/// main function is found, all other globals are marked as internal. If no api
-/// is supplied and AllButMain is not set, or no main function is found, nothing
-/// is internalized.
-///
-ModulePass *createInternalizePass(bool AllButMain);
-
-/// createInternalizePass - This pass loops over all of the functions in the
 /// input module, internalizing all globals (functions and variables) not in the
 /// given exportList.
 ///
 /// Note that commandline options that are used with the above function are not
-/// used now! Also, when exportList is empty, nothing is internalized.
-ModulePass *createInternalizePass(const std::vector<const char *> &exportList);
+/// used now!
+ModulePass *createInternalizePass(ArrayRef<const char *> exportList);
+/// createInternalizePass - Same as above, but with an empty exportList.
+ModulePass *createInternalizePass();
 
 //===----------------------------------------------------------------------===//
 /// createDeadArgEliminationPass - This pass removes arguments from functions
@@ -205,6 +183,16 @@ ModulePass *createMergeFunctionsPass();
 /// createPartialInliningPass - This pass inlines parts of functions.
 ///
 ModulePass *createPartialInliningPass();
+  
+//===----------------------------------------------------------------------===//
+// createMetaRenamerPass - Rename everything with metasyntatic names.
+//
+ModulePass *createMetaRenamerPass();
+
+//===----------------------------------------------------------------------===//
+/// createBarrierNoopPass - This pass is purely a module pass barrier in a pass
+/// manager.
+ModulePass *createBarrierNoopPass();
 
 } // End llvm namespace
 

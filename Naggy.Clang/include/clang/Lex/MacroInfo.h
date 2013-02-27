@@ -22,7 +22,7 @@
 namespace clang {
   class Preprocessor;
 
-/// MacroInfo - Each identifier that is #define'd has an instance of this class
+/// MacroInfo - Each identifier that is \#define'd has an instance of this class
 /// associated with it, used to implement macro expansion.
 class MacroInfo {
   //===--------------------------------------------------------------------===//
@@ -32,18 +32,33 @@ class MacroInfo {
   SourceLocation Location;
   /// EndLocation - The location of the last token in the macro.
   SourceLocation EndLocation;
+  /// \brief The location where the macro was #undef'd, or an invalid location
+  /// for macros that haven't been undefined.
+  SourceLocation UndefLocation;
+  /// \brief Previous definition, the identifier of this macro was defined to,
+  /// or NULL.
+  MacroInfo *PreviousDefinition;
 
   /// Arguments - The list of arguments for a function-like macro.  This can be
   /// empty, for, e.g. "#define X()".  In a C99-style variadic macro, this
-  /// includes the __VA_ARGS__ identifier on the list.
+  /// includes the \c __VA_ARGS__ identifier on the list.
   IdentifierInfo **ArgumentList;
   unsigned NumArguments;
 
-  /// ReplacementTokens - This is the list of tokens that the macro is defined
-  /// to.
-  llvm::SmallVector<Token, 8> ReplacementTokens;
+  /// \brief The location at which this macro was either explicitly exported
+  /// from its module or marked as private.
+  ///
+  /// If invalid, this macro has not been explicitly given any visibility.
+  SourceLocation VisibilityLocation;
+  
+  /// \brief This is the list of tokens that the macro is defined to.
+  SmallVector<Token, 8> ReplacementTokens;
 
-  /// IsFunctionLike - True if this macro is a function-like macro, false if it
+  /// \brief Length in characters of the macro definition.
+  mutable unsigned DefinitionLength;
+  mutable bool IsDefinitionLengthCached : 1;
+
+  /// \brief True if this macro is a function-like macro, false if it
   /// is an object-like macro.
   bool IsFunctionLike : 1;
 
@@ -61,16 +76,22 @@ class MacroInfo {
   /// it has not yet been redefined or undefined.
   bool IsBuiltinMacro : 1;
 
-  /// IsFromAST - True if this macro was loaded from an AST file.
+  /// \brief Whether this macro contains the sequence ", ## __VA_ARGS__"
+  bool HasCommaPasting : 1;
+
+  /// \brief True if this macro was loaded from an AST file.
   bool IsFromAST : 1;
 
+  /// \brief Whether this macro changed after it was loaded from an AST file.
+  bool ChangedAfterLoad : 1;
+  
 private:
   //===--------------------------------------------------------------------===//
   // State that changes as the macro is used.
 
   /// IsDisabled - True if we have started an expansion of this macro already.
-  /// This disbles recursive expansion, which would be quite bad for things like
-  /// #define A A.
+  /// This disables recursive expansion, which would be quite bad for things
+  /// like \#define A A.
   bool IsDisabled : 1;
 
   /// IsUsed - True if this macro is either defined in the main file and has
@@ -85,6 +106,18 @@ private:
   /// \brief Must warn if the macro is unused at the end of translation unit.
   bool IsWarnIfUnused : 1;
    
+  /// \brief Whether the macro has public (when described in a module).
+  bool IsPublic : 1;
+
+  /// \brief Whether the macro definition is currently "hidden".
+  /// Note that this is transient state that is never serialized to the AST
+  /// file.
+  bool IsHidden : 1;
+
+  /// \brief Whether the definition of this macro is ambiguous, due to
+  /// multiple definitions coming in from multiple modules.
+  bool IsAmbiguous : 1;
+
    ~MacroInfo() {
     assert(ArgumentList == 0 && "Didn't call destroy before dtor!");
   }
@@ -113,9 +146,40 @@ public:
   /// setDefinitionEndLoc - Set the location of the last token in the macro.
   ///
   void setDefinitionEndLoc(SourceLocation EndLoc) { EndLocation = EndLoc; }
+
   /// getDefinitionEndLoc - Return the location of the last token in the macro.
   ///
   SourceLocation getDefinitionEndLoc() const { return EndLocation; }
+
+  /// \brief Set the location where macro was undefined. Can only be set once.
+  void setUndefLoc(SourceLocation UndefLoc) {
+    assert(UndefLocation.isInvalid() && "UndefLocation is already set!");
+    assert(UndefLoc.isValid() && "Invalid UndefLoc!");
+    UndefLocation = UndefLoc;
+  }
+
+  /// \brief Get the location where macro was undefined.
+  SourceLocation getUndefLoc() const { return UndefLocation; }
+
+  /// \brief Set previous definition of the macro with the same name.
+  void setPreviousDefinition(MacroInfo *PreviousDef) {
+    PreviousDefinition = PreviousDef;
+  }
+
+  /// \brief Get previous definition of the macro with the same name.
+  MacroInfo *getPreviousDefinition() { return PreviousDefinition; }
+
+  /// \brief Find macro definition active in the specified source location. If
+  /// this macro was not defined there, return NULL.
+  const MacroInfo *findDefinitionAtLoc(SourceLocation L,
+                                       SourceManager &SM) const;
+
+  /// \brief Get length in characters of the macro definition.
+  unsigned getDefinitionLength(SourceManager &SM) const {
+    if (IsDefinitionLengthCached)
+      return DefinitionLength;
+    return getDefinitionLengthSlow(SM);
+  }
 
   /// isIdenticalTo - Return true if the specified macro definition is equal to
   /// this macro in spelling, arguments, and whitespace.  This is used to emit
@@ -192,12 +256,23 @@ public:
   /// __LINE__, which requires processing before expansion.
   bool isBuiltinMacro() const { return IsBuiltinMacro; }
 
+  bool hasCommaPasting() const { return HasCommaPasting; }
+  void setHasCommaPasting() { HasCommaPasting = true; }
+
   /// isFromAST - Return true if this macro was loaded from an AST file.
   bool isFromAST() const { return IsFromAST; }
 
   /// setIsFromAST - Set whether this macro was loaded from an AST file.
   void setIsFromAST(bool FromAST = true) { IsFromAST = FromAST; }
 
+  /// \brief Determine whether this macro has changed since it was loaded from
+  /// an AST file.
+  bool hasChangedAfterLoad() const { return ChangedAfterLoad; }
+  
+  /// \brief Note whether this macro has changed after it was loaded from an
+  /// AST file.
+  void setChangedAfterLoad(bool CAL = true) { ChangedAfterLoad = CAL; }
+  
   /// isUsed - Return false if this macro is defined in the main file and has
   /// not yet been used.
   bool isUsed() const { return IsUsed; }
@@ -224,7 +299,7 @@ public:
     return ReplacementTokens[Tok];
   }
 
-  typedef llvm::SmallVector<Token, 8>::const_iterator tokens_iterator;
+  typedef SmallVector<Token, 8>::const_iterator tokens_iterator;
   tokens_iterator tokens_begin() const { return ReplacementTokens.begin(); }
   tokens_iterator tokens_end() const { return ReplacementTokens.end(); }
   bool tokens_empty() const { return ReplacementTokens.empty(); }
@@ -232,6 +307,8 @@ public:
   /// AddTokenToBody - Add the specified token to the replacement text for the
   /// macro.
   void AddTokenToBody(const Token &Tok) {
+    assert(!IsDefinitionLengthCached &&
+          "Changing replacement tokens after definition length got calculated");
     ReplacementTokens.push_back(Tok);
   }
 
@@ -248,6 +325,40 @@ public:
     assert(!IsDisabled && "Cannot disable an already-disabled macro!");
     IsDisabled = true;
   }
+
+  /// \brief Set the export location for this macro.
+  void setVisibility(bool Public, SourceLocation Loc) {
+    VisibilityLocation = Loc;
+    IsPublic = Public;
+  }
+
+  /// \brief Determine whether this macro is part of the public API of its
+  /// module.
+  bool isPublic() const { return IsPublic; }
+  
+  /// \brief Determine the location where this macro was explicitly made
+  /// public or private within its module.
+  SourceLocation getVisibilityLocation() { return VisibilityLocation; }
+
+  /// \brief Determine whether this macro is currently defined (and has not
+  /// been #undef'd) or has been hidden.
+  bool isDefined() const { return UndefLocation.isInvalid() && !IsHidden; }
+
+  /// \brief Determine whether this macro definition is hidden.
+  bool isHidden() const { return IsHidden; }
+
+  /// \brief Set whether this macro definition is hidden.
+  void setHidden(bool Val) { IsHidden = Val; }
+
+  /// \brief Determine whether this macro definition is ambiguous with
+  /// other macro definitions.
+  bool isAmbiguous() const { return IsAmbiguous; }
+
+  /// \brief Set whether this macro definition is ambiguous.
+  void setAmbiguous(bool Val) { IsAmbiguous = Val; }
+  
+private:
+  unsigned getDefinitionLengthSlow(SourceManager &SM) const;
 };
 
 }  // end namespace clang

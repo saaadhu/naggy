@@ -18,16 +18,18 @@ using namespace System::Collections::Generic;
 using namespace NaggyClang;
 using namespace std;
 
-class StoredDiagnosticClient : public clang::DiagnosticClient
+class StoredDiagnosticClient : public clang::DiagnosticConsumer
 {
 	std::vector<clang::StoredDiagnostic> diags;
 
 public:
-	virtual void HandleDiagnostic(clang::Diagnostic::Level DiagLevel,
-		const clang::DiagnosticInfo &Info)
+	virtual void HandleDiagnostic(clang::DiagnosticsEngine::Level DiagLevel,
+		const clang::Diagnostic& Info)
 	{
 		diags.push_back(clang::StoredDiagnostic(DiagLevel, Info));
 	}
+
+	virtual bool IncludeInDiagnosticsCount() const { return true; }
 
 	void clear() { diags.clear(); }
 
@@ -35,6 +37,13 @@ public:
 	clang::StoredDiagnostic& getDiagInfo(unsigned int elementIndex)
 	{
 		return diags[elementIndex];
+	}
+
+	virtual DiagnosticConsumer *clone(clang::DiagnosticsEngine &Diags) const
+	{
+		StoredDiagnosticClient *client = new StoredDiagnosticClient();
+		client->diags = diags;
+		return client;
 	}
 };
 
@@ -54,9 +63,9 @@ static NaggyClang::Diagnostic^ ToDiagnostic(clang::StoredDiagnostic& diag)
 
 	switch(diag.getLevel())
 	{
-	case clang::Diagnostic::Level::Warning:
-	case clang::Diagnostic::Level::Note:
-	case clang::Diagnostic::Level::Ignored:
+	case clang::DiagnosticsEngine::Level::Warning:
+	case clang::DiagnosticsEngine::Level::Note:
+	case clang::DiagnosticsEngine::Level::Ignored:
 		managedDiag->Level = DiagnosticLevel::Warning;
 		break;
 	default:
@@ -153,7 +162,7 @@ void ClangAdapter::CreateClangCompiler()
 {
 	m_pInstance = new clang::CompilerInstance();
 	m_pDiagnosticClient = new StoredDiagnosticClient();
-	m_pInstance->createDiagnostics(0, NULL, m_pDiagnosticClient);
+	m_pInstance->createDiagnostics(m_pDiagnosticClient, true, false);
 }
 
 void ClangAdapter::DestroyClangCompiler()
@@ -166,13 +175,13 @@ void ClangAdapter::DestroyClangCompiler()
 
 void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 {
-	pInvocation->getFrontendOpts().Inputs.push_back(std::pair<clang::InputKind, std::string>(clang::IK_CXX, m_filePath));
+	pInvocation->getFrontendOpts().Inputs.push_back(clang::FrontendInputFile(m_filePath, clang::IK_CXX));
 	pInvocation->getFrontendOpts().ProgramAction = clang::frontend::ParseSyntaxOnly;
 	pInvocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
 
 	for each(String^ path in includePaths)
 	{
-		pInvocation->getHeaderSearchOpts().AddPath(ToCString(path), clang::frontend::Angled, true, false, true);
+		pInvocation->getHeaderSearchOpts().AddPath(ToCString(path), clang::frontend::Angled, false, true);
 	}
 
 	for each(String^ symbol in predefinedSymbols)
@@ -181,7 +190,7 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 	}
 
 	//pInvocation->getLangOpts().C99 = 1;
-	pInvocation->getLangOpts().GNUMode = 1;
-	pInvocation->getLangOpts().GNUKeywords = 1;
-	pInvocation->getLangOpts().Bool = 1;
+	pInvocation->getLangOpts()->GNUMode = 1;
+	pInvocation->getLangOpts()->GNUKeywords = 1;
+	pInvocation->getLangOpts()->Bool = 1;
 }

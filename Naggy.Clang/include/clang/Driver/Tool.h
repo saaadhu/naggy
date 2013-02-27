@@ -10,9 +10,7 @@
 #ifndef CLANG_DRIVER_TOOL_H_
 #define CLANG_DRIVER_TOOL_H_
 
-namespace llvm {
-  template<typename T, unsigned N> class SmallVector;
-}
+#include "clang/Basic/LLVM.h"
 
 namespace clang {
 namespace driver {
@@ -23,7 +21,7 @@ namespace driver {
   class JobAction;
   class ToolChain;
 
-  typedef llvm::SmallVector<InputInfo, 4> InputInfoList;
+  typedef SmallVector<InputInfo, 4> InputInfoList;
 
 /// Tool - Information on a specific compilation tool.
 class Tool {
@@ -51,13 +49,15 @@ public:
 
   virtual bool hasIntegratedAssembler() const { return false; }
   virtual bool hasIntegratedCPP() const = 0;
+  virtual bool isLinkJob() const { return false; }
+  virtual bool isDsymutilJob() const { return false; }
 
   /// \brief Does this tool have "good" standardized diagnostics, or should the
   /// driver add an additional "command failed" diagnostic on failures.
   virtual bool hasGoodDiagnostics() const { return false; }
 
-  /// ConstructJob - Construct jobs to perform the action \arg JA,
-  /// writing to \arg Output and with \arg Inputs.
+  /// ConstructJob - Construct jobs to perform the action \p JA,
+  /// writing to \p Output and with \p Inputs.
   ///
   /// \param TCArgs - The argument list for this toolchain, with any
   /// tool chain specific translations applied.

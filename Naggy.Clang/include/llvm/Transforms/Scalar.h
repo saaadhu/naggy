@@ -70,11 +70,20 @@ FunctionPass *createAggressiveDCEPass();
 
 //===----------------------------------------------------------------------===//
 //
+// SROA - Replace aggregates or pieces of aggregates with scalar SSA values.
+//
+FunctionPass *createSROAPass(bool RequiresDomTree = true);
+
+//===----------------------------------------------------------------------===//
+//
 // ScalarReplAggregates - Break up alloca's of aggregates into multiple allocas
 // if possible.
 //
 FunctionPass *createScalarReplAggregatesPass(signed Threshold = -1,
-                                             bool UseDomTree = true);
+                                             bool UseDomTree = true,
+                                             signed StructMemberThreshold = -1,
+                                             signed ArrayElementThreshold = -1,
+                                             signed ScalarLoadThreshold = -1);
 
 //===----------------------------------------------------------------------===//
 //
@@ -106,11 +115,11 @@ Pass *createLICMPass();
 //===----------------------------------------------------------------------===//
 //
 // LoopStrengthReduce - This pass is strength reduces GEP instructions that use
-// a loop's canonical induction variable as one of their indices.  It takes an
-// optional parameter used to consult the target machine whether certain
-// transformations are profitable.
+// a loop's canonical induction variable as one of their indices.
 //
-Pass *createLoopStrengthReducePass(const TargetLowering *TLI = 0);
+Pass *createLoopStrengthReducePass();
+
+Pass *createGlobalMergePass(const TargetLowering *TLI = 0);
 
 //===----------------------------------------------------------------------===//
 //
@@ -173,13 +182,6 @@ extern char &DemoteRegisterToMemoryID;
 // For example:  4 + (x + 5)  ->  x + (4 + 5)
 //
 FunctionPass *createReassociatePass();
-
-//===----------------------------------------------------------------------===//
-//
-// TailDuplication - Eliminate unconditional branches through controlled code
-// duplication, creating simpler CFG structures.
-//
-FunctionPass *createTailDuplicationPass();
 
 //===----------------------------------------------------------------------===//
 //
@@ -314,12 +316,6 @@ extern char &InstructionNamerID;
   
 //===----------------------------------------------------------------------===//
 //
-// GEPSplitter - Split complex GEPs into simple ones
-//
-FunctionPass *createGEPSplitterPass();
-
-//===----------------------------------------------------------------------===//
-//
 // Sink - Code Sinking
 //
 FunctionPass *createSinkingPass();
@@ -342,6 +338,14 @@ Pass *createCorrelatedValuePropagationPass();
 //
 FunctionPass *createInstructionSimplifierPass();
 extern char &InstructionSimplifierID;
+
+
+//===----------------------------------------------------------------------===//
+//
+// LowerExpectIntriniscs - Removes llvm.expect intrinsics and creates
+// "block_weights" metadata.
+FunctionPass *createLowerExpectIntrinsicPass();
+
 
 } // End llvm namespace
 

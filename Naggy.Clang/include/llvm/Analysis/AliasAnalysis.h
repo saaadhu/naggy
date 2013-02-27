@@ -34,9 +34,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_ANALYSIS_ALIAS_ANALYSIS_H
-#define LLVM_ANALYSIS_ALIAS_ANALYSIS_H
+#ifndef LLVM_ANALYSIS_ALIASANALYSIS_H
+#define LLVM_ANALYSIS_ALIASANALYSIS_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/CallSite.h"
 
 namespace llvm {
@@ -44,15 +45,18 @@ namespace llvm {
 class LoadInst;
 class StoreInst;
 class VAArgInst;
-class TargetData;
+class DataLayout;
+class TargetLibraryInfo;
 class Pass;
 class AnalysisUsage;
 class MemTransferInst;
 class MemIntrinsic;
+class DominatorTree;
 
 class AliasAnalysis {
 protected:
-  const TargetData *TD;
+  const DataLayout *TD;
+  const TargetLibraryInfo *TLI;
 
 private:
   AliasAnalysis *AA;       // Previous Alias Analysis to chain to.
@@ -71,7 +75,7 @@ protected:
 
 public:
   static char ID; // Class identification, replacement for typeinfo
-  AliasAnalysis() : TD(0), AA(0) {}
+  AliasAnalysis() : TD(0), TLI(0), AA(0) {}
   virtual ~AliasAnalysis();  // We want to be subclassed
 
   /// UnknownSize - This is a special value which can be used with the
@@ -79,15 +83,20 @@ public:
   /// know the sizes of the potential memory references.
   static uint64_t const UnknownSize = ~UINT64_C(0);
 
-  /// getTargetData - Return a pointer to the current TargetData object, or
-  /// null if no TargetData object is available.
+  /// getDataLayout - Return a pointer to the current DataLayout object, or
+  /// null if no DataLayout object is available.
   ///
-  const TargetData *getTargetData() const { return TD; }
+  const DataLayout *getDataLayout() const { return TD; }
 
-  /// getTypeStoreSize - Return the TargetData store size for the given type,
+  /// getTargetLibraryInfo - Return a pointer to the current TargetLibraryInfo
+  /// object, or null if no TargetLibraryInfo object is available.
+  ///
+  const TargetLibraryInfo *getTargetLibraryInfo() const { return TLI; }
+
+  /// getTypeStoreSize - Return the DataLayout store size for the given type,
   /// if known, or a conservative value otherwise.
   ///
-  uint64_t getTypeStoreSize(const Type *Ty);
+  uint64_t getTypeStoreSize(Type *Ty);
 
   //===--------------------------------------------------------------------===//
   /// Alias Queries...
@@ -135,6 +144,8 @@ public:
   Location getLocation(const LoadInst *LI);
   Location getLocation(const StoreInst *SI);
   Location getLocation(const VAArgInst *VI);
+  Location getLocation(const AtomicCmpXchgInst *CXI);
+  Location getLocation(const AtomicRMWInst *RMWI);
   static Location getLocationForSource(const MemTransferInst *MTI);
   static Location getLocationForDest(const MemIntrinsic *MI);
 
@@ -181,6 +192,11 @@ public:
   bool isNoAlias(const Value *V1, uint64_t V1Size,
                  const Value *V2, uint64_t V2Size) {
     return isNoAlias(Location(V1, V1Size), Location(V2, V2Size));
+  }
+  
+  /// isNoAlias - A convenience wrapper.
+  bool isNoAlias(const Value *V1, const Value *V2) {
+    return isNoAlias(Location(V1), Location(V2));
   }
   
   /// isMustAlias - A convenience wrapper.
@@ -324,7 +340,7 @@ public:
   }
 
   /// doesAccessArgPointees - Return true if functions with the specified
-  /// behavior are known to potentially read or write  from objects pointed
+  /// behavior are known to potentially read or write from objects pointed
   /// to be their pointer-typed arguments (with arbitrary offsets).
   ///
   static bool doesAccessArgPointees(ModRefBehavior MRB) {
@@ -340,6 +356,11 @@ public:
     case Instruction::VAArg:  return getModRefInfo((const VAArgInst*)I, Loc);
     case Instruction::Load:   return getModRefInfo((const LoadInst*)I,  Loc);
     case Instruction::Store:  return getModRefInfo((const StoreInst*)I, Loc);
+    case Instruction::Fence:  return getModRefInfo((const FenceInst*)I, Loc);
+    case Instruction::AtomicCmpXchg:
+      return getModRefInfo((const AtomicCmpXchgInst*)I, Loc);
+    case Instruction::AtomicRMW:
+      return getModRefInfo((const AtomicRMWInst*)I, Loc);
     case Instruction::Call:   return getModRefInfo((const CallInst*)I,  Loc);
     case Instruction::Invoke: return getModRefInfo((const InvokeInst*)I,Loc);
     default:                  return NoModRef;
@@ -352,7 +373,7 @@ public:
     return getModRefInfo(I, Location(P, Size));
   }
 
-  /// getModRefInfo (for call sites) - Return whether information about whether
+  /// getModRefInfo (for call sites) - Return information about whether
   /// a particular call site modifies or reads the specified memory location.
   virtual ModRefResult getModRefInfo(ImmutableCallSite CS,
                                      const Location &Loc);
@@ -363,7 +384,7 @@ public:
     return getModRefInfo(CS, Location(P, Size));
   }
 
-  /// getModRefInfo (for calls) - Return whether information about whether
+  /// getModRefInfo (for calls) - Return information about whether
   /// a particular call modifies or reads the specified memory location.
   ModRefResult getModRefInfo(const CallInst *C, const Location &Loc) {
     return getModRefInfo(ImmutableCallSite(C), Loc);
@@ -374,7 +395,7 @@ public:
     return getModRefInfo(C, Location(P, Size));
   }
 
-  /// getModRefInfo (for invokes) - Return whether information about whether
+  /// getModRefInfo (for invokes) - Return information about whether
   /// a particular invoke modifies or reads the specified memory location.
   ModRefResult getModRefInfo(const InvokeInst *I,
                              const Location &Loc) {
@@ -387,7 +408,7 @@ public:
     return getModRefInfo(I, Location(P, Size));
   }
 
-  /// getModRefInfo (for loads) - Return whether information about whether
+  /// getModRefInfo (for loads) - Return information about whether
   /// a particular load modifies or reads the specified memory location.
   ModRefResult getModRefInfo(const LoadInst *L, const Location &Loc);
 
@@ -396,7 +417,7 @@ public:
     return getModRefInfo(L, Location(P, Size));
   }
 
-  /// getModRefInfo (for stores) - Return whether information about whether
+  /// getModRefInfo (for stores) - Return information about whether
   /// a particular store modifies or reads the specified memory location.
   ModRefResult getModRefInfo(const StoreInst *S, const Location &Loc);
 
@@ -405,7 +426,40 @@ public:
     return getModRefInfo(S, Location(P, Size));
   }
 
-  /// getModRefInfo (for va_args) - Return whether information about whether
+  /// getModRefInfo (for fences) - Return information about whether
+  /// a particular store modifies or reads the specified memory location.
+  ModRefResult getModRefInfo(const FenceInst *S, const Location &Loc) {
+    // Conservatively correct.  (We could possibly be a bit smarter if
+    // Loc is a alloca that doesn't escape.)
+    return ModRef;
+  }
+
+  /// getModRefInfo (for fences) - A convenience wrapper.
+  ModRefResult getModRefInfo(const FenceInst *S, const Value *P, uint64_t Size){
+    return getModRefInfo(S, Location(P, Size));
+  }
+
+  /// getModRefInfo (for cmpxchges) - Return information about whether
+  /// a particular cmpxchg modifies or reads the specified memory location.
+  ModRefResult getModRefInfo(const AtomicCmpXchgInst *CX, const Location &Loc);
+
+  /// getModRefInfo (for cmpxchges) - A convenience wrapper.
+  ModRefResult getModRefInfo(const AtomicCmpXchgInst *CX,
+                             const Value *P, unsigned Size) {
+    return getModRefInfo(CX, Location(P, Size));
+  }
+
+  /// getModRefInfo (for atomicrmws) - Return information about whether
+  /// a particular atomicrmw modifies or reads the specified memory location.
+  ModRefResult getModRefInfo(const AtomicRMWInst *RMW, const Location &Loc);
+
+  /// getModRefInfo (for atomicrmws) - A convenience wrapper.
+  ModRefResult getModRefInfo(const AtomicRMWInst *RMW,
+                             const Value *P, unsigned Size) {
+    return getModRefInfo(RMW, Location(P, Size));
+  }
+
+  /// getModRefInfo (for va_args) - Return information about whether
   /// a particular va_arg modifies or reads the specified memory location.
   ModRefResult getModRefInfo(const VAArgInst* I, const Location &Loc);
 
@@ -420,6 +474,18 @@ public:
   /// for details.
   virtual ModRefResult getModRefInfo(ImmutableCallSite CS1,
                                      ImmutableCallSite CS2);
+
+  /// callCapturesBefore - Return information about whether a particular call 
+  /// site modifies or reads the specified memory location.
+  ModRefResult callCapturesBefore(const Instruction *I,
+                                  const AliasAnalysis::Location &MemLoc,
+                                  DominatorTree *DT);
+
+  /// callCapturesBefore - A convenience wrapper.
+  ModRefResult callCapturesBefore(const Instruction *I, const Value *P,
+                                  uint64_t Size, DominatorTree *DT) {
+    return callCapturesBefore(I, Location(P, Size), DT);
+  }
 
   //===--------------------------------------------------------------------===//
   /// Higher level methods for querying mod/ref information.
@@ -488,6 +554,32 @@ public:
   }
 };
 
+// Specialize DenseMapInfo for Location.
+template<>
+struct DenseMapInfo<AliasAnalysis::Location> {
+  static inline AliasAnalysis::Location getEmptyKey() {
+    return
+      AliasAnalysis::Location(DenseMapInfo<const Value *>::getEmptyKey(),
+                              0, 0);
+  }
+  static inline AliasAnalysis::Location getTombstoneKey() {
+    return
+      AliasAnalysis::Location(DenseMapInfo<const Value *>::getTombstoneKey(),
+                              0, 0);
+  }
+  static unsigned getHashValue(const AliasAnalysis::Location &Val) {
+    return DenseMapInfo<const Value *>::getHashValue(Val.Ptr) ^
+           DenseMapInfo<uint64_t>::getHashValue(Val.Size) ^
+           DenseMapInfo<const MDNode *>::getHashValue(Val.TBAATag);
+  }
+  static bool isEqual(const AliasAnalysis::Location &LHS,
+                      const AliasAnalysis::Location &RHS) {
+    return LHS.Ptr == RHS.Ptr &&
+           LHS.Size == RHS.Size &&
+           LHS.TBAATag == RHS.TBAATag;
+  }
+};
+
 /// isNoAliasCall - Return true if this pointer is returned by a noalias
 /// function.
 bool isNoAliasCall(const Value *V);
@@ -495,9 +587,9 @@ bool isNoAliasCall(const Value *V);
 /// isIdentifiedObject - Return true if this pointer refers to a distinct and
 /// identifiable object.  This returns true for:
 ///    Global Variables and Functions (but not Global Aliases)
-///    Allocas and Mallocs
+///    Allocas
 ///    ByVal and NoAlias Arguments
-///    NoAlias returns
+///    NoAlias returns (e.g. calls to malloc)
 ///
 bool isIdentifiedObject(const Value *V);
 

@@ -14,26 +14,30 @@
 #ifndef LLVM_CLANG_FRONTEND_ASTUNIT_H
 #define LLVM_CLANG_FRONTEND_ASTUNIT_H
 
-#include "clang/Index/ASTLocation.h"
-#include "clang/Serialization/ASTBitCodes.h"
-#include "clang/Sema/Sema.h"
-#include "clang/Sema/CodeCompleteConsumer.h"
-#include "clang/Lex/PreprocessingRecord.h"
-#include "clang/Basic/SourceManager.h"
+#include "clang-c/Index.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/FileSystemOptions.h"
-#include "clang-c/Index.h"
+#include "clang/Basic/LangOptions.h"
+#include "clang/Basic/SourceManager.h"
+#include "clang/Basic/TargetOptions.h"
+#include "clang/Lex/HeaderSearchOptions.h"
+#include "clang/Lex/ModuleLoader.h"
+#include "clang/Lex/PreprocessingRecord.h"
+#include "clang/Sema/CodeCompleteConsumer.h"
+#include "clang/Sema/Sema.h"
+#include "clang/Serialization/ASTBitCodes.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Path.h"
+#include <cassert>
 #include <map>
 #include <string>
-#include <vector>
-#include <cassert>
-#include <utility>
 #include <sys/types.h>
+#include <utility>
+#include <vector>
 
 namespace llvm {
   class MemoryBuffer;
@@ -41,63 +45,53 @@ namespace llvm {
 
 namespace clang {
 class ASTContext;
+class ASTReader;
 class CodeCompleteConsumer;
 class CompilerInvocation;
+class CompilerInstance;
 class Decl;
-class Diagnostic;
+class DiagnosticsEngine;
 class FileEntry;
 class FileManager;
 class HeaderSearch;
 class Preprocessor;
 class SourceManager;
 class TargetInfo;
+class ASTFrontendAction;
+class ASTDeserializationListener;
 
-using namespace idx;
-  
-/// \brief Allocator for a cached set of global code completions.
-class GlobalCodeCompletionAllocator 
-  : public CodeCompletionAllocator,
-    public llvm::RefCountedBase<GlobalCodeCompletionAllocator> 
-{
-
-};
-  
 /// \brief Utility class for loading a ASTContext from an AST file.
 ///
-class ASTUnit {
-public:
-  typedef std::map<FileID, std::vector<PreprocessedEntity *> > 
-    PreprocessedEntitiesByFileMap;
-  
+class ASTUnit : public ModuleLoader {
 private:
-  llvm::IntrusiveRefCntPtr<Diagnostic> Diagnostics;
-  llvm::IntrusiveRefCntPtr<FileManager>      FileMgr;
-  llvm::IntrusiveRefCntPtr<SourceManager>    SourceMgr;
-  llvm::OwningPtr<HeaderSearch>     HeaderInfo;
-  llvm::IntrusiveRefCntPtr<TargetInfo>       Target;
-  llvm::IntrusiveRefCntPtr<Preprocessor>     PP;
-  llvm::IntrusiveRefCntPtr<ASTContext>       Ctx;
+  IntrusiveRefCntPtr<LangOptions>         LangOpts;
+  IntrusiveRefCntPtr<DiagnosticsEngine>   Diagnostics;
+  IntrusiveRefCntPtr<FileManager>         FileMgr;
+  IntrusiveRefCntPtr<SourceManager>       SourceMgr;
+  OwningPtr<HeaderSearch>                 HeaderInfo;
+  IntrusiveRefCntPtr<TargetInfo>          Target;
+  IntrusiveRefCntPtr<Preprocessor>        PP;
+  IntrusiveRefCntPtr<ASTContext>          Ctx;
+  IntrusiveRefCntPtr<TargetOptions>       TargetOpts;
+  IntrusiveRefCntPtr<HeaderSearchOptions> HSOpts;
+  ASTReader *Reader;
+
+  struct ASTWriterData;
+  OwningPtr<ASTWriterData> WriterData;
 
   FileSystemOptions FileSystemOpts;
 
   /// \brief The AST consumer that received information about the translation
   /// unit as it was parsed or loaded.
-  llvm::OwningPtr<ASTConsumer> Consumer;
+  OwningPtr<ASTConsumer> Consumer;
   
   /// \brief The semantic analysis object used to type-check the translation
   /// unit.
-  llvm::OwningPtr<Sema> TheSema;
+  OwningPtr<Sema> TheSema;
   
   /// Optional owned invocation, just used to make the invocation used in
   /// LoadFromCommandLine available.
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> Invocation;
-  
-  /// \brief The set of target features.
-  ///
-  /// FIXME: each time we reparse, we need to restore the set of target
-  /// features from this vector, because TargetInfo::CreateTargetInfo()
-  /// mangles the target options in place. Yuck!
-  std::vector<std::string> TargetFeatures;
+  IntrusiveRefCntPtr<CompilerInvocation> Invocation;
   
   // OnlyLocalDecls - when true, walking this AST should only visit declarations
   // that come from the AST itself, not from included precompiled headers.
@@ -110,8 +104,8 @@ private:
   /// \brief Track whether the main file was loaded from an AST or not.
   bool MainFileIsAST;
 
-  /// \brief Whether this AST represents a complete translation unit.
-  bool CompleteTranslationUnit;
+  /// \brief What kind of translation unit this AST represents.
+  TranslationUnitKind TUKind;
 
   /// \brief Whether we should time each operation.
   bool WantTiming;
@@ -128,23 +122,27 @@ private:
   // more scalable search mechanisms.
   std::vector<Decl*> TopLevelDecls;
 
-  /// \brief The list of preprocessed entities which appeared when the ASTUnit
-  /// was loaded.
-  ///
-  /// FIXME: This is just an optimization hack to avoid deserializing large
-  /// parts of a PCH file while performing a walk or search. In the long term,
-  /// we should provide more scalable search mechanisms.
-  std::vector<PreprocessedEntity *> PreprocessedEntities;
+  /// \brief Sorted (by file offset) vector of pairs of file offset/Decl.
+  typedef SmallVector<std::pair<unsigned, Decl *>, 64> LocDeclsTy;
+  typedef llvm::DenseMap<FileID, LocDeclsTy *> FileDeclsTy;
+
+  /// \brief Map from FileID to the file-level declarations that it contains.
+  /// The files and decls are only local (and non-preamble) ones.
+  FileDeclsTy FileDecls;
   
   /// The name of the original source file used to generate this ASTUnit.
   std::string OriginalSourceFile;
 
-  // Critical optimization when using clang_getCursor().
-  ASTLocation LastLoc;
+  /// \brief The set of diagnostics produced when creating the preamble.
+  SmallVector<StoredDiagnostic, 4> PreambleDiagnostics;
 
   /// \brief The set of diagnostics produced when creating this
   /// translation unit.
-  llvm::SmallVector<StoredDiagnostic, 4> StoredDiagnostics;
+  SmallVector<StoredDiagnostic, 4> StoredDiagnostics;
+
+  /// \brief The set of diagnostics produced when failing to parse, e.g. due
+  /// to failure to load the PCH.
+  SmallVector<StoredDiagnostic, 4> FailedParseDiagnostics;
 
   /// \brief The number of stored diagnostics that come from the driver
   /// itself.
@@ -153,29 +151,6 @@ private:
   /// the next.
   unsigned NumStoredDiagnosticsFromDriver;
   
-  /// \brief Temporary files that should be removed when the ASTUnit is 
-  /// destroyed.
-  llvm::SmallVector<llvm::sys::Path, 4> TemporaryFiles;
-
-  /// \brief A mapping from file IDs to the set of preprocessed entities
-  /// stored in that file. 
-  ///
-  /// FIXME: This is just an optimization hack to avoid searching through
-  /// many preprocessed entities during cursor traversal in the CIndex library.
-  /// Ideally, we would just be able to perform a binary search within the
-  /// list of preprocessed entities.
-  PreprocessedEntitiesByFileMap PreprocessedEntitiesByFile;
-  
-  /// \brief Simple hack to allow us to assert that ASTUnit is not being
-  /// used concurrently, which is not supported.
-  ///
-  /// Clients should create instances of the ConcurrencyCheck class whenever
-  /// using the ASTUnit in a way that isn't intended to be concurrent, which is
-  /// just about any usage.
-  unsigned int ConcurrencyCheckValue;
-  static const unsigned int CheckLocked = 28573289;
-  static const unsigned int CheckUnlocked = 9803453;
-
   /// \brief Counter that determines when we want to try building a
   /// precompiled preamble.
   ///
@@ -186,13 +161,54 @@ private:
   /// building the precompiled preamble fails, we won't try again for
   /// some number of calls.
   unsigned PreambleRebuildCounter;
-  
-  /// \brief The file in which the precompiled preamble is stored.
-  std::string PreambleFile;
-  
+
+public:
+  class PreambleData {
+    const FileEntry *File;
+    std::vector<char> Buffer;
+    mutable unsigned NumLines;
+    
+  public:
+    PreambleData() : File(0), NumLines(0) { }
+    
+    void assign(const FileEntry *F, const char *begin, const char *end) {
+      File = F;
+      Buffer.assign(begin, end);
+      NumLines = 0;
+    }
+
+    void clear() { Buffer.clear(); File = 0; NumLines = 0; }
+
+    size_t size() const { return Buffer.size(); }
+    bool empty() const { return Buffer.empty(); }
+
+    const char *getBufferStart() const { return &Buffer[0]; }
+
+    unsigned getNumLines() const {
+      if (NumLines)
+        return NumLines;
+      countLines();
+      return NumLines;
+    }
+
+    SourceRange getSourceRange(const SourceManager &SM) const {
+      SourceLocation FileLoc = SM.getLocForStartOfFile(SM.getPreambleFileID());
+      return SourceRange(FileLoc, FileLoc.getLocWithOffset(size()-1));
+    }
+
+  private:
+    void countLines() const;
+  };
+
+  const PreambleData &getPreambleData() const {
+    return Preamble;
+  }
+
+private:
+
   /// \brief The contents of the preamble that has been precompiled to
   /// \c PreambleFile.
-  std::vector<char> Preamble;
+  PreambleData Preamble;
 
   /// \brief Whether the preamble ends at the start of a new line.
   /// 
@@ -223,34 +239,40 @@ private:
 
   /// \brief The number of warnings that occurred while parsing the preamble.
   ///
-  /// This value will be used to restore the state of the \c Diagnostic object
-  /// when re-using the precompiled preamble. Note that only the
+  /// This value will be used to restore the state of the \c DiagnosticsEngine
+  /// object when re-using the precompiled preamble. Note that only the
   /// number of warnings matters, since we will not save the preamble
   /// when any errors are present.
   unsigned NumWarningsInPreamble;
 
-  /// \brief The number of diagnostics that were stored when parsing
-  /// the precompiled preamble.
-  ///
-  /// This value is used to determine how many of the stored
-  /// diagnostics should be retained when reparsing in the presence of
-  /// a precompiled preamble.
-  unsigned NumStoredDiagnosticsInPreamble;
-
   /// \brief A list of the serialization ID numbers for each of the top-level
   /// declarations parsed within the precompiled preamble.
   std::vector<serialization::DeclID> TopLevelDeclsInPreamble;
-
-  /// \brief A list of the offsets into the precompiled preamble which
-  /// correspond to preprocessed entities.
-  std::vector<uint64_t> PreprocessedEntitiesInPreamble;
   
   /// \brief Whether we should be caching code-completion results.
-  bool ShouldCacheCodeCompletionResults;
-  
-  static void ConfigureDiags(llvm::IntrusiveRefCntPtr<Diagnostic> &Diags,
+  bool ShouldCacheCodeCompletionResults : 1;
+
+  /// \brief Whether to include brief documentation within the set of code
+  /// completions cached.
+  bool IncludeBriefCommentsInCodeCompletion : 1;
+
+  /// \brief True if non-system source files should be treated as volatile
+  /// (likely to change while trying to use them).
+  bool UserFilesAreVolatile : 1;
+ 
+  /// \brief The language options used when we load an AST file.
+  LangOptions ASTFileLangOpts;
+
+  static void ConfigureDiags(IntrusiveRefCntPtr<DiagnosticsEngine> &Diags,
                              const char **ArgBegin, const char **ArgEnd,
                              ASTUnit &AST, bool CaptureDiagnostics);
+
+  void TranslateStoredDiagnostics(ASTReader *MMan, StringRef ModName,
+                                  SourceManager &SrcMan,
+                      const SmallVectorImpl<StoredDiagnostic> &Diags,
+                            SmallVectorImpl<StoredDiagnostic> &Out);
+
+  void clearFileLevelDecls();
 
 public:
   /// \brief A cached code-completion result, which may be introduced in one of
@@ -263,12 +285,11 @@ public:
     /// \brief A bitmask that indicates which code-completion contexts should
     /// contain this completion result.
     ///
-    /// The bits in the bitmask correspond to the values of 
-    /// CodeCompleteContext::Kind. To map from a completion context kind to a 
-    /// bit, subtract one from the completion context kind and shift 1 by that
-    /// number of bits. Many completions can occur in several different
-    /// contexts.
-    unsigned ShowInContexts;
+    /// The bits in the bitmask correspond to the values of
+    /// CodeCompleteContext::Kind. To map from a completion context kind to a
+    /// bit, shift 1 by that number of bits. Many completions can occur in
+    /// several different contexts.
+    uint64_t ShowInContexts;
     
     /// \brief The priority given to this code-completion result.
     unsigned Priority;
@@ -299,15 +320,24 @@ public:
   }
   
   /// \brief Retrieve the allocator used to cache global code completions.
-  llvm::IntrusiveRefCntPtr<GlobalCodeCompletionAllocator> 
+  IntrusiveRefCntPtr<GlobalCodeCompletionAllocator>
   getCachedCompletionAllocator() {
     return CachedCompletionAllocator;
   }
-  
+
+  CodeCompletionTUInfo &getCodeCompletionTUInfo() {
+    if (!CCTUInfo)
+      CCTUInfo.reset(new CodeCompletionTUInfo(
+                                            new GlobalCodeCompletionAllocator));
+    return *CCTUInfo;
+  }
+
 private:
   /// \brief Allocator used to store cached code completions.
-  llvm::IntrusiveRefCntPtr<GlobalCodeCompletionAllocator>
+  IntrusiveRefCntPtr<GlobalCodeCompletionAllocator>
     CachedCompletionAllocator;
+  
+  OwningPtr<CodeCompletionTUInfo> CCTUInfo;
 
   /// \brief The set of cached code-completion results.
   std::vector<CachedCodeCompletionResult> CachedCompletionResults;
@@ -345,8 +375,8 @@ private:
   /// \brief Clear out and deallocate 
   void ClearCachedCompletionResults();
   
-  ASTUnit(const ASTUnit&); // DO NOT IMPLEMENT
-  ASTUnit &operator=(const ASTUnit &); // DO NOT IMPLEMENT
+  ASTUnit(const ASTUnit &) LLVM_DELETED_FUNCTION;
+  void operator=(const ASTUnit &) LLVM_DELETED_FUNCTION;
   
   explicit ASTUnit(bool MainFileIsAST);
 
@@ -358,27 +388,48 @@ private:
                   unsigned MaxLines, bool &CreatedBuffer);
   
   llvm::MemoryBuffer *getMainBufferWithPrecompiledPreamble(
-                                         CompilerInvocation PreambleInvocation,
+                               const CompilerInvocation &PreambleInvocationIn,
                                                      bool AllowRebuild = true,
                                                         unsigned MaxLines = 0);
   void RealizeTopLevelDeclsFromPreamble();
-  void RealizePreprocessedEntitiesFromPreamble();
-  
+
+  /// \brief Transfers ownership of the objects (like SourceManager) from
+  /// \param CI to this ASTUnit.
+  void transferASTDataFromCompilerInstance(CompilerInstance &CI);
+
+  /// \brief Allows us to assert that ASTUnit is not being used concurrently,
+  /// which is not supported.
+  ///
+  /// Clients should create instances of the ConcurrencyCheck class whenever
+  /// using the ASTUnit in a way that isn't intended to be concurrent, which is
+  /// just about any usage.
+  /// Becomes a noop in release mode; only useful for debug mode checking.
+  class ConcurrencyState {
+#ifndef NDEBUG
+    void *Mutex; // a llvm::sys::MutexImpl in debug;
+#endif
+
+  public:
+    ConcurrencyState();
+    ~ConcurrencyState();
+
+    void start();
+    void finish();
+  };
+  ConcurrencyState ConcurrencyCheckValue;
+
 public:
   class ConcurrencyCheck {
-    volatile ASTUnit &Self;
+    ASTUnit &Self;
     
   public:
     explicit ConcurrencyCheck(ASTUnit &Self)
       : Self(Self) 
     { 
-      assert(Self.ConcurrencyCheckValue == CheckUnlocked && 
-             "Concurrent access to ASTUnit!");
-      Self.ConcurrencyCheckValue = CheckLocked;
+      Self.ConcurrencyCheckValue.start();
     }
-    
     ~ConcurrencyCheck() {
-      Self.ConcurrencyCheckValue = CheckUnlocked;
+      Self.ConcurrencyCheckValue.finish();
     }
   };
   friend class ConcurrencyCheck;
@@ -390,8 +441,8 @@ public:
   bool isUnsafeToFree() const { return UnsafeToFree; }
   void setUnsafeToFree(bool Value) { UnsafeToFree = Value; }
 
-  const Diagnostic &getDiagnostics() const { return *Diagnostics; }
-  Diagnostic &getDiagnostics()             { return *Diagnostics; }
+  const DiagnosticsEngine &getDiagnostics() const { return *Diagnostics; }
+  DiagnosticsEngine &getDiagnostics()             { return *Diagnostics; }
   
   const SourceManager &getSourceManager() const { return *SourceMgr; }
         SourceManager &getSourceManager()       { return *SourceMgr; }
@@ -401,6 +452,9 @@ public:
 
   const ASTContext &getASTContext() const { return *Ctx; }
         ASTContext &getASTContext()       { return *Ctx; }
+
+  void setASTContext(ASTContext *ctx) { Ctx = ctx; }
+  void setPreprocessor(Preprocessor *pp);
 
   bool hasSema() const { return TheSema; }
   Sema &getSema() const { 
@@ -413,30 +467,23 @@ public:
 
   const FileSystemOptions &getFileSystemOpts() const { return FileSystemOpts; }
 
-  const std::string &getOriginalSourceFileName();
-  const std::string &getASTFileName();
+  StringRef getOriginalSourceFileName() {
+    return OriginalSourceFile;
+  }
+
+  ASTDeserializationListener *getDeserializationListener();
 
   /// \brief Add a temporary file that the ASTUnit depends on.
   ///
   /// This file will be erased when the ASTUnit is destroyed.
-  void addTemporaryFile(const llvm::sys::Path &TempFile) {
-    TemporaryFiles.push_back(TempFile);
-  }
+  void addTemporaryFile(const llvm::sys::Path &TempFile);
                         
   bool getOnlyLocalDecls() const { return OnlyLocalDecls; }
 
   bool getOwnsRemappedFileBuffers() const { return OwnsRemappedFileBuffers; }
   void setOwnsRemappedFileBuffers(bool val) { OwnsRemappedFileBuffers = val; }
 
-  /// \brief Retrieve the maximum PCH level of declarations that a
-  /// traversal of the translation unit should consider.
-  unsigned getMaxPCHLevel() const;
-
-  void setLastASTLocation(ASTLocation ALoc) { LastLoc = ALoc; }
-  ASTLocation getLastASTLocation() const { return LastLoc; }
-
-
-  llvm::StringRef getMainFileName() const;
+  StringRef getMainFileName() const;
 
   typedef std::vector<Decl *>::iterator top_level_iterator;
 
@@ -469,6 +516,15 @@ public:
     TopLevelDecls.push_back(D);
   }
 
+  /// \brief Add a new local file-level declaration.
+  void addFileLevelDecl(Decl *D);
+
+  /// \brief Get the decls that are contained in a file in the Offset/Length
+  /// range. \p Length can be 0 to indicate a point at \p Offset instead of
+  /// a range. 
+  void findFileRegionDecls(FileID File, unsigned Offset, unsigned Length,
+                           SmallVectorImpl<Decl *> &Decls);
+
   /// \brief Add a new top-level declaration, identified by its ID in
   /// the precompiled preamble.
   void addTopLevelDeclFromPreamble(serialization::DeclID D) {
@@ -479,36 +535,66 @@ public:
   ///
   /// Note: This is used internally by the top-level tracking action
   unsigned &getCurrentTopLevelHashValue() { return CurrentTopLevelHashValue; }
-  
-  typedef std::vector<PreprocessedEntity *>::iterator pp_entity_iterator;
-  
-  pp_entity_iterator pp_entity_begin();
-  pp_entity_iterator pp_entity_end();
-  
-  /// \brief Add a new preprocessed entity that's stored at the given offset
-  /// in the precompiled preamble.
-  void addPreprocessedEntityFromPreamble(uint64_t Offset) {
-    PreprocessedEntitiesInPreamble.push_back(Offset);
+
+  /// \brief Get the source location for the given file:line:col triplet.
+  ///
+  /// The difference with SourceManager::getLocation is that this method checks
+  /// whether the requested location points inside the precompiled preamble
+  /// in which case the returned source location will be a "loaded" one.
+  SourceLocation getLocation(const FileEntry *File,
+                             unsigned Line, unsigned Col) const;
+
+  /// \brief Get the source location for the given file:offset pair.
+  SourceLocation getLocation(const FileEntry *File, unsigned Offset) const;
+
+  /// \brief If \p Loc is a loaded location from the preamble, returns
+  /// the corresponding local location of the main file, otherwise it returns
+  /// \p Loc.
+  SourceLocation mapLocationFromPreamble(SourceLocation Loc);
+
+  /// \brief If \p Loc is a local location of the main file but inside the
+  /// preamble chunk, returns the corresponding loaded location from the
+  /// preamble, otherwise it returns \p Loc.
+  SourceLocation mapLocationToPreamble(SourceLocation Loc);
+
+  bool isInPreambleFileID(SourceLocation Loc);
+  bool isInMainFileID(SourceLocation Loc);
+  SourceLocation getStartOfMainFileID();
+  SourceLocation getEndOfPreambleFileID();
+
+  /// \see mapLocationFromPreamble.
+  SourceRange mapRangeFromPreamble(SourceRange R) {
+    return SourceRange(mapLocationFromPreamble(R.getBegin()),
+                       mapLocationFromPreamble(R.getEnd()));
   }
-  
-  /// \brief Retrieve the mapping from File IDs to the preprocessed entities
-  /// within that file.
-  PreprocessedEntitiesByFileMap &getPreprocessedEntitiesByFile() {
-    return PreprocessedEntitiesByFile;
+
+  /// \see mapLocationToPreamble.
+  SourceRange mapRangeToPreamble(SourceRange R) {
+    return SourceRange(mapLocationToPreamble(R.getBegin()),
+                       mapLocationToPreamble(R.getEnd()));
   }
   
   // Retrieve the diagnostics associated with this AST
-  typedef const StoredDiagnostic *stored_diag_iterator;
-  stored_diag_iterator stored_diag_begin() const { 
+  typedef StoredDiagnostic *stored_diag_iterator;
+  typedef const StoredDiagnostic *stored_diag_const_iterator;
+  stored_diag_const_iterator stored_diag_begin() const { 
     return StoredDiagnostics.begin(); 
   }
-  stored_diag_iterator stored_diag_end() const { 
+  stored_diag_iterator stored_diag_begin() { 
+    return StoredDiagnostics.begin(); 
+  }
+  stored_diag_const_iterator stored_diag_end() const { 
+    return StoredDiagnostics.end(); 
+  }
+  stored_diag_iterator stored_diag_end() { 
     return StoredDiagnostics.end(); 
   }
   unsigned stored_diag_size() const { return StoredDiagnostics.size(); }
-  
-  llvm::SmallVector<StoredDiagnostic, 4> &getStoredDiagnostics() { 
-    return StoredDiagnostics; 
+
+  stored_diag_iterator stored_diag_afterDriver_begin() {
+    if (NumStoredDiagnosticsFromDriver > StoredDiagnostics.size())
+      NumStoredDiagnosticsFromDriver = 0;
+    return StoredDiagnostics.begin() + NumStoredDiagnosticsFromDriver; 
   }
 
   typedef std::vector<CachedCodeCompletionResult>::iterator
@@ -526,14 +612,34 @@ public:
     return CachedCompletionResults.size(); 
   }
 
-  llvm::MemoryBuffer *getBufferForFile(llvm::StringRef Filename,
+  /// \brief Returns an iterator range for the local preprocessing entities
+  /// of the local Preprocessor, if this is a parsed source file, or the loaded
+  /// preprocessing entities of the primary module if this is an AST file.
+  std::pair<PreprocessingRecord::iterator, PreprocessingRecord::iterator>
+    getLocalPreprocessingEntities() const;
+
+  /// \brief Type for a function iterating over a number of declarations.
+  /// \returns true to continue iteration and false to abort.
+  typedef bool (*DeclVisitorFn)(void *context, const Decl *D);
+
+  /// \brief Iterate over local declarations (locally parsed if this is a parsed
+  /// source file or the loaded declarations of the primary module if this is an
+  /// AST file).
+  /// \returns true if the iteration was complete or false if it was aborted.
+  bool visitLocalTopLevelDecls(void *context, DeclVisitorFn Fn);
+
+  /// \brief Get the PCH file if one was included.
+  const FileEntry *getPCHFile();
+
+  /// \brief Returns true if the ASTUnit was constructed from a serialized
+  /// module file.
+  bool isModuleFile();
+
+  llvm::MemoryBuffer *getBufferForFile(StringRef Filename,
                                        std::string *ErrorStr = 0);
 
-  /// \brief Whether this AST represents a complete translation unit.
-  ///
-  /// If false, this AST is only a partial translation unit, e.g., one
-  /// that might still be used as a precompiled header or preamble.
-  bool isCompleteTranslationUnit() const { return CompleteTranslationUnit; }
+  /// \brief Determine what kind of translation unit this AST represents.
+  TranslationUnitKind getTranslationUnitKind() const { return TUKind; }
 
   typedef llvm::PointerUnion<const char *, const llvm::MemoryBuffer *>
       FilenameOrMemBuf;
@@ -543,7 +649,9 @@ public:
 
   /// \brief Create a ASTUnit. Gets ownership of the passed CompilerInvocation. 
   static ASTUnit *create(CompilerInvocation *CI,
-                         llvm::IntrusiveRefCntPtr<Diagnostic> Diags);
+                         IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+                         bool CaptureDiagnostics,
+                         bool UserFilesAreVolatile);
 
   /// \brief Create a ASTUnit from an AST file.
   ///
@@ -554,12 +662,14 @@ public:
   ///
   /// \returns - The initialized ASTUnit or null if the AST failed to load.
   static ASTUnit *LoadFromASTFile(const std::string &Filename,
-                                  llvm::IntrusiveRefCntPtr<Diagnostic> Diags,
+                              IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
                                   const FileSystemOptions &FileSystemOpts,
                                   bool OnlyLocalDecls = false,
                                   RemappedFile *RemappedFiles = 0,
                                   unsigned NumRemappedFiles = 0,
-                                  bool CaptureDiagnostics = false);
+                                  bool CaptureDiagnostics = false,
+                                  bool AllowPCHWithCompilerErrors = false,
+                                  bool UserFilesAreVolatile = false);
 
 private:
   /// \brief Helper function for \c LoadFromCompilerInvocation() and
@@ -574,6 +684,45 @@ private:
   
 public:
   
+  /// \brief Create an ASTUnit from a source file, via a CompilerInvocation
+  /// object, by invoking the optionally provided ASTFrontendAction. 
+  ///
+  /// \param CI - The compiler invocation to use; it must have exactly one input
+  /// source file. The ASTUnit takes ownership of the CompilerInvocation object.
+  ///
+  /// \param Diags - The diagnostics engine to use for reporting errors; its
+  /// lifetime is expected to extend past that of the returned ASTUnit.
+  ///
+  /// \param Action - The ASTFrontendAction to invoke. Its ownership is not
+  /// transfered.
+  ///
+  /// \param Unit - optionally an already created ASTUnit. Its ownership is not
+  /// transfered.
+  ///
+  /// \param Persistent - if true the returned ASTUnit will be complete.
+  /// false means the caller is only interested in getting info through the
+  /// provided \see Action.
+  ///
+  /// \param ErrAST - If non-null and parsing failed without any AST to return
+  /// (e.g. because the PCH could not be loaded), this accepts the ASTUnit
+  /// mainly to allow the caller to see the diagnostics.
+  /// This will only receive an ASTUnit if a new one was created. If an already
+  /// created ASTUnit was passed in \p Unit then the caller can check that.
+  ///
+  static ASTUnit *LoadFromCompilerInvocationAction(CompilerInvocation *CI,
+                              IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+                                             ASTFrontendAction *Action = 0,
+                                             ASTUnit *Unit = 0,
+                                             bool Persistent = true,
+                                      StringRef ResourceFilesPath = StringRef(),
+                                             bool OnlyLocalDecls = false,
+                                             bool CaptureDiagnostics = false,
+                                             bool PrecompilePreamble = false,
+                                       bool CacheCodeCompletionResults = false,
+                              bool IncludeBriefCommentsInCodeCompletion = false,
+                                       bool UserFilesAreVolatile = false,
+                                       OwningPtr<ASTUnit> *ErrAST = 0);
+
   /// LoadFromCompilerInvocation - Create an ASTUnit from a source file, via a
   /// CompilerInvocation object.
   ///
@@ -586,12 +735,14 @@ public:
   // FIXME: Move OnlyLocalDecls, UseBumpAllocator to setters on the ASTUnit, we
   // shouldn't need to specify them at construction time.
   static ASTUnit *LoadFromCompilerInvocation(CompilerInvocation *CI,
-                                     llvm::IntrusiveRefCntPtr<Diagnostic> Diags,
+                              IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
                                              bool OnlyLocalDecls = false,
                                              bool CaptureDiagnostics = false,
                                              bool PrecompilePreamble = false,
-                                          bool CompleteTranslationUnit = true,
-                                       bool CacheCodeCompletionResults = false);
+                                      TranslationUnitKind TUKind = TU_Complete,
+                                       bool CacheCodeCompletionResults = false,
+                            bool IncludeBriefCommentsInCodeCompletion = false,
+                                             bool UserFilesAreVolatile = false);
 
   /// LoadFromCommandLine - Create an ASTUnit from a vector of command line
   /// arguments, which must specify exactly one source file.
@@ -604,23 +755,31 @@ public:
   /// lifetime is expected to extend past that of the returned ASTUnit.
   ///
   /// \param ResourceFilesPath - The path to the compiler resource files.
-  //
+  ///
+  /// \param ErrAST - If non-null and parsing failed without any AST to return
+  /// (e.g. because the PCH could not be loaded), this accepts the ASTUnit
+  /// mainly to allow the caller to see the diagnostics.
+  ///
   // FIXME: Move OnlyLocalDecls, UseBumpAllocator to setters on the ASTUnit, we
   // shouldn't need to specify them at construction time.
   static ASTUnit *LoadFromCommandLine(const char **ArgBegin,
                                       const char **ArgEnd,
-                                    llvm::IntrusiveRefCntPtr<Diagnostic> Diags,
-                                      llvm::StringRef ResourceFilesPath,
+                              IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+                                      StringRef ResourceFilesPath,
                                       bool OnlyLocalDecls = false,
                                       bool CaptureDiagnostics = false,
                                       RemappedFile *RemappedFiles = 0,
                                       unsigned NumRemappedFiles = 0,
                                       bool RemappedFilesKeepOriginalName = true,
                                       bool PrecompilePreamble = false,
-                                      bool CompleteTranslationUnit = true,
+                                      TranslationUnitKind TUKind = TU_Complete,
                                       bool CacheCodeCompletionResults = false,
-                                      bool CXXPrecompilePreamble = false,
-                                      bool CXXChainedPCH = false);
+                            bool IncludeBriefCommentsInCodeCompletion = false,
+                                      bool AllowPCHWithCompilerErrors = false,
+                                      bool SkipFunctionBodies = false,
+                                      bool UserFilesAreVolatile = false,
+                                      bool ForSerialization = false,
+                                      OwningPtr<ASTUnit> *ErrAST = 0);
   
   /// \brief Reparse the source files using the same command-line options that
   /// were originally used to produce this translation unit.
@@ -645,26 +804,44 @@ public:
   /// \param IncludeCodePatterns Whether to include code patterns (such as a 
   /// for loop) in the code-completion results.
   ///
+  /// \param IncludeBriefComments Whether to include brief documentation within
+  /// the set of code completions returned.
+  ///
   /// FIXME: The Diag, LangOpts, SourceMgr, FileMgr, StoredDiagnostics, and
   /// OwnedBuffers parameters are all disgusting hacks. They will go away.
-  void CodeComplete(llvm::StringRef File, unsigned Line, unsigned Column,
+  void CodeComplete(StringRef File, unsigned Line, unsigned Column,
                     RemappedFile *RemappedFiles, unsigned NumRemappedFiles,
                     bool IncludeMacros, bool IncludeCodePatterns,
+                    bool IncludeBriefComments,
                     CodeCompleteConsumer &Consumer,
-                    Diagnostic &Diag, LangOptions &LangOpts,
+                    DiagnosticsEngine &Diag, LangOptions &LangOpts,
                     SourceManager &SourceMgr, FileManager &FileMgr,
-                    llvm::SmallVectorImpl<StoredDiagnostic> &StoredDiagnostics,
-              llvm::SmallVectorImpl<const llvm::MemoryBuffer *> &OwnedBuffers);
+                    SmallVectorImpl<StoredDiagnostic> &StoredDiagnostics,
+              SmallVectorImpl<const llvm::MemoryBuffer *> &OwnedBuffers);
 
   /// \brief Save this translation unit to a file with the given name.
   ///
-  /// \returns True if an error occurred, false otherwise.
-  bool Save(llvm::StringRef File);
+  /// \returns true if there was a file error or false if the save was
+  /// successful.
+  bool Save(StringRef File);
 
   /// \brief Serialize this translation unit with the given output stream.
   ///
   /// \returns True if an error occurred, false otherwise.
-  bool serialize(llvm::raw_ostream &OS);
+  bool serialize(raw_ostream &OS);
+  
+  virtual ModuleLoadResult loadModule(SourceLocation ImportLoc,
+                                      ModuleIdPath Path,
+                                      Module::NameVisibilityKind Visibility,
+                                      bool IsInclusionDirective) {
+    // ASTUnit doesn't know how to load modules (not that this matters).
+    return ModuleLoadResult();
+  }
+
+  virtual void makeModuleVisible(Module *Mod,
+                                 Module::NameVisibilityKind Visibility,
+                                 SourceLocation ImportLoc) { }
+
 };
 
 } // namespace clang

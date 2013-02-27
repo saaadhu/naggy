@@ -31,9 +31,12 @@ enum CastKind {
   /// to be reinterpreted as a bit pattern of another type.  Generally
   /// the operands must have equivalent size and unrelated types.
   ///
-  /// The pointer conversion char* -> int* is a bitcast.  Many other
-  /// pointer conversions which are "physically" bitcasts are given
-  /// special cast kinds.
+  /// The pointer conversion char* -> int* is a bitcast.  A conversion
+  /// from any pointer type to a C pointer type is a bitcast unless
+  /// it's actually BaseToDerived or DerivedToBase.  A conversion to a
+  /// block pointer or ObjC pointer type is a bitcast only if the
+  /// operand has the same type kind; otherwise, it's one of the
+  /// specialized casts below.
   ///
   /// Vector coercions are bitcasts.
   CK_BitCast,
@@ -49,13 +52,6 @@ enum CastKind {
   /// conversion is always unqualified.
   CK_LValueToRValue,
 
-  /// CK_GetObjCProperty - A conversion which calls an Objective-C
-  /// property getter.  The operand is an OK_ObjCProperty l-value; the
-  /// result will generally be an r-value, but could be an ordinary
-  /// gl-value if the property reference is to an implicit property
-  /// for a method that returns a reference type.
-  CK_GetObjCProperty,
-    
   /// CK_NoOp - A conversion which does not affect the type other than
   /// (possibly) adding qualifiers.
   ///   int    -> int
@@ -120,6 +116,15 @@ enum CastKind {
   /// CK_MemberPointerToBoolean - Member pointer to boolean.  A check
   /// against the null member pointer.
   CK_MemberPointerToBoolean,
+
+  /// CK_ReinterpretMemberPointer - Reinterpret a member pointer as a
+  /// different kind of member pointer.  C++ forbids this from
+  /// crossing between function and object types, but otherwise does
+  /// not restrict it.  However, the only operation that is permitted
+  /// on a "punned" member pointer is casting it back to the original
+  /// type, which is required to be a lossless operation (although
+  /// many ABIs do not guarantee this on all possible intermediate types).
+  CK_ReinterpretMemberPointer,
 
   /// CK_UserDefinedConversion - Conversion using a user defined type
   /// conversion function.
@@ -186,12 +191,16 @@ enum CastKind {
   ///    (float) ld
   CK_FloatingCast,
     
-  /// CK_AnyPointerToObjCPointerCast - Casting any other pointer kind
-  /// to an Objective-C pointer.
-  CK_AnyPointerToObjCPointerCast,
+  /// CK_CPointerToObjCPointerCast - Casting a C pointer kind to an
+  /// Objective-C pointer.
+  CK_CPointerToObjCPointerCast,
 
-  /// CK_AnyPointerToBlockPointerCast - Casting any other pointer kind
-  /// to a block pointer.
+  /// CK_BlockPointerToObjCPointerCast - Casting a block pointer to an
+  /// ObjC pointer.
+  CK_BlockPointerToObjCPointerCast,
+
+  /// CK_AnyPointerToBlockPointerCast - Casting any non-block pointer
+  /// to a block pointer.  Block-to-block casts are bitcasts.
   CK_AnyPointerToBlockPointerCast,
 
   /// \brief Converting between two Objective-C object types, which
@@ -245,10 +254,51 @@ enum CastKind {
 
   /// \brief Converts from an integral complex to a floating complex.
   ///   _Complex unsigned -> _Complex float
-  CK_IntegralComplexToFloatingComplex
+  CK_IntegralComplexToFloatingComplex,
+
+  /// \brief [ARC] Produces a retainable object pointer so that it may
+  /// be consumed, e.g. by being passed to a consuming parameter.
+  /// Calls objc_retain.
+  CK_ARCProduceObject,
+
+  /// \brief [ARC] Consumes a retainable object pointer that has just
+  /// been produced, e.g. as the return value of a retaining call.
+  /// Enters a cleanup to call objc_release at some indefinite time.
+  CK_ARCConsumeObject,
+
+  /// \brief [ARC] Reclaim a retainable object pointer object that may
+  /// have been produced and autoreleased as part of a function return
+  /// sequence.
+  CK_ARCReclaimReturnedObject,
+
+  /// \brief [ARC] Causes a value of block type to be copied to the
+  /// heap, if it is not already there.  A number of other operations
+  /// in ARC cause blocks to be copied; this is for cases where that
+  /// would not otherwise be guaranteed, such as when casting to a
+  /// non-block pointer type.
+  CK_ARCExtendBlockObject,
+
+  /// \brief Converts from _Atomic(T) to T.
+  CK_AtomicToNonAtomic,
+  /// \brief Converts from T to _Atomic(T).
+  CK_NonAtomicToAtomic,
+  
+  /// \brief Causes a block literal to by copied to the heap and then 
+  /// autoreleased.
+  ///
+  /// This particular cast kind is used for the conversion from a C++11
+  /// lambda expression to a block pointer.
+  CK_CopyAndAutoreleaseBlockObject,
+
+  // Convert a builtin function to a function pointer; only allowed in the
+  // callee of a call expression.
+  CK_BuiltinFnToFnPtr,
+
+  // Convert a zero value for OpenCL event_t initialization.
+  CK_ZeroToOCLEvent
 };
 
-#define CK_Invalid ((CastKind) -1)
+static const CastKind CK_Invalid = static_cast<CastKind>(-1);
 
 enum BinaryOperatorKind {
   // Operators listed in order of precedence.
@@ -282,6 +332,19 @@ enum UnaryOperatorKind {
   UO_Not, UO_LNot,        // [C99 6.5.3.3] Unary arithmetic
   UO_Real, UO_Imag,       // "__real expr"/"__imag expr" Extension.
   UO_Extension            // __extension__ marker.
+};
+
+/// \brief The kind of bridging performed by the Objective-C bridge cast.
+enum ObjCBridgeCastKind {
+  /// \brief Bridging via __bridge, which does nothing but reinterpret
+  /// the bits.
+  OBC_Bridge,
+  /// \brief Bridging via __bridge_transfer, which transfers ownership of an
+  /// Objective-C pointer into ARC.
+  OBC_BridgeTransfer,
+  /// \brief Bridging via __bridge_retain, which makes an ARC object available
+  /// as a +1 C pointer.
+  OBC_BridgeRetained
 };
 
 }

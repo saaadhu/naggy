@@ -13,15 +13,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_REGION_PASS_H
-#define LLVM_REGION_PASS_H
+#ifndef LLVM_ANALYSIS_REGIONPASS_H
+#define LLVM_ANALYSIS_REGIONPASS_H
 
 #include "llvm/Analysis/RegionInfo.h"
-
+#include "llvm/IR/Function.h"
 #include "llvm/Pass.h"
 #include "llvm/PassManagers.h"
-#include "llvm/Function.h"
-
 #include <deque>
 
 namespace llvm {
@@ -59,6 +57,9 @@ public:
   /// @return The pass to print the LLVM IR in the region.
   Pass *createPrinterPass(raw_ostream &O, const std::string &Banner) const;
 
+  using llvm::Pass::doInitialization;
+  using llvm::Pass::doFinalization;
+
   virtual bool doInitialization(Region *R, RGPassManager &RGM) { return false; }
   virtual bool doFinalization() { return false; }
   //@}
@@ -88,7 +89,7 @@ class RGPassManager : public FunctionPass, public PMDataManager {
 
 public:
   static char ID;
-  explicit RGPassManager(int Depth);
+  explicit RGPassManager();
 
   /// @brief Execute all of the passes scheduled for execution.
   ///
@@ -109,7 +110,7 @@ public:
   /// @brief Print passes managed by this manager.
   void dumpPassStructure(unsigned Offset);
 
-  /// @brief Print passes contained by this manager.
+  /// @brief Get passes contained by this manager.
   Pass *getContainedPass(unsigned N) {
     assert(N < PassVector.size() && "Pass number out of range!");
     Pass *FP = static_cast<Pass *>(PassVector[N]);

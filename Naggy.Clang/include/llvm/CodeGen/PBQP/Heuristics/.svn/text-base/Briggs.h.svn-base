@@ -18,9 +18,8 @@
 #ifndef LLVM_CODEGEN_PBQP_HEURISTICS_BRIGGS_H
 #define LLVM_CODEGEN_PBQP_HEURISTICS_BRIGGS_H
 
-#include "../HeuristicSolver.h"
 #include "../HeuristicBase.h"
-
+#include "../HeuristicSolver.h"
 #include <limits>
 
 namespace PBQP {
@@ -418,6 +417,12 @@ namespace PBQP {
         unsigned numRegs = getGraph().getNodeCosts(nItr).getLength() - 1;
 
         nd.numDenied = 0;
+        const Vector& nCosts = getGraph().getNodeCosts(nItr);
+        for (unsigned i = 1; i < nCosts.getLength(); ++i) {
+          if (nCosts[i] == std::numeric_limits<PBQPNum>::infinity())
+            ++nd.numDenied;
+        }
+
         nd.numSafe = numRegs;
         nd.unsafeDegrees.resize(numRegs, 0);
 

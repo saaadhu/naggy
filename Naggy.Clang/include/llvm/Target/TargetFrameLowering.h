@@ -15,15 +15,12 @@
 #define LLVM_TARGET_TARGETFRAMELOWERING_H
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
-
 #include <utility>
 #include <vector>
 
 namespace llvm {
   class CalleeSavedInfo;
   class MachineFunction;
-  class MachineBasicBlock;
-  class MachineMove;
   class RegScavenger;
 
 /// Information about stack frame layout on the target.  It holds the direction
@@ -50,11 +47,12 @@ private:
   unsigned StackAlignment;
   unsigned TransientStackAlignment;
   int LocalAreaOffset;
+  bool StackRealignable;
 public:
   TargetFrameLowering(StackDirection D, unsigned StackAl, int LAO,
-                      unsigned TransAl = 1)
+                      unsigned TransAl = 1, bool StackReal = true)
     : StackDir(D), StackAlignment(StackAl), TransientStackAlignment(TransAl),
-      LocalAreaOffset(LAO) {}
+      LocalAreaOffset(LAO), StackRealignable(StackReal) {}
 
   virtual ~TargetFrameLowering();
 
@@ -77,6 +75,12 @@ public:
   ///
   unsigned getTransientStackAlignment() const {
     return TransientStackAlignment;
+  }
+
+  /// isStackRealignable - This method returns whether the stack can be
+  /// realigned.
+  bool isStackRealignable() const {
+    return StackRealignable;
   }
 
   /// getOffsetOfLocalArea - This method returns the offset of the local area
@@ -111,6 +115,10 @@ public:
   virtual void emitPrologue(MachineFunction &MF) const = 0;
   virtual void emitEpilogue(MachineFunction &MF,
                             MachineBasicBlock &MBB) const = 0;
+
+  /// Adjust the prologue to have the function use segmented stacks. This works
+  /// by adding a check even before the "normal" function prologue.
+  virtual void adjustForSegmentedStacks(MachineFunction &MF) const { }
 
   /// spillCalleeSavedRegisters - Issues instruction(s) to spill all callee
   /// saved registers and returns true if it isn't possible / profitable to do
@@ -158,11 +166,6 @@ public:
   virtual bool canSimplifyCallFramePseudos(const MachineFunction &MF) const {
     return hasReservedCallFrame(MF) || hasFP(MF);
   }
-
-  /// getInitialFrameState - Returns a list of machine moves that are assumed
-  /// on entry to all functions.  Note that LabelID is ignored (assumed to be
-  /// the beginning of the function.)
-  virtual void getInitialFrameState(std::vector<MachineMove> &Moves) const;
 
   /// getFrameIndexOffset - Returns the displacement from the frame register to
   /// the stack frame of the specified index.

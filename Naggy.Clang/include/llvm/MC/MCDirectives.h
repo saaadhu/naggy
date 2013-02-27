@@ -47,8 +47,17 @@ enum MCSymbolAttr {
 enum MCAssemblerFlag {
   MCAF_SyntaxUnified,         ///< .syntax (ARM/ELF)
   MCAF_SubsectionsViaSymbols, ///< .subsections_via_symbols (MachO)
-  MCAF_Code16,                ///< .code 16
-  MCAF_Code32                 ///< .code 32
+  MCAF_Code16,                ///< .code16 (X86) / .code 16 (ARM)
+  MCAF_Code32,                ///< .code32 (X86) / .code 32 (ARM)
+  MCAF_Code64                 ///< .code64 (X86)
+};
+
+enum MCDataRegionType {
+  MCDR_DataRegion,            ///< .data_region
+  MCDR_DataRegionJT8,         ///< .data_region jt8
+  MCDR_DataRegionJT16,        ///< .data_region jt16
+  MCDR_DataRegionJT32,        ///< .data_region jt32
+  MCDR_DataRegionEnd          ///< .end_data_region
 };
 
 } // end namespace llvm

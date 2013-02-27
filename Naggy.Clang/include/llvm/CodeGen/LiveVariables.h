@@ -29,16 +29,16 @@
 #ifndef LLVM_CODEGEN_LIVEVARIABLES_H
 #define LLVM_CODEGEN_LIVEVARIABLES_H
 
-#include "llvm/CodeGen/MachineBasicBlock.h"
-#include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/CodeGen/MachineInstr.h"
-#include "llvm/Target/TargetRegisterInfo.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IndexedMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SparseBitVector.h"
+#include "llvm/CodeGen/MachineBasicBlock.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/Target/TargetRegisterInfo.h"
 
 namespace llvm {
 
@@ -85,16 +85,10 @@ public:
     ///
     SparseBitVector<> AliveBlocks;
 
-    /// NumUses - Number of uses of this register across the entire function.
-    ///
-    unsigned NumUses;
-
     /// Kills - List of MachineInstruction's which are the last use of this
     /// virtual register (kill it) in their basic block.
     ///
     std::vector<MachineInstr*> Kills;
-
-    VarInfo() : NumUses(0) {}
 
     /// removeKill - Delete a kill corresponding to the specified
     /// machine instruction. Returns true if there was a kill
@@ -132,12 +126,6 @@ private:
   /// building live intervals.
   SparseBitVector<> PHIJoins;
 
-  /// ReservedRegisters - This vector keeps track of which registers
-  /// are reserved register which are not allocatable by the target machine.
-  /// We can not track liveness for values that are in this set.
-  ///
-  BitVector ReservedRegisters;
-
 private:   // Intermediate data structures
   MachineFunction *MF;
 
@@ -165,6 +153,9 @@ private:   // Intermediate data structures
   /// uses. Pay special attention to the sub-register uses which may come below
   /// the last use of the whole register.
   bool HandlePhysRegKill(unsigned Reg, MachineInstr *MI);
+
+  /// HandleRegMask - Call HandlePhysRegKill for all registers clobbered by Mask.
+  void HandleRegMask(const MachineOperand&);
 
   void HandlePhysRegUse(unsigned Reg, MachineInstr *MI);
   void HandlePhysRegDef(unsigned Reg, MachineInstr *MI,
@@ -231,6 +222,7 @@ public:
     }
 
     assert(Removed && "Register is not used by this instruction!");
+    (void)Removed;
     return true;
   }
 
@@ -265,6 +257,7 @@ public:
       }
     }
     assert(Removed && "Register is not defined by this instruction!");
+    (void)Removed;
     return true;
   }
   

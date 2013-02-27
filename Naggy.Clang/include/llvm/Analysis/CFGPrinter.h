@@ -15,10 +15,10 @@
 #ifndef LLVM_ANALYSIS_CFGPRINTER_H
 #define LLVM_ANALYSIS_CFGPRINTER_H
 
-#include "llvm/Constants.h"
-#include "llvm/Function.h"
-#include "llvm/Instructions.h"
 #include "llvm/Assembly/Writer.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Support/CFG.h"
 #include "llvm/Support/GraphWriter.h"
 
@@ -29,13 +29,13 @@ struct DOTGraphTraits<const Function*> : public DefaultDOTGraphTraits {
   DOTGraphTraits (bool isSimple=false) : DefaultDOTGraphTraits(isSimple) {}
 
   static std::string getGraphName(const Function *F) {
-    return "CFG for '" + F->getNameStr() + "' function";
+    return "CFG for '" + F->getName().str() + "' function";
   }
 
   static std::string getSimpleNodeLabel(const BasicBlock *Node,
-                                  const Function *Graph) {
+                                        const Function *) {
     if (!Node->getName().empty())
-      return Node->getNameStr(); 
+      return Node->getName().str();
 
     std::string Str;
     raw_string_ostream OS(Str);
@@ -45,7 +45,7 @@ struct DOTGraphTraits<const Function*> : public DefaultDOTGraphTraits {
   }
 
   static std::string getCompleteNodeLabel(const BasicBlock *Node, 
-                                          const Function *Graph) {
+                                          const Function *) {
     std::string Str;
     raw_string_ostream OS(Str);
 
@@ -95,7 +95,9 @@ struct DOTGraphTraits<const Function*> : public DefaultDOTGraphTraits {
       
       std::string Str;
       raw_string_ostream OS(Str);
-      OS << SI->getCaseValue(SuccNo)->getValue();
+      SwitchInst::ConstCaseIt Case =
+          SwitchInst::ConstCaseIt::fromSuccessorIndex(SI, SuccNo); 
+      OS << Case.getCaseValue()->getValue();
       return OS.str();
     }    
     return "";

@@ -7,11 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MC_MCASMPARSEREXTENSION_H
-#define LLVM_MC_MCASMPARSEREXTENSION_H
+#ifndef LLVM_MC_MCPARSER_MCASMPARSEREXTENSION_H
+#define LLVM_MC_MCPARSER_MCASMPARSEREXTENSION_H
 
-#include "llvm/MC/MCParser/MCAsmParser.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/MC/MCParser/MCAsmParser.h"
 #include "llvm/Support/SMLoc.h"
 
 namespace llvm {
@@ -21,8 +21,8 @@ class Twine;
 /// which is implemented by target and object file assembly parser
 /// implementations.
 class MCAsmParserExtension {
-  MCAsmParserExtension(const MCAsmParserExtension &);   // DO NOT IMPLEMENT
-  void operator=(const MCAsmParserExtension &);  // DO NOT IMPLEMENT
+  MCAsmParserExtension(const MCAsmParserExtension &) LLVM_DELETED_FUNCTION;
+  void operator=(const MCAsmParserExtension &) LLVM_DELETED_FUNCTION;
 
   MCAsmParser *Parser;
 
@@ -43,8 +43,8 @@ protected:
 public:
   virtual ~MCAsmParserExtension();
 
-  /// \brief Initialize the extension for parsing using the given \arg
-  /// Parser. The extension should use the AsmParser interfaces to register its
+  /// \brief Initialize the extension for parsing using the given \p Parser.
+  /// The extension should use the AsmParser interfaces to register its
   /// parsing routines.
   virtual void Initialize(MCAsmParser &Parser);
 
@@ -56,7 +56,7 @@ public:
   MCAsmParser &getParser() { return *Parser; }
   SourceMgr &getSourceManager() { return getParser().getSourceManager(); }
   MCStreamer &getStreamer() { return getParser().getStreamer(); }
-  void Warning(SMLoc L, const Twine &Msg) {
+  bool Warning(SMLoc L, const Twine &Msg) {
     return getParser().Warning(L, Msg);
   }
   bool Error(SMLoc L, const Twine &Msg) {

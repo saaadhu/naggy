@@ -15,6 +15,7 @@
 #define LLVM_SUPPORT_MEMORYBUFFER_H
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/DataTypes.h"
 
 namespace llvm {
@@ -36,8 +37,8 @@ class MemoryBuffer {
   const char *BufferStart; // Start of the buffer.
   const char *BufferEnd;   // End of the buffer.
 
-  MemoryBuffer(const MemoryBuffer &); // DO NOT IMPLEMENT
-  MemoryBuffer &operator=(const MemoryBuffer &); // DO NOT IMPLEMENT
+  MemoryBuffer(const MemoryBuffer &) LLVM_DELETED_FUNCTION;
+  MemoryBuffer &operator=(const MemoryBuffer &) LLVM_DELETED_FUNCTION;
 protected:
   MemoryBuffer() {}
   void init(const char *BufStart, const char *BufEnd,
@@ -75,13 +76,13 @@ public:
   /// return a MemoryBuffer.
   static error_code getOpenFile(int FD, const char *Filename,
                                 OwningPtr<MemoryBuffer> &result,
-                                size_t FileSize = -1,
-                                size_t MapSize = -1,
-                                off_t Offset = 0,
+                                uint64_t FileSize = -1,
+                                uint64_t MapSize = -1,
+                                int64_t Offset = 0,
                                 bool RequiresNullTerminator = true);
 
   /// getMemBuffer - Open the specified memory range as a MemoryBuffer.  Note
-  /// that InputData must be null terminated.
+  /// that InputData must be null terminated if RequiresNullTerminator is true.
   static MemoryBuffer *getMemBuffer(StringRef InputData,
                                     StringRef BufferName = "",
                                     bool RequiresNullTerminator = true);

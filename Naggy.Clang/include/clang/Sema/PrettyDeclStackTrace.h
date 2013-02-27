@@ -33,12 +33,13 @@ class PrettyDeclStackTraceEntry : public llvm::PrettyStackTraceEntry {
   Decl *TheDecl;
   SourceLocation Loc;
   const char *Message;
-  
+
 public:
-  PrettyDeclStackTraceEntry(Sema &S, Decl *D, SourceLocation Loc, const char *Msg)
+  PrettyDeclStackTraceEntry(Sema &S, Decl *D, SourceLocation Loc,
+                            const char *Msg)
     : S(S), TheDecl(D), Loc(Loc), Message(Msg) {}
 
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(raw_ostream &OS) const;
 };
 
 }

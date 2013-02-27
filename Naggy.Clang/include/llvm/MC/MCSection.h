@@ -16,10 +16,9 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/MC/SectionKind.h"
-#include "llvm/Support/Casting.h"
+#include "llvm/Support/Compiler.h"
 
 namespace llvm {
-  class MCContext;
   class MCAsmInfo;
   class raw_ostream;
 
@@ -35,8 +34,8 @@ namespace llvm {
     };
 
   private:
-    MCSection(const MCSection&);      // DO NOT IMPLEMENT
-    void operator=(const MCSection&); // DO NOT IMPLEMENT
+    MCSection(const MCSection&) LLVM_DELETED_FUNCTION;
+    void operator=(const MCSection&) LLVM_DELETED_FUNCTION;
   protected:
     MCSection(SectionVariant V, SectionKind K) : Variant(V), Kind(K) {}
     SectionVariant Variant;
@@ -50,6 +49,11 @@ namespace llvm {
 
     virtual void PrintSwitchToSection(const MCAsmInfo &MAI,
                                       raw_ostream &OS) const = 0;
+
+    // Convenience routines to get label names for the beginning/end of a
+    // section.
+    virtual std::string getLabelBeginName() const = 0;
+    virtual std::string getLabelEndName() const = 0;
 
     /// isBaseAddressKnownZero - Return true if we know that this section will
     /// get a base address of zero.  In cases where we know that this is true we
@@ -66,8 +70,6 @@ namespace llvm {
     /// isVirtualSection - Check whether this section is "virtual", that is
     /// has no actual object file contents.
     virtual bool isVirtualSection() const = 0;
-
-    static bool classof(const MCSection *) { return true; }
   };
 
 } // end namespace llvm

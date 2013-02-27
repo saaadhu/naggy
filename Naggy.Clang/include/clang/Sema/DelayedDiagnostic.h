@@ -21,7 +21,7 @@
 #ifndef LLVM_CLANG_SEMA_DELAYED_DIAGNOSTIC_H
 #define LLVM_CLANG_SEMA_DELAYED_DIAGNOSTIC_H
 
-#include "clang/AST/DeclCXX.h"
+#include "clang/Sema/Sema.h"
 
 namespace clang {
 namespace sema {
@@ -40,17 +40,17 @@ public:
 
   bool isMemberAccess() const { return IsMember; }
 
-  AccessedEntity(ASTContext &Context,
+  AccessedEntity(PartialDiagnostic::StorageAllocator &Allocator,
                  MemberNonce _,
                  CXXRecordDecl *NamingClass,
                  DeclAccessPair FoundDecl,
                  QualType BaseObjectType)
     : Access(FoundDecl.getAccess()), IsMember(true),
       Target(FoundDecl.getDecl()), NamingClass(NamingClass),
-      BaseObjectType(BaseObjectType), Diag(0, Context.getDiagAllocator()) {
+      BaseObjectType(BaseObjectType), Diag(0, Allocator) {
   }
 
-  AccessedEntity(ASTContext &Context,
+  AccessedEntity(PartialDiagnostic::StorageAllocator &Allocator,
                  BaseNonce _,
                  CXXRecordDecl *BaseClass,
                  CXXRecordDecl *DerivedClass,
@@ -58,7 +58,7 @@ public:
     : Access(Access), IsMember(false),
       Target(BaseClass),
       NamingClass(DerivedClass),
-      Diag(0, Context.getDiagAllocator()) {
+      Diag(0, Allocator) {
   }
 
   bool isQuiet() const { return Diag.getDiagID() == 0; }
@@ -112,7 +112,7 @@ private:
 /// the complete parsing of the current declaration.
 class DelayedDiagnostic {
 public:
-  enum DDKind { Deprecation, Access };
+  enum DDKind { Deprecation, Access, ForbiddenType };
 
   unsigned char Kind; // actually a DDKind
   bool Triggered;
@@ -122,8 +122,10 @@ public:
   void Destroy();
 
   static DelayedDiagnostic makeDeprecation(SourceLocation Loc,
-                                           const NamedDecl *D,
-                                           llvm::StringRef Msg);
+           const NamedDecl *D,
+           const ObjCInterfaceDecl *UnknownObjCClass,
+           const ObjCPropertyDecl  *ObjCProperty,
+           StringRef Msg);
 
   static DelayedDiagnostic makeAccess(SourceLocation Loc,
                                       const AccessedEntity &Entity) {
@@ -132,6 +134,20 @@ public:
     DD.Triggered = false;
     DD.Loc = Loc;
     new (&DD.getAccessData()) AccessedEntity(Entity);
+    return DD;
+  }
+
+  static DelayedDiagnostic makeForbiddenType(SourceLocation loc,
+                                             unsigned diagnostic,
+                                             QualType type,
+                                             unsigned argument) {
+    DelayedDiagnostic DD;
+    DD.Kind = ForbiddenType;
+    DD.Triggered = false;
+    DD.Loc = loc;
+    DD.ForbiddenTypeData.Diagnostic = diagnostic;
+    DD.ForbiddenTypeData.OperandType = type.getAsOpaquePtr();
+    DD.ForbiddenTypeData.Argument = argument;
     return DD;
   }
 
@@ -149,27 +165,116 @@ public:
     return DeprecationData.Decl;
   }
 
-  llvm::StringRef getDeprecationMessage() const {
+  StringRef getDeprecationMessage() const {
     assert(Kind == Deprecation && "Not a deprecation diagnostic.");
-    return llvm::StringRef(DeprecationData.Message,
+    return StringRef(DeprecationData.Message,
                            DeprecationData.MessageLen);
   }
 
+  /// The diagnostic ID to emit.  Used like so:
+  ///   Diag(diag.Loc, diag.getForbiddenTypeDiagnostic())
+  ///     << diag.getForbiddenTypeOperand()
+  ///     << diag.getForbiddenTypeArgument();
+  unsigned getForbiddenTypeDiagnostic() const {
+    assert(Kind == ForbiddenType && "not a forbidden-type diagnostic");
+    return ForbiddenTypeData.Diagnostic;
+  }
+
+  unsigned getForbiddenTypeArgument() const {
+    assert(Kind == ForbiddenType && "not a forbidden-type diagnostic");
+    return ForbiddenTypeData.Argument;
+  }
+
+  QualType getForbiddenTypeOperand() const {
+    assert(Kind == ForbiddenType && "not a forbidden-type diagnostic");
+    return QualType::getFromOpaquePtr(ForbiddenTypeData.OperandType);
+  }
+  
+  const ObjCInterfaceDecl *getUnknownObjCClass() const {
+    return DeprecationData.UnknownObjCClass;
+  }
+
+  const ObjCPropertyDecl *getObjCProperty() const {
+    return DeprecationData.ObjCProperty;
+  }
+  
 private:
   union {
     /// Deprecation.
     struct {
       const NamedDecl *Decl;
+      const ObjCInterfaceDecl *UnknownObjCClass;
+      const ObjCPropertyDecl  *ObjCProperty;
       const char *Message;
       size_t MessageLen;
     } DeprecationData;
+
+    struct {
+      unsigned Diagnostic;
+      unsigned Argument;
+      void *OperandType;
+    } ForbiddenTypeData;
 
     /// Access control.
     char AccessData[sizeof(AccessedEntity)];
   };
 };
 
+/// DelayedDiagnosticPool - A collection of diagnostics which were
+/// delayed.
+class DelayedDiagnosticPool {
+  const DelayedDiagnosticPool *Parent;
+  SmallVector<DelayedDiagnostic, 4> Diagnostics;
+
+  DelayedDiagnosticPool(const DelayedDiagnosticPool &) LLVM_DELETED_FUNCTION;
+  void operator=(const DelayedDiagnosticPool &) LLVM_DELETED_FUNCTION;
+public:
+  DelayedDiagnosticPool(const DelayedDiagnosticPool *parent) : Parent(parent) {}
+  ~DelayedDiagnosticPool() {
+    for (SmallVectorImpl<DelayedDiagnostic>::iterator
+           i = Diagnostics.begin(), e = Diagnostics.end(); i != e; ++i)
+      i->Destroy();
+  }
+
+  const DelayedDiagnosticPool *getParent() const { return Parent; }
+
+  /// Does this pool, or any of its ancestors, contain any diagnostics?
+  bool empty() const {
+    return (Diagnostics.empty() && (Parent == NULL || Parent->empty()));
+  }
+
+  /// Add a diagnostic to this pool.
+  void add(const DelayedDiagnostic &diag) {
+    Diagnostics.push_back(diag);
+  }
+
+  /// Steal the diagnostics from the given pool.
+  void steal(DelayedDiagnosticPool &pool) {
+    if (pool.Diagnostics.empty()) return;
+
+    if (Diagnostics.empty()) {
+      Diagnostics = llvm_move(pool.Diagnostics);
+    } else {
+      Diagnostics.append(pool.pool_begin(), pool.pool_end());
+    }
+    pool.Diagnostics.clear();
+  }
+
+  typedef SmallVectorImpl<DelayedDiagnostic>::const_iterator pool_iterator;
+  pool_iterator pool_begin() const { return Diagnostics.begin(); }
+  pool_iterator pool_end() const { return Diagnostics.end(); }
+  bool pool_empty() const { return Diagnostics.empty(); }
+};
+
 }
+
+/// Add a diagnostic to the current delay pool.
+inline void Sema::DelayedDiagnostics::add(const sema::DelayedDiagnostic &diag) {
+  assert(shouldDelayDiagnostics() && "trying to delay without pool");
+  CurPool->add(diag);
+}
+
+
 }
 
 #endif

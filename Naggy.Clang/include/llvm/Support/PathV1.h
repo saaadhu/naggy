@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SYSTEM_PATH_H
-#define LLVM_SYSTEM_PATH_H
+#ifndef LLVM_SUPPORT_PATHV1_H
+#define LLVM_SUPPORT_PATHV1_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
@@ -130,20 +130,6 @@ namespace sys {
       /// dependent library paths to locate the library.
       /// @brief Find a library.
       static Path FindLibrary(std::string& short_name);
-
-      /// Construct a path to the default LLVM configuration directory. The
-      /// implementation must ensure that this is a well-known (same on many
-      /// systems) directory in which llvm configuration files exist. For
-      /// example, on Unix, the /etc/llvm directory has been selected.
-      /// @brief Construct a path to the default LLVM configuration directory
-      static Path GetLLVMDefaultConfigDir();
-
-      /// Construct a path to the LLVM installed configuration directory. The
-      /// implementation must ensure that this refers to the "etc" directory of
-      /// the LLVM installation. This is the location where configuration files
-      /// will be located for a particular installation of LLVM on a machine.
-      /// @brief Construct a path to the LLVM installed configuration directory
-      static Path GetLLVMConfigDir();
 
       /// Construct a path to the current user's home directory. The
       /// implementation must use an operating system specific mechanism for
@@ -697,8 +683,8 @@ namespace sys {
       /// This function returns status information about the file. The type of
       /// path (file or directory) is updated to reflect the actual contents
       /// of the file system.
-      /// @returns 0 on failure, with Error explaining why (if non-zero)
-      /// @returns a pointer to a FileStatus structure on success.
+      /// @returns 0 on failure, with Error explaining why (if non-zero),
+      /// otherwise returns a pointer to a FileStatus structure on success.
       /// @brief Get file status.
       const FileStatus *getFileStatus(
         bool forceUpdate = false, ///< Force an update from the file system
@@ -733,6 +719,7 @@ namespace sys {
     Mach_O_DynamicLinker_FileType,     ///< The Mach-O dynamic linker
     Mach_O_Bundle_FileType,            ///< Mach-O Bundle file
     Mach_O_DynamicallyLinkedSharedLibStub_FileType, ///< Mach-O Shared lib stub
+    Mach_O_DSYMCompanion_FileType,     ///< Mach-O dSYM companion file
     COFF_FileType                      ///< COFF object file or lib
   };
 
