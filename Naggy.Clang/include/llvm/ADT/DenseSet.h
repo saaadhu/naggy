@@ -28,12 +28,14 @@ class DenseSet {
   MapTy TheMap;
 public:
   DenseSet(const DenseSet &Other) : TheMap(Other.TheMap) {}
-  explicit DenseSet(unsigned NumInitBuckets = 64) : TheMap(NumInitBuckets) {}
+  explicit DenseSet(unsigned NumInitBuckets = 0) : TheMap(NumInitBuckets) {}
 
   bool empty() const { return TheMap.empty(); }
   unsigned size() const { return TheMap.size(); }
+  size_t getMemorySize() const { return TheMap.getMemorySize(); }
 
-  /// Grow the denseset so that it has at least Size buckets. Does not shrink
+  /// Grow the DenseSet so that it has at least Size buckets. Will not shrink
+  /// the Size of the set.
   void resize(size_t Size) { TheMap.resize(Size); }
 
   void clear() {

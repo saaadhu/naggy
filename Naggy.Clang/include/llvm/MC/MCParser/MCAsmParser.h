@@ -7,37 +7,55 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MC_MCASMPARSER_H
-#define LLVM_MC_MCASMPARSER_H
+#ifndef LLVM_MC_MCPARSER_MCASMPARSER_H
+#define LLVM_MC_MCPARSER_MCASMPARSER_H
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/MC/MCParser/AsmLexer.h"
 #include "llvm/Support/DataTypes.h"
 
 namespace llvm {
-class AsmToken;
 class MCAsmInfo;
 class MCAsmLexer;
 class MCAsmParserExtension;
 class MCContext;
 class MCExpr;
+class MCInstPrinter;
+class MCInstrInfo;
 class MCStreamer;
+class MCTargetAsmParser;
 class SMLoc;
+class SMRange;
 class SourceMgr;
-class StringRef;
-class Target;
-class TargetAsmParser;
 class Twine;
+
+/// MCAsmParserSemaCallback - Generic Sema callback for assembly parser.
+class MCAsmParserSemaCallback {
+public:
+  virtual ~MCAsmParserSemaCallback(); 
+  virtual void *LookupInlineAsmIdentifier(StringRef Name, void *Loc,
+                                          unsigned &Length, unsigned &Size, 
+                                          unsigned &Type, bool &IsVarDecl) = 0;
+
+  virtual bool LookupInlineAsmField(StringRef Base, StringRef Member,
+                                    unsigned &Offset) = 0;
+};
+
 
 /// MCAsmParser - Generic assembler parser interface, for use by target specific
 /// assembly parsers.
 class MCAsmParser {
 public:
   typedef bool (*DirectiveHandler)(MCAsmParserExtension*, StringRef, SMLoc);
+  typedef std::pair<MCAsmParserExtension*, DirectiveHandler>
+    ExtensionDirectiveHandler;
 
 private:
-  MCAsmParser(const MCAsmParser &);   // DO NOT IMPLEMENT
-  void operator=(const MCAsmParser &);  // DO NOT IMPLEMENT
+  MCAsmParser(const MCAsmParser &) LLVM_DELETED_FUNCTION;
+  void operator=(const MCAsmParser &) LLVM_DELETED_FUNCTION;
 
-  TargetAsmParser *TargetParser;
+  MCTargetAsmParser *TargetParser;
 
   unsigned ShowParsedOperands : 1;
 
@@ -47,9 +65,8 @@ protected: // Can only create subclasses.
 public:
   virtual ~MCAsmParser();
 
-  virtual void AddDirectiveHandler(MCAsmParserExtension *Object,
-                                   StringRef Directive,
-                                   DirectiveHandler Handler) = 0;
+  virtual void AddDirectiveHandler(StringRef Directive,
+                                   ExtensionDirectiveHandler Handler) = 0;
 
   virtual SourceMgr &getSourceManager() = 0;
 
@@ -60,8 +77,11 @@ public:
   /// getStreamer - Return the output streamer for the assembler.
   virtual MCStreamer &getStreamer() = 0;
 
-  TargetAsmParser &getTargetParser() const { return *TargetParser; }
-  void setTargetParser(TargetAsmParser &P);
+  MCTargetAsmParser &getTargetParser() const { return *TargetParser; }
+  void setTargetParser(MCTargetAsmParser &P);
+
+  virtual unsigned getAssemblerDialect() { return 0;}
+  virtual void setAssemblerDialect(unsigned i) { }
 
   bool getShowParsedOperands() const { return ShowParsedOperands; }
   void setShowParsedOperands(bool Value) { ShowParsedOperands = Value; }
@@ -69,16 +89,31 @@ public:
   /// Run - Run the parser on the input source buffer.
   virtual bool Run(bool NoInitialTextSection, bool NoFinalize = false) = 0;
 
-  /// Warning - Emit a warning at the location \arg L, with the message \arg
-  /// Msg.
-  virtual void Warning(SMLoc L, const Twine &Msg) = 0;
+  virtual void setParsingInlineAsm(bool V) = 0;
+  virtual bool isParsingInlineAsm() = 0;
 
-  /// Error - Emit an error at the location \arg L, with the message \arg
-  /// Msg.
+  /// ParseMSInlineAsm - Parse ms-style inline assembly.
+  virtual bool ParseMSInlineAsm(void *AsmLoc, std::string &AsmString,
+                                unsigned &NumOutputs, unsigned &NumInputs,
+                                SmallVectorImpl<std::pair<void *, bool> > &OpDecls,
+                                SmallVectorImpl<std::string> &Constraints,
+                                SmallVectorImpl<std::string> &Clobbers,
+                                const MCInstrInfo *MII,
+                                const MCInstPrinter *IP,
+                                MCAsmParserSemaCallback &SI) = 0;
+
+  /// Warning - Emit a warning at the location \p L, with the message \p Msg.
+  ///
+  /// \return The return value is true, if warnings are fatal.
+  virtual bool Warning(SMLoc L, const Twine &Msg,
+                       ArrayRef<SMRange> Ranges = ArrayRef<SMRange>()) = 0;
+
+  /// Error - Emit an error at the location \p L, with the message \p Msg.
   ///
   /// \return The return value is always true, as an idiomatic convenience to
   /// clients.
-  virtual bool Error(SMLoc L, const Twine &Msg) = 0;
+  virtual bool Error(SMLoc L, const Twine &Msg,
+                     ArrayRef<SMRange> Ranges = ArrayRef<SMRange>()) = 0;
 
   /// Lex - Get the next AsmToken in the stream, possibly handling file
   /// inclusion first.
@@ -88,16 +123,21 @@ public:
   const AsmToken &getTok();
 
   /// \brief Report an error at the current lexer location.
-  bool TokError(const Twine &Msg);
+  bool TokError(const Twine &Msg,
+                ArrayRef<SMRange> Ranges = ArrayRef<SMRange>());
 
   /// ParseIdentifier - Parse an identifier or string (as a quoted identifier)
-  /// and set \arg Res to the identifier contents.
+  /// and set \p Res to the identifier contents.
   virtual bool ParseIdentifier(StringRef &Res) = 0;
 
   /// \brief Parse up to the end of statement and return the contents from the
   /// current token until the end of the statement; the current token on exit
   /// will be either the EndOfStatement or EOF.
   virtual StringRef ParseStringToEndOfStatement() = 0;
+
+  /// ParseEscapedString - Parse the current token as a string which may include
+  /// escaped characters and return the string contents.
+  virtual bool ParseEscapedString(std::string &Data) = 0;
 
   /// EatToEndOfStatement - Skip to the end of the current statement, for error
   /// recovery.
@@ -126,10 +166,14 @@ public:
   /// on error.
   /// @result - False on success.
   virtual bool ParseAbsoluteExpression(int64_t &Res) = 0;
+
+  /// CheckForValidSection - Ensure that we have a valid section set in the
+  /// streamer. Otherwise, report and error and switch to .text.
+  virtual void CheckForValidSection() = 0;
 };
 
 /// \brief Create an MCAsmParser instance.
-MCAsmParser *createMCAsmParser(const Target &, SourceMgr &, MCContext &,
+MCAsmParser *createMCAsmParser(SourceMgr &, MCContext &,
                                MCStreamer &, const MCAsmInfo &);
 
 } // End llvm namespace

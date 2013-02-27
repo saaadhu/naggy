@@ -10,11 +10,12 @@
 #ifndef LLVM_MC_MCCONTEXT_H
 #define LLVM_MC_MCCONTEXT_H
 
-#include "llvm/MC/SectionKind.h"
-#include "llvm/MC/MCDwarf.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/MC/MCDwarf.h"
+#include "llvm/MC/SectionKind.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <vector> // FIXME: Shouldn't be needed.
 
@@ -26,10 +27,12 @@ namespace llvm {
   class MCLabel;
   class MCDwarfFile;
   class MCDwarfLoc;
+  class MCObjectFileInfo;
+  class MCRegisterInfo;
   class MCLineSection;
+  class SMLoc;
   class StringRef;
   class Twine;
-  class TargetAsmInfo;
   class MCSectionMachO;
   class MCSectionELF;
 
@@ -37,13 +40,22 @@ namespace llvm {
   /// of the sections that it creates.
   ///
   class MCContext {
-    MCContext(const MCContext&); // DO NOT IMPLEMENT
-    MCContext &operator=(const MCContext&); // DO NOT IMPLEMENT
+    MCContext(const MCContext&) LLVM_DELETED_FUNCTION;
+    MCContext &operator=(const MCContext&) LLVM_DELETED_FUNCTION;
+  public:
+    typedef StringMap<MCSymbol*, BumpPtrAllocator&> SymbolTable;
+  private:
+    /// The SourceMgr for this object, if any.
+    const SourceMgr *SrcMgr;
 
     /// The MCAsmInfo for this target.
     const MCAsmInfo &MAI;
 
-    const TargetAsmInfo *TAI;
+    /// The MCRegisterInfo for this target.
+    const MCRegisterInfo &MRI;
+
+    /// The MCObjectFileInfo for this target.
+    const MCObjectFileInfo *MOFI;
 
     /// Allocator - Allocator object used for creating machine code objects.
     ///
@@ -52,7 +64,7 @@ namespace llvm {
     BumpPtrAllocator Allocator;
 
     /// Symbols - Bindings of names to symbols.
-    StringMap<MCSymbol*, BumpPtrAllocator&> Symbols;
+    SymbolTable Symbols;
 
     /// UsedNames - Keeps tracks of names that were used both for used declared
     /// and artificial symbols.
@@ -82,6 +94,12 @@ namespace llvm {
     /// .secure_log_reset appearing between them.
     bool SecureLogUsed;
 
+    /// The compilation directory to use for DW_AT_comp_dir.
+    std::string CompilationDir;
+
+    /// The main file name if passed in explicitly.
+    std::string MainFileName;
+
     /// The dwarf file and directory tables from the dwarf .file directive.
     std::vector<MCDwarfFile *> MCDwarfFiles;
     std::vector<StringRef> MCDwarfDirs;
@@ -89,6 +107,31 @@ namespace llvm {
     /// The current dwarf line information from the last dwarf .loc directive.
     MCDwarfLoc CurrentDwarfLoc;
     bool DwarfLocSeen;
+
+    /// Generate dwarf debugging info for assembly source files.
+    bool GenDwarfForAssembly;
+
+    /// The current dwarf file number when generate dwarf debugging info for
+    /// assembly source files.
+    unsigned GenDwarfFileNumber;
+
+    /// The default initial text section that we generate dwarf debugging line
+    /// info for when generating dwarf assembly source files.
+    const MCSection *GenDwarfSection;
+    /// Symbols created for the start and end of this section.
+    MCSymbol *GenDwarfSectionStartSym, *GenDwarfSectionEndSym;
+
+    /// The information gathered from labels that will have dwarf label
+    /// entries when generating dwarf assembly source files.
+    std::vector<const MCGenDwarfLabelEntry *> MCGenDwarfLabelEntries;
+
+    /// The string to embed in the debug information for the compile unit, if
+    /// non-empty.
+    StringRef DwarfDebugFlags;
+
+    /// The string to embed in as the dwarf AT_producer for the compile unit, if
+    /// non-empty.
+    StringRef DwarfDebugProducer;
 
     /// Honor temporary labels, this is useful for debugging semantic
     /// differences between temporary and non-temporary labels (primarily on
@@ -101,20 +144,42 @@ namespace llvm {
     /// We need a deterministic iteration order, so we remember the order
     /// the elements were added.
     std::vector<const MCSection *> MCLineSectionOrder;
+    /// The Compile Unit ID that we are currently processing.
+    unsigned DwarfCompileUnitID;
+    /// The line table start symbol for each Compile Unit.
+    DenseMap<unsigned, MCSymbol *> MCLineTableSymbols;
 
     void *MachOUniquingMap, *ELFUniquingMap, *COFFUniquingMap;
+
+    /// Do automatic reset in destructor
+    bool AutoReset;
 
     MCSymbol *CreateSymbol(StringRef Name);
 
   public:
-    explicit MCContext(const MCAsmInfo &MAI, const TargetAsmInfo *TAI);
+    explicit MCContext(const MCAsmInfo &MAI, const MCRegisterInfo &MRI,
+                       const MCObjectFileInfo *MOFI, const SourceMgr *Mgr = 0,
+                       bool DoAutoReset = true);
     ~MCContext();
+
+    const SourceMgr *getSourceManager() const { return SrcMgr; }
 
     const MCAsmInfo &getAsmInfo() const { return MAI; }
 
-    const TargetAsmInfo &getTargetAsmInfo() const { return *TAI; }
+    const MCRegisterInfo &getRegisterInfo() const { return MRI; }
+
+    const MCObjectFileInfo *getObjectFileInfo() const { return MOFI; }
 
     void setAllowTemporaryLabels(bool Value) { AllowTemporaryLabels = Value; }
+
+    /// @name Module Lifetime Management
+    /// @{
+
+    /// reset - return object to right after construction state to prepare
+    /// to process a new module
+    void reset();
+
+    /// @}
 
     /// @name Symbol Management
     /// @{
@@ -122,6 +187,10 @@ namespace llvm {
     /// CreateTempSymbol - Create and return a new assembler temporary symbol
     /// with a unique but unspecified name.
     MCSymbol *CreateTempSymbol();
+
+    /// getUniqueSymbolID() - Return a unique identifier for use in constructing
+    /// symbol names.
+    unsigned getUniqueSymbolID() { return NextUniqueID++; }
 
     /// CreateDirectionalLocalSymbol - Create the definition of a directional
     /// local symbol for numbered label (used for "1:" definitions).
@@ -141,6 +210,15 @@ namespace llvm {
 
     /// LookupSymbol - Get the symbol for \p Name, or null.
     MCSymbol *LookupSymbol(StringRef Name) const;
+    MCSymbol *LookupSymbol(const Twine &Name) const;
+
+    /// getSymbols - Get a reference for the symbol table for clients that
+    /// want to, for example, iterate over all symbols. 'const' because we
+    /// still want any modifications to the table itself to use the MCContext
+    /// APIs.
+    const SymbolTable &getSymbols() const {
+      return Symbols;
+    }
 
     /// @}
 
@@ -184,8 +262,27 @@ namespace llvm {
     /// @name Dwarf Management
     /// @{
 
+    /// \brief Get the compilation directory for DW_AT_comp_dir
+    /// This can be overridden by clients which want to control the reported
+    /// compilation directory and have it be something other than the current
+    /// working directory.
+    const std::string &getCompilationDir() const { return CompilationDir; }
+
+    /// \brief Set the compilation directory for DW_AT_comp_dir
+    /// Override the default (CWD) compilation directory.
+    void setCompilationDir(StringRef S) { CompilationDir = S.str(); }
+
+    /// \brief Get the main file name for use in error messages and debug
+    /// info. This can be set to ensure we've got the correct file name
+    /// after preprocessing or for -save-temps.
+    const std::string &getMainFileName() const { return MainFileName; }
+
+    /// \brief Set the main file name and override the default.
+    void setMainFileName(StringRef S) { MainFileName = S.str(); }
+
     /// GetDwarfFile - creates an entry in the dwarf file and directory tables.
-    unsigned GetDwarfFile(StringRef FileName, unsigned FileNumber);
+    unsigned GetDwarfFile(StringRef Directory, StringRef FileName,
+                          unsigned FileNumber);
 
     bool isValidDwarfFileNumber(unsigned FileNumber);
 
@@ -211,6 +308,25 @@ namespace llvm {
       MCLineSections[Sec] = Line;
       MCLineSectionOrder.push_back(Sec);
     }
+    unsigned getDwarfCompileUnitID() {
+      return DwarfCompileUnitID;
+    }
+    void setDwarfCompileUnitID(unsigned CUIndex) {
+      DwarfCompileUnitID = CUIndex;
+    }
+    const DenseMap<unsigned, MCSymbol *> &getMCLineTableSymbols() const {
+      return MCLineTableSymbols;
+    }
+    MCSymbol *getMCLineTableSymbol(unsigned ID) const {
+      DenseMap<unsigned, MCSymbol *>::const_iterator CIter =
+        MCLineTableSymbols.find(ID);
+      if (CIter == MCLineTableSymbols.end())
+        return NULL;
+      return CIter->second;
+    }
+    void setMCLineTableSymbol(MCSymbol *Sym, unsigned ID) {
+      MCLineTableSymbols[ID] = Sym;
+    }
 
     /// setCurrentDwarfLoc - saves the information from the currently parsed
     /// dwarf .loc directive and sets DwarfLocSeen.  When the next instruction
@@ -232,6 +348,34 @@ namespace llvm {
     bool getDwarfLocSeen() { return DwarfLocSeen; }
     const MCDwarfLoc &getCurrentDwarfLoc() { return CurrentDwarfLoc; }
 
+    bool getGenDwarfForAssembly() { return GenDwarfForAssembly; }
+    void setGenDwarfForAssembly(bool Value) { GenDwarfForAssembly = Value; }
+    unsigned getGenDwarfFileNumber() { return GenDwarfFileNumber; }
+    unsigned nextGenDwarfFileNumber() { return ++GenDwarfFileNumber; }
+    const MCSection *getGenDwarfSection() { return GenDwarfSection; }
+    void setGenDwarfSection(const MCSection *Sec) { GenDwarfSection = Sec; }
+    MCSymbol *getGenDwarfSectionStartSym() { return GenDwarfSectionStartSym; }
+    void setGenDwarfSectionStartSym(MCSymbol *Sym) {
+      GenDwarfSectionStartSym = Sym;
+    }
+    MCSymbol *getGenDwarfSectionEndSym() { return GenDwarfSectionEndSym; }
+    void setGenDwarfSectionEndSym(MCSymbol *Sym) {
+      GenDwarfSectionEndSym = Sym;
+    }
+    const std::vector<const MCGenDwarfLabelEntry *>
+      &getMCGenDwarfLabelEntries() const {
+      return MCGenDwarfLabelEntries;
+    }
+    void addMCGenDwarfLabelEntry(const MCGenDwarfLabelEntry *E) {
+      MCGenDwarfLabelEntries.push_back(E);
+    }
+
+    void setDwarfDebugFlags(StringRef S) { DwarfDebugFlags = S; }
+    StringRef getDwarfDebugFlags() { return DwarfDebugFlags; }
+
+    void setDwarfDebugProducer(StringRef S) { DwarfDebugProducer = S; }
+    StringRef getDwarfDebugProducer() { return DwarfDebugProducer; }
+
     /// @}
 
     char *getSecureLogFile() { return SecureLogFile; }
@@ -249,6 +393,11 @@ namespace llvm {
     }
     void Deallocate(void *Ptr) {
     }
+
+    // Unrecoverable error has occured. Display the best diagnostic we can
+    // and bail via exit(1). For now, most MC backend errors are unrecoverable.
+    // FIXME: We should really do something about that.
+    LLVM_ATTRIBUTE_NORETURN void FatalError(SMLoc L, const Twine &Msg);
   };
 
 } // end namespace llvm

@@ -17,11 +17,11 @@
 #ifndef LLVM_ANALYSIS_ALIASSETTRACKER_H
 #define LLVM_ANALYSIS_ALIASSETTRACKER_H
 
-#include "llvm/Support/CallSite.h"
-#include "llvm/Support/ValueHandle.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/Support/CallSite.h"
+#include "llvm/Support/ValueHandle.h"
 #include <vector>
 
 namespace llvm {
@@ -109,10 +109,9 @@ class AliasSet : public ilist_node<AliasSet> {
 
   PointerRec *PtrList, **PtrListEnd;  // Doubly linked list of nodes.
   AliasSet *Forward;             // Forwarding pointer.
-  AliasSet *Next, *Prev;         // Doubly linked list of AliasSets.
 
-  // All calls & invokes in this alias set.
-  std::vector<AssertingVH<Instruction> > CallSites;
+  // All instructions without a specific address in this alias set.
+  std::vector<AssertingVH<Instruction> > UnknownInsts;
 
   // RefCount - Number of nodes pointing to this AliasSet plus the number of
   // AliasSets forwarding to it.
@@ -147,9 +146,9 @@ class AliasSet : public ilist_node<AliasSet> {
       removeFromTracker(AST);
   }
 
-  CallSite getCallSite(unsigned i) const {
-    assert(i < CallSites.size());
-    return CallSite(CallSites[i]);
+  Instruction *getUnknownInst(unsigned i) const {
+    assert(i < UnknownInsts.size());
+    return UnknownInsts[i];
   }
   
 public:
@@ -226,8 +225,8 @@ private:
                AccessTy(NoModRef), AliasTy(MustAlias), Volatile(false) {
   }
 
-  AliasSet(const AliasSet &AS);        // do not implement
-  void operator=(const AliasSet &AS);  // do not implement
+  AliasSet(const AliasSet &AS) LLVM_DELETED_FUNCTION;
+  void operator=(const AliasSet &AS) LLVM_DELETED_FUNCTION;
 
   PointerRec *getSomePointer() const {
     return PtrList;
@@ -253,23 +252,24 @@ private:
   void addPointer(AliasSetTracker &AST, PointerRec &Entry, uint64_t Size,
                   const MDNode *TBAAInfo,
                   bool KnownMustAlias = false);
-  void addCallSite(CallSite CS, AliasAnalysis &AA);
-  void removeCallSite(CallSite CS) {
-    for (size_t i = 0, e = CallSites.size(); i != e; ++i)
-      if (CallSites[i] == CS.getInstruction()) {
-        CallSites[i] = CallSites.back();
-        CallSites.pop_back();
+  void addUnknownInst(Instruction *I, AliasAnalysis &AA);
+  void removeUnknownInst(Instruction *I) {
+    for (size_t i = 0, e = UnknownInsts.size(); i != e; ++i)
+      if (UnknownInsts[i] == I) {
+        UnknownInsts[i] = UnknownInsts.back();
+        UnknownInsts.pop_back();
         --i; --e;  // Revisit the moved entry.
       }
   }
   void setVolatile() { Volatile = true; }
 
+public:
   /// aliasesPointer - Return true if the specified pointer "may" (or must)
   /// alias one of the members in the set.
   ///
   bool aliasesPointer(const Value *Ptr, uint64_t Size, const MDNode *TBAAInfo,
                       AliasAnalysis &AA) const;
-  bool aliasesCallSite(CallSite CS, AliasAnalysis &AA) const;
+  bool aliasesUnknownInst(Instruction *Inst, AliasAnalysis &AA) const;
 };
 
 inline raw_ostream& operator<<(raw_ostream &OS, const AliasSet &AS) {
@@ -326,12 +326,10 @@ public:
   bool add(LoadInst *LI);
   bool add(StoreInst *SI);
   bool add(VAArgInst *VAAI);
-  bool add(CallSite CS);          // Call/Invoke instructions
-  bool add(CallInst *CI)   { return add(CallSite(CI)); }
-  bool add(InvokeInst *II) { return add(CallSite(II)); }
   bool add(Instruction *I);       // Dispatch to one of the other add methods...
   void add(BasicBlock &BB);       // Add all instructions in basic block
   void add(const AliasSetTracker &AST); // Add alias relations from another AST
+  bool addUnknown(Instruction *I);
 
   /// remove methods - These methods are used to remove all entries that might
   /// be aliased by the specified instruction.  These methods return true if any
@@ -341,11 +339,9 @@ public:
   bool remove(LoadInst *LI);
   bool remove(StoreInst *SI);
   bool remove(VAArgInst *VAAI);
-  bool remove(CallSite CS);
-  bool remove(CallInst *CI)   { return remove(CallSite(CI)); }
-  bool remove(InvokeInst *II) { return remove(CallSite(II)); }
   bool remove(Instruction *I);
   void remove(AliasSet &AS);
+  bool removeUnknown(Instruction *I);
   
   void clear();
 
@@ -429,7 +425,7 @@ private:
   AliasSet *findAliasSetForPointer(const Value *Ptr, uint64_t Size,
                                    const MDNode *TBAAInfo);
 
-  AliasSet *findAliasSetForCallSite(CallSite CS);
+  AliasSet *findAliasSetForUnknownInst(Instruction *Inst);
 };
 
 inline raw_ostream& operator<<(raw_ostream &OS, const AliasSetTracker &AST) {

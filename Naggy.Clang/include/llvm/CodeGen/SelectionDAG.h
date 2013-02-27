@@ -15,16 +15,17 @@
 #ifndef LLVM_CODEGEN_SELECTIONDAG_H
 #define LLVM_CODEGEN_SELECTIONDAG_H
 
-#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/ilist.h"
+#include "llvm/CodeGen/DAGCombine.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
 #include "llvm/Support/RecyclingAllocator.h"
 #include "llvm/Target/TargetMachine.h"
 #include <cassert>
-#include <vector>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace llvm {
 
@@ -36,6 +37,7 @@ class SDNodeOrdering;
 class SDDbgValue;
 class TargetLowering;
 class TargetSelectionDAGInfo;
+class TargetTransformInfo;
 
 template<> struct ilist_traits<SDNode> : public ilist_default_traits<SDNode> {
 private:
@@ -51,7 +53,7 @@ public:
   static void noteHead(SDNode*, SDNode*) {}
 
   static void deleteNode(SDNode *) {
-    assert(0 && "ilist_traits<SDNode> shouldn't see a deleteNode call!");
+    llvm_unreachable("ilist_traits<SDNode> shouldn't see a deleteNode call!");
   }
 private:
   static void createNode(const SDNode &);
@@ -73,8 +75,8 @@ class SDDbgInfo {
   SmallVector<SDDbgValue*, 32> ByvalParmDbgValues;
   DenseMap<const SDNode*, SmallVector<SDDbgValue*, 2> > DbgValMap;
 
-  void operator=(const SDDbgInfo&);   // Do not implement.
-  SDDbgInfo(const SDDbgInfo&);   // Do not implement.
+  void operator=(const SDDbgInfo&) LLVM_DELETED_FUNCTION;
+  SDDbgInfo(const SDDbgInfo&) LLVM_DELETED_FUNCTION;
 public:
   SDDbgInfo() {}
 
@@ -96,8 +98,12 @@ public:
     return DbgValues.empty() && ByvalParmDbgValues.empty();
   }
 
-  SmallVector<SDDbgValue*,2> &getSDDbgValues(const SDNode *Node) {
-    return DbgValMap[Node];
+  ArrayRef<SDDbgValue*> getSDDbgValues(const SDNode *Node) {
+    DenseMap<const SDNode*, SmallVector<SDDbgValue*, 2> >::iterator I =
+      DbgValMap.find(Node);
+    if (I != DbgValMap.end())
+      return I->second;
+    return ArrayRef<SDDbgValue*>();
   }
 
   typedef SmallVector<SDDbgValue*,32>::iterator DbgIterator;
@@ -105,12 +111,6 @@ public:
   DbgIterator DbgEnd()   { return DbgValues.end(); }
   DbgIterator ByvalParmDbgBegin() { return ByvalParmDbgValues.begin(); }
   DbgIterator ByvalParmDbgEnd()   { return ByvalParmDbgValues.end(); }
-};
-
-enum CombineLevel {
-  Unrestricted,   // Combine may create illegal operations and illegal types.
-  NoIllegalTypes, // Combine may create illegal operations but no illegal types.
-  NoIllegalOperations // Combine may only create legal operations and types.
 };
 
 class SelectionDAG;
@@ -132,8 +132,10 @@ class SelectionDAG {
   const TargetMachine &TM;
   const TargetLowering &TLI;
   const TargetSelectionDAGInfo &TSI;
+  const TargetTransformInfo *TTI;
   MachineFunction *MF;
   LLVMContext *Context;
+  CodeGenOpt::Level OptLevel;
 
   /// EntryNode - The starting token.
   SDNode EntryNode;
@@ -171,6 +173,44 @@ class SelectionDAG {
   /// DbgInfo - Tracks dbg_value information through SDISel.
   SDDbgInfo *DbgInfo;
 
+public:
+  /// DAGUpdateListener - Clients of various APIs that cause global effects on
+  /// the DAG can optionally implement this interface.  This allows the clients
+  /// to handle the various sorts of updates that happen.
+  ///
+  /// A DAGUpdateListener automatically registers itself with DAG when it is
+  /// constructed, and removes itself when destroyed in RAII fashion.
+  struct DAGUpdateListener {
+    DAGUpdateListener *const Next;
+    SelectionDAG &DAG;
+
+    explicit DAGUpdateListener(SelectionDAG &D)
+      : Next(D.UpdateListeners), DAG(D) {
+      DAG.UpdateListeners = this;
+    }
+
+    virtual ~DAGUpdateListener() {
+      assert(DAG.UpdateListeners == this &&
+             "DAGUpdateListeners must be destroyed in LIFO order");
+      DAG.UpdateListeners = Next;
+    }
+
+    /// NodeDeleted - The node N that was deleted and, if E is not null, an
+    /// equivalent node E that replaced it.
+    virtual void NodeDeleted(SDNode *N, SDNode *E);
+
+    /// NodeUpdated - The node N that was updated.
+    virtual void NodeUpdated(SDNode *N);
+  };
+
+private:
+  /// DAGUpdateListener is a friend so it can manipulate the listener stack.
+  friend struct DAGUpdateListener;
+
+  /// UpdateListeners - Linked list of registered DAGUpdateListener instances.
+  /// This stack is maintained by DAGUpdateListener RAII.
+  DAGUpdateListener *UpdateListeners;
+
   /// setGraphColorHelper - Implementation of setSubgraphColor.
   /// Return whether we had to truncate the search.
   ///
@@ -178,17 +218,17 @@ class SelectionDAG {
                               DenseSet<SDNode *> &visited,
                               int level, bool &printed);
 
-  void operator=(const SelectionDAG&); // Do not implement.
-  SelectionDAG(const SelectionDAG&);   // Do not implement.
+  void operator=(const SelectionDAG&) LLVM_DELETED_FUNCTION;
+  SelectionDAG(const SelectionDAG&) LLVM_DELETED_FUNCTION;
 
 public:
-  explicit SelectionDAG(const TargetMachine &TM);
+  explicit SelectionDAG(const TargetMachine &TM, llvm::CodeGenOpt::Level);
   ~SelectionDAG();
 
   /// init - Prepare this SelectionDAG to process code in the given
   /// MachineFunction.
   ///
-  void init(MachineFunction &mf);
+  void init(MachineFunction &mf, const TargetTransformInfo *TTI);
 
   /// clear - Clear state and free memory necessary to make this
   /// SelectionDAG ready to process a new block.
@@ -199,6 +239,7 @@ public:
   const TargetMachine &getTarget() const { return TM; }
   const TargetLowering &getTargetLoweringInfo() const { return TLI; }
   const TargetSelectionDAGInfo &getSelectionDAGInfo() const { return TSI; }
+  const TargetTransformInfo *getTargetTransformInfo() const { return TTI; }
   LLVMContext *getContext() const {return Context; }
 
   /// viewGraph - Pop up a GraphViz/gv window with the DAG rendered using 'dot'.
@@ -284,7 +325,7 @@ public:
   ///
   /// Note that this is an involved process that may invalidate pointers into
   /// the graph.
-  void Legalize(CodeGenOpt::Level OptLevel);
+  void Legalize();
 
   /// LegalizeVectors - This transforms the SelectionDAG into a SelectionDAG
   /// that only uses vector math operations supported by the target.  This is
@@ -378,6 +419,8 @@ public:
                                   int Offset = 0, unsigned char TargetFlags=0) {
     return getConstantPool(C, VT, Align, Offset, true, TargetFlags);
   }
+  SDValue getTargetIndex(int Index, EVT VT, int64_t Offset = 0,
+                         unsigned char TargetFlags = 0);
   // When generating a branch to a BB, we don't in general know enough
   // to provide debug info for the BB at that time, so keep this one around.
   SDValue getBasicBlock(MachineBasicBlock *MBB);
@@ -388,9 +431,16 @@ public:
                                   unsigned char TargetFlags = 0);
   SDValue getValueType(EVT);
   SDValue getRegister(unsigned Reg, EVT VT);
+  SDValue getRegisterMask(const uint32_t *RegMask);
   SDValue getEHLabel(DebugLoc dl, SDValue Root, MCSymbol *Label);
   SDValue getBlockAddress(const BlockAddress *BA, EVT VT,
-                          bool isTarget = false, unsigned char TargetFlags = 0);
+                          int64_t Offset = 0, bool isTarget = false,
+                          unsigned char TargetFlags = 0);
+  SDValue getTargetBlockAddress(const BlockAddress *BA, EVT VT,
+                                int64_t Offset = 0,
+                                unsigned char TargetFlags = 0) {
+    return getBlockAddress(BA, VT, Offset, true, TargetFlags);
+  }
 
   SDValue getCopyToReg(SDValue Chain, DebugLoc dl, unsigned Reg, SDValue N) {
     return getNode(ISD::CopyToReg, dl, MVT::Other, Chain,
@@ -445,6 +495,10 @@ public:
   /// undefined.
   SDValue getVectorShuffle(EVT VT, DebugLoc dl, SDValue N1, SDValue N2,
                            const int *MaskElts);
+
+  /// getAnyExtOrTrunc - Convert Op, which must be of integer type, to the
+  /// integer type VT, by either any-extending or truncating it.
+  SDValue getAnyExtOrTrunc(SDValue Op, DebugLoc DL, EVT VT);
 
   /// getSExtOrTrunc - Convert Op, which must be of integer type, to the
   /// integer type VT, by either sign-extending or truncating it.
@@ -556,15 +610,11 @@ public:
   ///
   SDValue getSetCC(DebugLoc DL, EVT VT, SDValue LHS, SDValue RHS,
                    ISD::CondCode Cond) {
+    assert(LHS.getValueType().isVector() == RHS.getValueType().isVector() &&
+      "Cannot compare scalars to vectors");
+    assert(LHS.getValueType().isVector() == VT.isVector() &&
+      "Cannot compare scalars to vectors");
     return getNode(ISD::SETCC, DL, VT, LHS, RHS, getCondCode(Cond));
-  }
-
-  /// getVSetCC - Helper function to make it easier to build VSetCC's nodes
-  /// if you just have an ISD::CondCode instead of an SDValue.
-  ///
-  SDValue getVSetCC(DebugLoc DL, EVT VT, SDValue LHS, SDValue RHS,
-                    ISD::CondCode Cond) {
-    return getNode(ISD::VSETCC, DL, VT, LHS, RHS, getCondCode(Cond));
   }
 
   /// getSelectCC - Helper function to make it easier to build SelectCC's if you
@@ -585,19 +635,37 @@ public:
   /// takes 3 operands
   SDValue getAtomic(unsigned Opcode, DebugLoc dl, EVT MemVT, SDValue Chain,
                     SDValue Ptr, SDValue Cmp, SDValue Swp,
-                    MachinePointerInfo PtrInfo, unsigned Alignment=0);
+                    MachinePointerInfo PtrInfo, unsigned Alignment,
+                    AtomicOrdering Ordering,
+                    SynchronizationScope SynchScope);
   SDValue getAtomic(unsigned Opcode, DebugLoc dl, EVT MemVT, SDValue Chain,
                     SDValue Ptr, SDValue Cmp, SDValue Swp,
-                    MachineMemOperand *MMO);
+                    MachineMemOperand *MMO,
+                    AtomicOrdering Ordering,
+                    SynchronizationScope SynchScope);
 
-  /// getAtomic - Gets a node for an atomic op, produces result and chain and
-  /// takes 2 operands.
+  /// getAtomic - Gets a node for an atomic op, produces result (if relevant)
+  /// and chain and takes 2 operands.
   SDValue getAtomic(unsigned Opcode, DebugLoc dl, EVT MemVT, SDValue Chain,
                     SDValue Ptr, SDValue Val, const Value* PtrVal,
-                    unsigned Alignment = 0);
+                    unsigned Alignment, AtomicOrdering Ordering,
+                    SynchronizationScope SynchScope);
   SDValue getAtomic(unsigned Opcode, DebugLoc dl, EVT MemVT, SDValue Chain,
-                    SDValue Ptr, SDValue Val,
-                    MachineMemOperand *MMO);
+                    SDValue Ptr, SDValue Val, MachineMemOperand *MMO,
+                    AtomicOrdering Ordering,
+                    SynchronizationScope SynchScope);
+
+  /// getAtomic - Gets a node for an atomic op, produces result and chain and
+  /// takes 1 operand.
+  SDValue getAtomic(unsigned Opcode, DebugLoc dl, EVT MemVT, EVT VT,
+                    SDValue Chain, SDValue Ptr, const Value* PtrVal,
+                    unsigned Alignment,
+                    AtomicOrdering Ordering,
+                    SynchronizationScope SynchScope);
+  SDValue getAtomic(unsigned Opcode, DebugLoc dl, EVT MemVT, EVT VT,
+                    SDValue Chain, SDValue Ptr, MachineMemOperand *MMO,
+                    AtomicOrdering Ordering,
+                    SynchronizationScope SynchScope);
 
   /// getMemIntrinsicNode - Creates a MemIntrinsicNode that may produce a
   /// result and takes a list of operands. Opcode may be INTRINSIC_VOID,
@@ -628,8 +696,8 @@ public:
   ///
   SDValue getLoad(EVT VT, DebugLoc dl, SDValue Chain, SDValue Ptr,
                   MachinePointerInfo PtrInfo, bool isVolatile,
-                  bool isNonTemporal, unsigned Alignment,
-                  const MDNode *TBAAInfo = 0);
+                  bool isNonTemporal, bool isInvariant, unsigned Alignment,
+                  const MDNode *TBAAInfo = 0, const MDNode *Ranges = 0);
   SDValue getExtLoad(ISD::LoadExtType ExtType, DebugLoc dl, EVT VT,
                      SDValue Chain, SDValue Ptr, MachinePointerInfo PtrInfo,
                      EVT MemVT, bool isVolatile,
@@ -641,8 +709,9 @@ public:
                   EVT VT, DebugLoc dl,
                   SDValue Chain, SDValue Ptr, SDValue Offset,
                   MachinePointerInfo PtrInfo, EVT MemVT,
-                  bool isVolatile, bool isNonTemporal, unsigned Alignment,
-                  const MDNode *TBAAInfo = 0);
+                  bool isVolatile, bool isNonTemporal, bool isInvariant,
+                  unsigned Alignment, const MDNode *TBAAInfo = 0,
+                  const MDNode *Ranges = 0);
   SDValue getLoad(ISD::MemIndexedMode AM, ISD::LoadExtType ExtType,
                   EVT VT, DebugLoc dl,
                   SDValue Chain, SDValue Ptr, SDValue Offset,
@@ -791,30 +860,14 @@ public:
   SDDbgValue *getDbgValue(MDNode *MDPtr, unsigned FI, uint64_t Off,
                           DebugLoc DL, unsigned O);
 
-  /// DAGUpdateListener - Clients of various APIs that cause global effects on
-  /// the DAG can optionally implement this interface.  This allows the clients
-  /// to handle the various sorts of updates that happen.
-  class DAGUpdateListener {
-  public:
-    virtual ~DAGUpdateListener();
-
-    /// NodeDeleted - The node N that was deleted and, if E is not null, an
-    /// equivalent node E that replaced it.
-    virtual void NodeDeleted(SDNode *N, SDNode *E) = 0;
-
-    /// NodeUpdated - The node N that was updated.
-    virtual void NodeUpdated(SDNode *N) = 0;
-  };
-
   /// RemoveDeadNode - Remove the specified node from the system. If any of its
   /// operands then becomes dead, remove them as well. Inform UpdateListener
   /// for each node deleted.
-  void RemoveDeadNode(SDNode *N, DAGUpdateListener *UpdateListener = 0);
+  void RemoveDeadNode(SDNode *N);
 
   /// RemoveDeadNodes - This method deletes the unreachable nodes in the
   /// given list, and any nodes that become unreachable as a result.
-  void RemoveDeadNodes(SmallVectorImpl<SDNode *> &DeadNodes,
-                       DAGUpdateListener *UpdateListener = 0);
+  void RemoveDeadNodes(SmallVectorImpl<SDNode *> &DeadNodes);
 
   /// ReplaceAllUsesWith - Modify anything using 'From' to use 'To' instead.
   /// This can cause recursive merging of nodes in the DAG.  Use the first
@@ -831,24 +884,19 @@ public:
   /// to be given new uses. These new uses of From are left in place, and
   /// not automatically transferred to To.
   ///
-  void ReplaceAllUsesWith(SDValue From, SDValue Op,
-                          DAGUpdateListener *UpdateListener = 0);
-  void ReplaceAllUsesWith(SDNode *From, SDNode *To,
-                          DAGUpdateListener *UpdateListener = 0);
-  void ReplaceAllUsesWith(SDNode *From, const SDValue *To,
-                          DAGUpdateListener *UpdateListener = 0);
+  void ReplaceAllUsesWith(SDValue From, SDValue Op);
+  void ReplaceAllUsesWith(SDNode *From, SDNode *To);
+  void ReplaceAllUsesWith(SDNode *From, const SDValue *To);
 
   /// ReplaceAllUsesOfValueWith - Replace any uses of From with To, leaving
   /// uses of other values produced by From.Val alone.
-  void ReplaceAllUsesOfValueWith(SDValue From, SDValue To,
-                                 DAGUpdateListener *UpdateListener = 0);
+  void ReplaceAllUsesOfValueWith(SDValue From, SDValue To);
 
   /// ReplaceAllUsesOfValuesWith - Like ReplaceAllUsesOfValueWith, but
   /// for multiple values at once. This correctly handles the case where
   /// there is an overlap between the From values and the To values.
   void ReplaceAllUsesOfValuesWith(const SDValue *From, const SDValue *To,
-                                  unsigned Num,
-                                  DAGUpdateListener *UpdateListener = 0);
+                                  unsigned Num);
 
   /// AssignTopologicalOrder - Topological-sort the AllNodes list and a
   /// assign a unique node id for each node in the DAG based on their
@@ -887,6 +935,20 @@ public:
     }
   }
 
+  /// Returns an APFloat semantics tag appropriate for the given type. If VT is
+  /// a vector type, the element semantics are returned.
+  static const fltSemantics &EVTToAPFloatSemantics(EVT VT) {
+    switch (VT.getScalarType().getSimpleVT().SimpleTy) {
+    default: llvm_unreachable("Unknown FP format");
+    case MVT::f16:     return APFloat::IEEEhalf;
+    case MVT::f32:     return APFloat::IEEEsingle;
+    case MVT::f64:     return APFloat::IEEEdouble;
+    case MVT::f80:     return APFloat::x87DoubleExtended;
+    case MVT::f128:    return APFloat::IEEEquad;
+    case MVT::ppcf128: return APFloat::PPCDoubleDouble;
+    }
+  }
+
   /// AssignOrdering - Assign an order to the SDNode.
   void AssignOrdering(const SDNode *SD, unsigned Order);
 
@@ -898,7 +960,7 @@ public:
   void AddDbgValue(SDDbgValue *DB, SDNode *SD, bool isParameter);
 
   /// GetDbgValues - Get the debug values which reference the given SDNode.
-  SmallVector<SDDbgValue*,2> &GetDbgValues(const SDNode* SD) {
+  ArrayRef<SDDbgValue*> GetDbgValues(const SDNode* SD) {
     return DbgInfo->getSDDbgValues(SD);
   }
 
@@ -930,10 +992,8 @@ public:
   SDValue CreateStackTemporary(EVT VT1, EVT VT2);
 
   /// FoldConstantArithmetic -
-  SDValue FoldConstantArithmetic(unsigned Opcode,
-                                 EVT VT,
-                                 ConstantSDNode *Cst1,
-                                 ConstantSDNode *Cst2);
+  SDValue FoldConstantArithmetic(unsigned Opcode, EVT VT,
+                                 SDNode *Cst1, SDNode *Cst2);
 
   /// FoldSetCC - Constant fold a setcc to true or false.
   SDValue FoldSetCC(EVT VT, SDValue N1,
@@ -954,8 +1014,8 @@ public:
   /// bitsets.  This code only analyzes bits in Mask, in order to short-circuit
   /// processing.  Targets can implement the computeMaskedBitsForTargetNode
   /// method in the TargetLowering class to allow target nodes to be understood.
-  void ComputeMaskedBits(SDValue Op, const APInt &Mask, APInt &KnownZero,
-                         APInt &KnownOne, unsigned Depth = 0) const;
+  void ComputeMaskedBits(SDValue Op, APInt &KnownZero, APInt &KnownOne,
+                         unsigned Depth = 0) const;
 
   /// ComputeNumSignBits - Return the number of times the sign bit of the
   /// register is replicated into the other bits.  We know that at least 1 bit
@@ -985,10 +1045,6 @@ public:
   /// other positive zero.
   bool isEqualTo(SDValue A, SDValue B) const;
 
-  /// isVerifiedDebugInfoDesc - Returns true if the specified SDValue has
-  /// been verified as a debug information descriptor.
-  bool isVerifiedDebugInfoDesc(SDValue Op) const;
-
   /// UnrollVectorOp - Utility function used by legalize and lowering to
   /// "unroll" a vector operation by splitting out the scalars and operating
   /// on each element individually.  If the ResNE is 0, fully unroll the vector
@@ -1009,12 +1065,13 @@ public:
 
 private:
   bool RemoveNodeFromCSEMaps(SDNode *N);
-  void AddModifiedNodeToCSEMaps(SDNode *N, DAGUpdateListener *UpdateListener);
+  void AddModifiedNodeToCSEMaps(SDNode *N);
   SDNode *FindModifiedNodeSlot(SDNode *N, SDValue Op, void *&InsertPos);
   SDNode *FindModifiedNodeSlot(SDNode *N, SDValue Op1, SDValue Op2,
                                void *&InsertPos);
   SDNode *FindModifiedNodeSlot(SDNode *N, const SDValue *Ops, unsigned NumOps,
                                void *&InsertPos);
+  SDNode *UpdadeDebugLocOnMergedSDNode(SDNode *N, DebugLoc loc);
 
   void DeleteNodeNotInCSEMaps(SDNode *N);
   void DeallocateNode(SDNode *N);

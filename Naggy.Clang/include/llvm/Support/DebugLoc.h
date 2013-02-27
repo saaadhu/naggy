@@ -15,9 +15,8 @@
 #ifndef LLVM_SUPPORT_DEBUGLOC_H
 #define LLVM_SUPPORT_DEBUGLOC_H
 
-#include "llvm/ADT/DenseMapInfo.h"
-
 namespace llvm {
+  template <typename T> struct DenseMapInfo;
   class MDNode;
   class LLVMContext;
   
@@ -61,7 +60,10 @@ namespace llvm {
     
     /// getFromDILocation - Translate the DILocation quad into a DebugLoc.
     static DebugLoc getFromDILocation(MDNode *N);
-    
+
+    /// getFromDILexicalBlock - Translate the DILexicalBlock into a DebugLoc.
+    static DebugLoc getFromDILexicalBlock(MDNode *N);
+
     /// isUnknown - Return true if this is an unknown location.
     bool isUnknown() const { return ScopeIdx == 0; }
     
@@ -94,15 +96,17 @@ namespace llvm {
       return LineCol == DL.LineCol && ScopeIdx == DL.ScopeIdx;
     }
     bool operator!=(const DebugLoc &DL) const { return !(*this == DL); }
+
+    void dump(const LLVMContext &Ctx) const;
   };
 
   template <>
   struct DenseMapInfo<DebugLoc> {
-    static DebugLoc getEmptyKey();
-    static DebugLoc getTombstoneKey();
+    static DebugLoc getEmptyKey() { return DebugLoc::getEmptyKey(); }
+    static DebugLoc getTombstoneKey() { return DebugLoc::getTombstoneKey(); }
     static unsigned getHashValue(const DebugLoc &Key);
-    static bool isEqual(const DebugLoc &LHS, const DebugLoc &RHS);
+    static bool isEqual(DebugLoc LHS, DebugLoc RHS) { return LHS == RHS; }
   };
 } // end namespace llvm
 
-#endif /* LLVM_DEBUGLOC_H */
+#endif /* LLVM_SUPPORT_DEBUGLOC_H */

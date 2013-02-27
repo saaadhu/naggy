@@ -14,10 +14,10 @@
 #ifndef LLVM_CLANG_PTHMANAGER_H
 #define LLVM_CLANG_PTHMANAGER_H
 
-#include "clang/Lex/PTHLexer.h"
-#include "clang/Basic/LangOptions.h"
-#include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/IdentifierTable.h"
+#include "clang/Basic/LangOptions.h"
+#include "clang/Lex/PTHLexer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Allocator.h"
 #include <string>
@@ -30,7 +30,7 @@ namespace clang {
 
 class FileEntry;
 class PTHLexer;
-class Diagnostic;
+class DiagnosticsEngine;
 class FileSystemStatCache;
 
 class PTHManager : public IdentifierInfoLookup {
@@ -81,9 +81,8 @@ class PTHManager : public IdentifierInfoLookup {
              void* stringIdLookup, unsigned numIds,
              const unsigned char* spellingBase, const char *originalSourceFile);
 
-  // Do not implement.
-  PTHManager();
-  void operator=(const PTHManager&);
+  PTHManager(const PTHManager &) LLVM_DELETED_FUNCTION;
+  void operator=(const PTHManager &) LLVM_DELETED_FUNCTION;
 
   /// getSpellingAtPTHOffset - Used by PTHLexer classes to get the cached
   ///  spelling for a token.
@@ -101,7 +100,7 @@ class PTHManager : public IdentifierInfoLookup {
 
 public:
   // The current PTH version.
-  enum { Version = 9 };
+  enum { Version = 10 };
 
   ~PTHManager();
 
@@ -115,11 +114,11 @@ public:
   ///  Unlike the version in IdentifierTable, this returns a pointer instead
   ///  of a reference.  If the pointer is NULL then the IdentifierInfo cannot
   ///  be found.
-  IdentifierInfo *get(llvm::StringRef Name);
+  IdentifierInfo *get(StringRef Name);
 
   /// Create - This method creates PTHManager objects.  The 'file' argument
   ///  is the name of the PTH file.  This method returns NULL upon failure.
-  static PTHManager *Create(const std::string& file, Diagnostic &Diags);
+  static PTHManager *Create(const std::string& file, DiagnosticsEngine &Diags);
 
   void setPreprocessor(Preprocessor *pp) { PP = pp; }
 

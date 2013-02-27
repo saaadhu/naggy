@@ -12,14 +12,14 @@
 
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/SourceLocation.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace clang {
 class DiagnosticOptions;
 class LangOptions;
 
-class LogDiagnosticPrinter : public DiagnosticClient {
+class LogDiagnosticPrinter : public DiagnosticConsumer {
   struct DiagEntry {
     /// The primary message line of the diagnostic.
     std::string Message;
@@ -37,28 +37,28 @@ class LogDiagnosticPrinter : public DiagnosticClient {
     unsigned DiagnosticID;
   
     /// The level of the diagnostic.
-    Diagnostic::Level DiagnosticLevel;
+    DiagnosticsEngine::Level DiagnosticLevel;
   };
   
-  llvm::raw_ostream &OS;
+  raw_ostream &OS;
   const LangOptions *LangOpts;
-  const DiagnosticOptions *DiagOpts;
+  IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts;
 
   SourceLocation LastWarningLoc;
   FullSourceLoc LastLoc;
   unsigned OwnsOutputStream : 1;
 
-  llvm::SmallVector<DiagEntry, 8> Entries;
+  SmallVector<DiagEntry, 8> Entries;
 
   std::string MainFilename;
   std::string DwarfDebugFlags;
 
 public:
-  LogDiagnosticPrinter(llvm::raw_ostream &OS, const DiagnosticOptions &Diags,
+  LogDiagnosticPrinter(raw_ostream &OS, DiagnosticOptions *Diags,
                        bool OwnsOutputStream = false);
   virtual ~LogDiagnosticPrinter();
 
-  void setDwarfDebugFlags(llvm::StringRef Value) {
+  void setDwarfDebugFlags(StringRef Value) {
     DwarfDebugFlags = Value;
   }
 
@@ -68,8 +68,10 @@ public:
 
   void EndSourceFile();
 
-  virtual void HandleDiagnostic(Diagnostic::Level DiagLevel,
-                                const DiagnosticInfo &Info);
+  virtual void HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
+                                const Diagnostic &Info);
+  
+  DiagnosticConsumer *clone(DiagnosticsEngine &Diags) const;
 };
 
 } // end namespace clang

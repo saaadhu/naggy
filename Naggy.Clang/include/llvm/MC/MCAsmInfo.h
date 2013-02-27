@@ -13,11 +13,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_ASM_INFO_H
-#define LLVM_TARGET_ASM_INFO_H
+#ifndef LLVM_MC_MCASMINFO_H
+#define LLVM_MC_MCASMINFO_H
 
 #include "llvm/MC/MCDirectives.h"
+#include "llvm/MC/MachineLocation.h"
 #include <cassert>
+#include <vector>
 
 namespace llvm {
   class MCExpr;
@@ -26,17 +28,38 @@ namespace llvm {
   class MCSymbol;
   class MCContext;
 
-  /// MCAsmInfo - This class is intended to be used as a base class for asm
-  /// properties and features specific to the target.
   namespace ExceptionHandling {
-    enum ExceptionsType { None, DwarfTable, DwarfCFI, SjLj, ARM };
+    enum ExceptionsType { None, DwarfCFI, SjLj, ARM, Win64 };
   }
 
+  namespace LCOMM {
+    enum LCOMMType { NoAlignment, ByteAlignment, Log2Alignment };
+  }
+
+  /// MCAsmInfo - This class is intended to be used as a base class for asm
+  /// properties and features specific to the target.
   class MCAsmInfo {
   protected:
     //===------------------------------------------------------------------===//
     // Properties to be set by the target writer, used to configure asm printer.
     //
+
+    /// PointerSize - Pointer size in bytes.
+    ///               Default is 4.
+    unsigned PointerSize;
+
+    /// CalleeSaveStackSlotSize - Size of the stack slot reserved for
+    ///                           callee-saved registers, in bytes.
+    ///                           Default is same as pointer size.
+    unsigned CalleeSaveStackSlotSize;
+
+    /// IsLittleEndian - True if target is little endian.
+    ///                  Default is true.
+    bool IsLittleEndian;
+
+    /// StackGrowsUp - True if target stack grow up.
+    ///                Default is false.
+    bool StackGrowsUp;
 
     /// HasSubsectionsViaSymbols - True if this target has the MachO
     /// .subsections_via_symbols directive.
@@ -84,6 +107,9 @@ namespace llvm {
     /// LabelSuffix - This is appended to emitted labels.
     const char *LabelSuffix;                 // Defaults to ":"
 
+    /// LabelSuffix - This is appended to emitted labels.
+    const char *DebugLabelSuffix;                 // Defaults to ":"
+
     /// GlobalPrefix - If this is set to a non-empty string, it is prepended
     /// onto all global symbols.  This is often used for "_" or ".".
     const char *GlobalPrefix;                // Defaults to ""
@@ -103,6 +129,13 @@ namespace llvm {
     const char *InlineAsmStart;              // Defaults to "#APP\n"
     const char *InlineAsmEnd;                // Defaults to "#NO_APP\n"
 
+    /// Code16Directive, Code32Directive, Code64Directive - These are assembly
+    /// directives that tells the assembler to interpret the following
+    /// instructions differently.
+    const char *Code16Directive;             // Defaults to ".code16"
+    const char *Code32Directive;             // Defaults to ".code32"
+    const char *Code64Directive;             // Defaults to ".code64"
+
     /// AssemblerDialect - Which dialect of an assembler variant to use.
     unsigned AssemblerDialect;               // Defaults to 0
 
@@ -117,6 +150,15 @@ namespace llvm {
     /// AllowPeriodsInName - This is true if the assembler allows periods in
     /// symbol names.  This defaults to true.
     bool AllowPeriodsInName;
+
+    /// AllowUTF8 - This is true if the assembler accepts UTF-8 input.
+    // FIXME: Make this a more general encoding setting?
+    bool AllowUTF8;
+
+    /// UseDataRegionDirectives - This is true if data region markers should
+    /// be printed as ".data_region/.end_data_region" directives. If false,
+    /// use "$d/$a" labels instead.
+    bool UseDataRegionDirectives;
 
     //===--- Data Emission Directives -------------------------------------===//
 
@@ -142,6 +184,11 @@ namespace llvm {
     const char *Data16bitsDirective;         // Defaults to "\t.short\t"
     const char *Data32bitsDirective;         // Defaults to "\t.long\t"
     const char *Data64bitsDirective;         // Defaults to "\t.quad\t"
+
+    /// GPRel64Directive - if non-null, a directive that is used to emit a word
+    /// which should be relocated as a 64-bit GP-relative offset, e.g. .gpdword
+    /// on Mips.
+    const char *GPRel64Directive;            // Defaults to NULL.
 
     /// GPRel32Directive - if non-null, a directive that is used to emit a word
     /// which should be relocated as a 32-bit GP-relative offset, e.g. .gpword
@@ -208,13 +255,13 @@ namespace llvm {
     /// .long a - b
     bool HasAggressiveSymbolFolding;           // Defaults to true.
 
-    /// HasLCOMMDirective - This is true if the target supports the .lcomm
-    /// directive.
-    bool HasLCOMMDirective;                  // Defaults to false.
-
-    /// COMMDirectiveAlignmentIsInBytes - True is COMMDirective's optional
+    /// COMMDirectiveAlignmentIsInBytes - True is .comm's and .lcomms optional
     /// alignment is to be specified in bytes instead of log2(n).
     bool COMMDirectiveAlignmentIsInBytes;    // Defaults to true;
+
+    /// LCOMMDirectiveAlignment - Describes if the .lcomm directive for the
+    /// target supports an alignment argument and how it is interpreted.
+    LCOMM::LCOMMType LCOMMDirectiveAlignmentType; // Defaults to NoAlignment.
 
     /// HasDotTypeDotSizeDirective - True if the target has .type and .size
     /// directives, this is true for most ELF targets.
@@ -269,9 +316,6 @@ namespace llvm {
     /// SupportsExceptionHandling - True if target supports exception handling.
     ExceptionHandling::ExceptionsType ExceptionsType; // Defaults to None
 
-    /// RequiresFrameSection - true if the Dwarf2 output needs a frame section
-    bool DwarfRequiresFrameSection;          // Defaults to true.
-
     /// DwarfUsesInlineInfoSection - True if DwarfDebugInlineSection is used to
     /// encode inline subroutine information.
     bool DwarfUsesInlineInfoSection;         // Defaults to false.
@@ -279,17 +323,17 @@ namespace llvm {
     /// DwarfSectionOffsetDirective - Special section offset directive.
     const char* DwarfSectionOffsetDirective; // Defaults to NULL
 
-    /// DwarfUsesAbsoluteLabelForStmtList - True if DW_AT_stmt_list needs
-    /// absolute label instead of offset.
-    bool DwarfUsesAbsoluteLabelForStmtList;  // Defaults to true;
+    /// DwarfUsesRelocationsAcrossSections - True if Dwarf2 output generally
+    /// uses relocations for references to other .debug_* sections.
+    bool DwarfUsesRelocationsAcrossSections;
 
-    // DwarfUsesLabelOffsetDifference - True if Dwarf2 output can
-    // use EmitLabelOffsetDifference.
-    bool DwarfUsesLabelOffsetForRanges;
+    /// DwarfRegNumForCFI - True if dwarf register numbers are printed
+    /// instead of symbolic register names in .cfi_* directives.
+    bool DwarfRegNumForCFI;  // Defaults to false;
 
-    //===--- CBE Asm Translation Table -----------------------------------===//
+    //===--- Prologue State ----------------------------------------------===//
 
-    const char *const *AsmTransCBE;          // Defaults to empty
+    std::vector<MachineMove> InitialFrameState;
 
   public:
     explicit MCAsmInfo();
@@ -298,6 +342,27 @@ namespace llvm {
     // FIXME: move these methods to DwarfPrinter when the JIT stops using them.
     static unsigned getSLEB128Size(int Value);
     static unsigned getULEB128Size(unsigned Value);
+
+    /// getPointerSize - Get the pointer size in bytes.
+    unsigned getPointerSize() const {
+      return PointerSize;
+    }
+
+    /// getCalleeSaveStackSlotSize - Get the callee-saved register stack slot
+    /// size in bytes.
+    unsigned getCalleeSaveStackSlotSize() const {
+      return CalleeSaveStackSlotSize;
+    }
+
+    /// isLittleEndian - True if the target is little endian.
+    bool isLittleEndian() const {
+      return IsLittleEndian;
+    }
+
+    /// isStackGrowthDirectionUp - True if target stack grow up.
+    bool isStackGrowthDirectionUp() const {
+      return StackGrowsUp;
+    }
 
     bool hasSubsectionsViaSymbols() const { return HasSubsectionsViaSymbols; }
 
@@ -315,6 +380,7 @@ namespace llvm {
     const char *getData64bitsDirective(unsigned AS = 0) const {
       return AS == 0 ? Data64bitsDirective : getDataASDirective(64, AS);
     }
+    const char *getGPRel64Directive() const { return GPRel64Directive; }
     const char *getGPRel32Directive() const { return GPRel32Directive; }
 
     /// getNonexecutableStackSection - Targets can implement this method to
@@ -326,10 +392,13 @@ namespace llvm {
 
     virtual const MCExpr *
     getExprForPersonalitySymbol(const MCSymbol *Sym,
+                                unsigned Encoding,
                                 MCStreamer &Streamer) const;
 
-    virtual const MCExpr *
-    getExprForFDESymbol(const MCSymbol *Sym, MCStreamer &Streamer) const;
+    const MCExpr *
+    getExprForFDESymbol(const MCSymbol *Sym,
+                        unsigned Encoding,
+                        MCStreamer &Streamer) const;
 
     bool usesSunStyleELFSectionSwitchSyntax() const {
       return SunStyleELFSectionSwitchSyntax;
@@ -371,6 +440,11 @@ namespace llvm {
     const char *getLabelSuffix() const {
       return LabelSuffix;
     }
+
+    const char *getDebugLabelSuffix() const {
+      return DebugLabelSuffix;
+    }
+
     const char *getGlobalPrefix() const {
       return GlobalPrefix;
     }
@@ -386,6 +460,15 @@ namespace llvm {
     const char *getInlineAsmEnd() const {
       return InlineAsmEnd;
     }
+    const char *getCode16Directive() const {
+      return Code16Directive;
+    }
+    const char *getCode32Directive() const {
+      return Code32Directive;
+    }
+    const char *getCode64Directive() const {
+      return Code64Directive;
+    }
     unsigned getAssemblerDialect() const {
       return AssemblerDialect;
     }
@@ -397,6 +480,12 @@ namespace llvm {
     }
     bool doesAllowPeriodsInName() const {
       return AllowPeriodsInName;
+    }
+    bool doesAllowUTF8() const {
+      return AllowUTF8;
+    }
+    bool doesSupportDataRegionDirectives() const {
+      return UseDataRegionDirectives;
     }
     const char *getZeroDirective() const {
       return ZeroDirective;
@@ -426,11 +515,13 @@ namespace llvm {
     bool hasAggressiveSymbolFolding() const {
       return HasAggressiveSymbolFolding;
     }
-    bool hasLCOMMDirective() const { return HasLCOMMDirective; }
-    bool hasDotTypeDotSizeDirective() const {return HasDotTypeDotSizeDirective;}
     bool getCOMMDirectiveAlignmentIsInBytes() const {
       return COMMDirectiveAlignmentIsInBytes;
     }
+    LCOMM::LCOMMType getLCOMMDirectiveAlignmentType() const {
+      return LCOMMDirectiveAlignmentType;
+    }
+    bool hasDotTypeDotSizeDirective() const {return HasDotTypeDotSizeDirective;}
     bool hasSingleParameterDotFile() const { return HasSingleParameterDotFile; }
     bool hasNoDeadStrip() const { return HasNoDeadStrip; }
     bool hasSymbolResolver() const { return HasSymbolResolver; }
@@ -459,28 +550,29 @@ namespace llvm {
     }
     bool isExceptionHandlingDwarf() const {
       return
-        (ExceptionsType == ExceptionHandling::DwarfTable ||
-         ExceptionsType == ExceptionHandling::DwarfCFI ||
-         ExceptionsType == ExceptionHandling::ARM);
+        (ExceptionsType == ExceptionHandling::DwarfCFI ||
+         ExceptionsType == ExceptionHandling::ARM ||
+         ExceptionsType == ExceptionHandling::Win64);
     }
-
-    bool doesDwarfRequireFrameSection() const {
-      return DwarfRequiresFrameSection;
-    }
-    bool doesDwarfUsesInlineInfoSection() const {
+    bool doesDwarfUseInlineInfoSection() const {
       return DwarfUsesInlineInfoSection;
     }
     const char *getDwarfSectionOffsetDirective() const {
       return DwarfSectionOffsetDirective;
     }
-    bool doesDwarfUsesAbsoluteLabelForStmtList() const {
-      return DwarfUsesAbsoluteLabelForStmtList;
+    bool doesDwarfUseRelocationsAcrossSections() const {
+      return DwarfUsesRelocationsAcrossSections;
     }
-    bool doesDwarfUsesLabelOffsetForRanges() const {
-      return DwarfUsesLabelOffsetForRanges;
+    bool useDwarfRegNumForCFI() const {
+      return DwarfRegNumForCFI;
     }
-    const char *const *getAsmCBE() const {
-      return AsmTransCBE;
+
+    void addInitialFrameState(MCSymbol *label, const MachineLocation &D,
+                              const MachineLocation &S) {
+      InitialFrameState.push_back(MachineMove(label, D, S));
+    }
+    const std::vector<MachineMove> &getInitialFrameState() const {
+      return InitialFrameState;
     }
   };
 }

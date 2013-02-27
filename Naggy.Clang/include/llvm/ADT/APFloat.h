@@ -97,8 +97,8 @@
     nexttoward.
 */
 
-#ifndef LLVM_FLOAT_H
-#define LLVM_FLOAT_H
+#ifndef LLVM_ADT_APFLOAT_H
+#define LLVM_ADT_APFLOAT_H
 
 // APInt contains static functions implementing bignum arithmetic.
 #include "llvm/ADT/APInt.h"
@@ -109,6 +109,7 @@ namespace llvm {
   typedef signed short exponent_t;
 
   struct fltSemantics;
+  class APSInt;
   class StringRef;
 
   /* When bits of a floating point number are truncated, this enum is
@@ -183,9 +184,9 @@ namespace llvm {
     APFloat(const fltSemantics &, integerPart);
     APFloat(const fltSemantics &, fltCategory, bool negative);
     APFloat(const fltSemantics &, uninitializedTag);
+    APFloat(const fltSemantics &, const APInt &);
     explicit APFloat(double d);
     explicit APFloat(float f);
-    explicit APFloat(const APInt &, bool isIEEE = false);
     APFloat(const APFloat &);
     ~APFloat();
 
@@ -273,6 +274,7 @@ namespace llvm {
     /* C fmod, or llvm frem. */
     opStatus mod(const APFloat &, roundingMode);
     opStatus fusedMultiplyAdd(const APFloat &, const APFloat &, roundingMode);
+    opStatus roundToIntegral(roundingMode);
 
     /* Sign operations.  */
     void changeSign();
@@ -283,6 +285,7 @@ namespace llvm {
     opStatus convert(const fltSemantics &, roundingMode, bool *);
     opStatus convertToInteger(integerPart *, unsigned int, bool,
                               roundingMode, bool *) const;
+    opStatus convertToInteger(APSInt&, roundingMode, bool *) const;
     opStatus convertFromAPInt(const APInt &,
                               bool, roundingMode);
     opStatus convertFromSignExtendedInteger(const integerPart *, unsigned int,
@@ -318,16 +321,26 @@ namespace llvm {
     const fltSemantics &getSemantics() const { return *semantics; }
     bool isZero() const { return category == fcZero; }
     bool isNonZero() const { return category != fcZero; }
+    bool isNormal() const { return category == fcNormal; }
     bool isNaN() const { return category == fcNaN; }
     bool isInfinity() const { return category == fcInfinity; }
     bool isNegative() const { return sign; }
     bool isPosZero() const { return isZero() && !isNegative(); }
     bool isNegZero() const { return isZero() && isNegative(); }
+    bool isDenormal() const;
 
     APFloat& operator=(const APFloat &);
 
-    /* Return an arbitrary integer value usable for hashing. */
-    uint32_t getHashValue() const;
+    /// \brief Overload to compute a hash code for an APFloat value.
+    ///
+    /// Note that the use of hash codes for floating point values is in general
+    /// frought with peril. Equality is hard to define for these values. For
+    /// example, should negative and positive zero hash to different codes? Are
+    /// they equal or not? This hash value implementation specifically
+    /// emphasizes producing different codes for different inputs in order to
+    /// be used in canonicalization and memoization. As such, equality is
+    /// bitwiseIsEqual, and 0 != -0.
+    friend hash_code hash_value(const APFloat &Arg);
 
     /// Converts this value into a decimal string.
     ///
@@ -410,7 +423,7 @@ namespace llvm {
     APInt convertQuadrupleAPFloatToAPInt() const;
     APInt convertF80LongDoubleAPFloatToAPInt() const;
     APInt convertPPCDoubleDoubleAPFloatToAPInt() const;
-    void initFromAPInt(const APInt& api, bool isIEEE = false);
+    void initFromAPInt(const fltSemantics *Sem, const APInt& api);
     void initFromHalfAPInt(const APInt& api);
     void initFromFloatAPInt(const APInt& api);
     void initFromDoubleAPInt(const APInt& api);
@@ -443,14 +456,11 @@ namespace llvm {
 
     /* The sign bit of this number.  */
     unsigned int sign: 1;
-
-    /* For PPCDoubleDouble, we have a second exponent and sign (the second
-       significand is appended to the first one, although it would be wrong to
-       regard these as a single number for arithmetic purposes).  These fields
-       are not meaningful for any other type. */
-    exponent_t exponent2 : 11;
-    unsigned int sign2: 1;
   };
+
+  // See friend declaration above. This additional declaration is required in
+  // order to compile LLVM with IBM xlC compiler.
+  hash_code hash_value(const APFloat &Arg);
 } /* namespace llvm */
 
-#endif /* LLVM_FLOAT_H */
+#endif /* LLVM_ADT_APFLOAT_H */

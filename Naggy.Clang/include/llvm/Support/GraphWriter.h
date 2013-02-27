@@ -23,17 +23,21 @@
 #ifndef LLVM_SUPPORT_GRAPHWRITER_H
 #define LLVM_SUPPORT_GRAPHWRITER_H
 
-#include "llvm/Support/DOTGraphTraits.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/GraphTraits.h"
+#include "llvm/Support/DOTGraphTraits.h"
 #include "llvm/Support/Path.h"
-#include <vector>
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
+#include <vector>
 
 namespace llvm {
 
 namespace DOT {  // Private functions...
   std::string EscapeString(const std::string &Label);
+
+  /// \brief Get a color string for this node number. Simply round-robin selects
+  /// from a reasonable number of colors.
+  StringRef getColorString(unsigned NodeNumber);
 }
 
 namespace GraphProgram {
@@ -172,7 +176,11 @@ public:
 
       // If we should include the address of the node in the label, do so now.
       if (DTraits.hasNodeAddressLabel(Node, G))
-        O << "|" << (void*)Node;
+        O << "|" << static_cast<const void*>(Node);
+
+      std::string NodeDesc = DTraits.getNodeDescription(Node, G);
+      if (!NodeDesc.empty())
+        O << "|" << DOT::EscapeString(NodeDesc);
     }
 
     std::string edgeSourceLabels;
@@ -192,7 +200,11 @@ public:
 
       // If we should include the address of the node in the label, do so now.
       if (DTraits.hasNodeAddressLabel(Node, G))
-        O << "|" << (void*)Node;
+        O << "|" << static_cast<const void*>(Node);
+
+      std::string NodeDesc = DTraits.getNodeDescription(Node, G);
+      if (!NodeDesc.empty())
+        O << "|" << DOT::EscapeString(NodeDesc);
     }
 
     if (DTraits.hasEdgeDestLabels()) {
@@ -296,26 +308,26 @@ public:
 template<typename GraphType>
 raw_ostream &WriteGraph(raw_ostream &O, const GraphType &G,
                         bool ShortNames = false,
-                        const std::string &Title = "") {
+                        const Twine &Title = "") {
   // Start the graph emission process...
   GraphWriter<GraphType> W(O, G, ShortNames);
 
   // Emit the graph.
-  W.writeGraph(Title);
+  W.writeGraph(Title.str());
 
   return O;
 }
 
 template<typename GraphType>
-sys::Path WriteGraph(const GraphType &G, const std::string &Name,
-                     bool ShortNames = false, const std::string &Title = "") {
+sys::Path WriteGraph(const GraphType &G, const Twine &Name,
+                     bool ShortNames = false, const Twine &Title = "") {
   std::string ErrMsg;
   sys::Path Filename = sys::Path::GetTemporaryDirectory(&ErrMsg);
   if (Filename.isEmpty()) {
     errs() << "Error: " << ErrMsg << "\n";
     return Filename;
   }
-  Filename.appendComponent(Name + ".dot");
+  Filename.appendComponent((Name + ".dot").str());
   if (Filename.makeUnique(true,&ErrMsg)) {
     errs() << "Error: " << ErrMsg << "\n";
     return sys::Path();
@@ -341,8 +353,8 @@ sys::Path WriteGraph(const GraphType &G, const std::string &Name,
 /// then cleanup.  For use from the debugger.
 ///
 template<typename GraphType>
-void ViewGraph(const GraphType &G, const std::string &Name,
-               bool ShortNames = false, const std::string &Title = "",
+void ViewGraph(const GraphType &G, const Twine &Name,
+               bool ShortNames = false, const Twine &Title = "",
                GraphProgram::Name Program = GraphProgram::DOT) {
   sys::Path Filename = llvm::WriteGraph(G, Name, ShortNames, Title);
 

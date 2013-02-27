@@ -57,11 +57,13 @@ class PointerIntPair {
   };
 public:
   PointerIntPair() : Value(0) {}
-  PointerIntPair(PointerTy Ptr, IntType Int) : Value(0) {
+  PointerIntPair(PointerTy Ptr, IntType Int) {
     assert(IntBits <= PtrTraits::NumLowBitsAvailable &&
            "PointerIntPair formed with integer size too large for pointer");
-    setPointer(Ptr);
-    setInt(Int);
+    setPointerAndInt(Ptr, Int);
+  }
+  explicit PointerIntPair(PointerTy Ptr) {
+    initWithPointer(Ptr);
   }
 
   PointerTy getPointer() const {
@@ -91,11 +93,34 @@ public:
     Value |= IntVal << IntShift;  // Set new integer.
   }
 
+  void initWithPointer(PointerTy Ptr) {
+    intptr_t PtrVal
+      = reinterpret_cast<intptr_t>(PtrTraits::getAsVoidPointer(Ptr));
+    assert((PtrVal & ((1 << PtrTraits::NumLowBitsAvailable)-1)) == 0 &&
+           "Pointer is not sufficiently aligned");
+    Value = PtrVal;
+  }
+
+  void setPointerAndInt(PointerTy Ptr, IntType Int) {
+    intptr_t PtrVal
+      = reinterpret_cast<intptr_t>(PtrTraits::getAsVoidPointer(Ptr));
+    assert((PtrVal & ((1 << PtrTraits::NumLowBitsAvailable)-1)) == 0 &&
+           "Pointer is not sufficiently aligned");
+    intptr_t IntVal = Int;
+    assert(IntVal < (1 << IntBits) && "Integer too large for field");
+
+    Value = PtrVal | (IntVal << IntShift);
+  }
+
   PointerTy const *getAddrOfPointer() const {
+    return const_cast<PointerIntPair *>(this)->getAddrOfPointer();
+  }
+
+  PointerTy *getAddrOfPointer() {
     assert(Value == reinterpret_cast<intptr_t>(getPointer()) &&
            "Can only return the address if IntBits is cleared and "
            "PtrTraits doesn't change the pointer");
-    return reinterpret_cast<PointerTy const *>(&Value);
+    return reinterpret_cast<PointerTy *>(&Value);
   }
 
   void *getOpaqueValue() const { return reinterpret_cast<void*>(Value); }
@@ -104,7 +129,14 @@ public:
   static PointerIntPair getFromOpaqueValue(void *V) {
     PointerIntPair P; P.setFromOpaqueValue(V); return P; 
   }
-  
+
+  // Allow PointerIntPairs to be created from const void * if and only if the
+  // pointer type could be created from a const void *.
+  static PointerIntPair getFromOpaqueValue(const void *V) {
+    (void)PtrTraits::getFromVoidPointer(V);
+    return getFromOpaqueValue(const_cast<void *>(V));
+  }
+
   bool operator==(const PointerIntPair &RHS) const {return Value == RHS.Value;}
   bool operator!=(const PointerIntPair &RHS) const {return Value != RHS.Value;}
   bool operator<(const PointerIntPair &RHS) const {return Value < RHS.Value;}
@@ -124,12 +156,12 @@ template<typename PointerTy, unsigned IntBits, typename IntType>
 struct DenseMapInfo<PointerIntPair<PointerTy, IntBits, IntType> > {
   typedef PointerIntPair<PointerTy, IntBits, IntType> Ty;
   static Ty getEmptyKey() {
-    intptr_t Val = -1;
+    uintptr_t Val = static_cast<uintptr_t>(-1);
     Val <<= PointerLikeTypeTraits<PointerTy>::NumLowBitsAvailable;
     return Ty(reinterpret_cast<PointerTy>(Val), IntType((1 << IntBits)-1));
   }
   static Ty getTombstoneKey() {
-    intptr_t Val = -2;
+    uintptr_t Val = static_cast<uintptr_t>(-2);
     Val <<= PointerLikeTypeTraits<PointerTy>::NumLowBitsAvailable;
     return Ty(reinterpret_cast<PointerTy>(Val), IntType(0));
   }
@@ -152,6 +184,10 @@ public:
   }
   static inline PointerIntPair<PointerTy, IntBits, IntType>
   getFromVoidPointer(void *P) {
+    return PointerIntPair<PointerTy, IntBits, IntType>::getFromOpaqueValue(P);
+  }
+  static inline PointerIntPair<PointerTy, IntBits, IntType>
+  getFromVoidPointer(const void *P) {
     return PointerIntPair<PointerTy, IntBits, IntType>::getFromOpaqueValue(P);
   }
   enum {

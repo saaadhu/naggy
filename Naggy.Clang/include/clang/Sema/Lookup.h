@@ -15,8 +15,8 @@
 #ifndef LLVM_CLANG_SEMA_LOOKUP_H
 #define LLVM_CLANG_SEMA_LOOKUP_H
 
-#include "clang/Sema/Sema.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/Sema/Sema.h"
 
 namespace clang {
 
@@ -138,7 +138,8 @@ public:
       IDNS(0),
       Redecl(Redecl != Sema::NotForRedeclaration),
       HideTags(true),
-      Diagnose(Redecl == Sema::NotForRedeclaration)
+      Diagnose(Redecl == Sema::NotForRedeclaration),
+      AllowHidden(Redecl == Sema::ForRedeclaration)
   {
     configure();
   }
@@ -158,7 +159,8 @@ public:
       IDNS(0),
       Redecl(Redecl != Sema::NotForRedeclaration),
       HideTags(true),
-      Diagnose(Redecl == Sema::NotForRedeclaration)
+      Diagnose(Redecl == Sema::NotForRedeclaration),
+      AllowHidden(Redecl == Sema::ForRedeclaration)
   {
     configure();
   }
@@ -176,7 +178,8 @@ public:
       IDNS(Other.IDNS),
       Redecl(Other.Redecl),
       HideTags(Other.HideTags),
-      Diagnose(false)
+      Diagnose(false),
+      AllowHidden(Other.AllowHidden)
   {}
 
   ~LookupResult() {
@@ -214,6 +217,18 @@ public:
     return Redecl;
   }
 
+  /// \brief Specify whether hidden declarations are visible, e.g.,
+  /// for recovery reasons.
+  void setAllowHidden(bool AH) {
+    AllowHidden = AH;
+  }
+
+  /// \brief Determine whether this lookup is permitted to see hidden
+  /// declarations, such as those in modules that have not yet been imported.
+  bool isHiddenDeclarationVisible() const {
+    return AllowHidden || LookupKind == Sema::LookupTagName;
+  }
+  
   /// Sets whether tag declarations should be hidden by non-tag
   /// declarations during resolution.  The default is true.
   void setHideTags(bool Hide) {
@@ -266,11 +281,35 @@ public:
     return Paths;
   }
 
-  /// \brief Tests whether the given declaration is acceptable.
-  bool isAcceptableDecl(NamedDecl *D) const {
-    return D->isInIdentifierNamespace(IDNS);
+  /// \brief Determine whether the given declaration is visible to the
+  /// program.
+  static bool isVisible(NamedDecl *D) {
+    // If this declaration is not hidden, it's visible.
+    if (!D->isHidden())
+      return true;
+    
+    // FIXME: We should be allowed to refer to a module-private name from 
+    // within the same module, e.g., during template instantiation.
+    // This requires us know which module a particular declaration came from.
+    return false;
   }
-
+  
+  /// \brief Retrieve the accepted (re)declaration of the given declaration,
+  /// if there is one.
+  NamedDecl *getAcceptableDecl(NamedDecl *D) const {
+    if (!D->isInIdentifierNamespace(IDNS))
+      return 0;
+    
+    if (isHiddenDeclarationVisible() || isVisible(D))
+      return D;
+    
+    return getAcceptableDeclSlow(D);
+  }
+  
+private:
+  NamedDecl *getAcceptableDeclSlow(NamedDecl *D) const;
+public:
+  
   /// \brief Returns the identifier namespace mask for this lookup.
   unsigned getIdentifierNamespace() const {
     return IDNS;
@@ -453,10 +492,11 @@ public:
   /// \brief Change this lookup's redeclaration kind.
   void setRedeclarationKind(Sema::RedeclarationKind RK) {
     Redecl = RK;
+    AllowHidden = (RK == Sema::ForRedeclaration);
     configure();
   }
 
-  void print(llvm::raw_ostream &);
+  void print(raw_ostream &);
 
   /// Suppress the diagnostics that would normally fire because of this
   /// lookup.  This happens during (e.g.) redeclaration lookups.
@@ -520,6 +560,11 @@ public:
       return *I++;
     }
 
+    /// Restart the iteration.
+    void restart() {
+      I = Results.begin();
+    }
+
     /// Erase the last element returned from this iterator.
     void erase() {
       Results.Decls.erase(--I);
@@ -557,7 +602,7 @@ private:
   void diagnose() {
     if (isAmbiguous())
       SemaRef.DiagnoseAmbiguousLookup(*this);
-    else if (isClassLookup() && SemaRef.getLangOptions().AccessControl)
+    else if (isClassLookup() && SemaRef.getLangOpts().AccessControl)
       SemaRef.CheckLookupAccess(*this);
   }
 
@@ -570,11 +615,17 @@ private:
   void configure();
 
   // Sanity checks.
-  void sanity() const;
+  void sanityImpl() const;
+
+  void sanity() const {
+#ifndef NDEBUG
+    sanityImpl();
+#endif
+  }
 
   bool sanityCheckUnresolved() const {
     for (iterator I = begin(), E = end(); I != E; ++I)
-      if (isa<UnresolvedUsingValueDecl>(*I))
+      if (isa<UnresolvedUsingValueDecl>((*I)->getUnderlyingDecl()))
         return true;
     return false;
   }
@@ -603,6 +654,9 @@ private:
   bool HideTags;
 
   bool Diagnose;
+
+  /// \brief True if we should allow hidden declarations to be 'visible'.
+  bool AllowHidden;
 };
 
   /// \brief Consumes visible declarations found when searching for
@@ -624,9 +678,11 @@ private:
     /// \param Hiding a declaration that hides the declaration \p ND,
     /// or NULL if no such declaration exists.
     ///
+    /// \param Ctx the original context from which the lookup started.
+    ///
     /// \param InBaseClass whether this declaration was found in base
     /// class of the context we searched.
-    virtual void FoundDecl(NamedDecl *ND, NamedDecl *Hiding, 
+    virtual void FoundDecl(NamedDecl *ND, NamedDecl *Hiding, DeclContext *Ctx,
                            bool InBaseClass) = 0;
   };
 

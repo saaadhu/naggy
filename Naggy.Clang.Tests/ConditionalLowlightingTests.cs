@@ -34,7 +34,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 0) });
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(2, 5) });
         }
 
         [TestMethod]
@@ -47,7 +47,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(2,2)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(1,3)});
         }
 
         [TestMethod]
@@ -67,7 +67,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(2, 9)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(1, 10)});
         }
 
         [TestMethod]
@@ -83,7 +83,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 3)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(2, 4)});
         }
 
         [TestMethod]
@@ -96,7 +96,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(2, 2)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(1, 3)});
         }
 
         [TestMethod]
@@ -111,7 +111,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(2, 2)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(1, 3)});
         }
 
         [TestMethod]
@@ -126,7 +126,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(4, 4)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 5)});
         }
 
         [TestMethod]
@@ -143,7 +143,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(2, 2), Tuple.Create(6, 6)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(1, 3), Tuple.Create(5, 7)});
         }
 
         [TestMethod]
@@ -160,7 +160,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(4, 4)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(3, 5)});
         }
 
         [TestMethod]
@@ -180,7 +180,7 @@ namespace Naggy.Clang.Tests
 ");
             var adapter = new ClangAdapter(sourceFilePath);
             adapter.Process(null);
-            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(5, 5), Tuple.Create(9, 9)});
+            AssertSkippedBlocksMatch(adapter, new[] { Tuple.Create(4, 6), Tuple.Create(8, 10)});
         }
 
         [TestMethod]
@@ -204,12 +204,8 @@ namespace Naggy.Clang.Tests
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
                 var skippedBlock = skippedBlocks.First();
-                Assert.AreEqual(5, skippedBlock.Item1);
-                Assert.AreEqual(5, skippedBlock.Item2);
-
-                skippedBlock = skippedBlocks.ElementAt(1);
-                Assert.AreEqual(7, skippedBlock.Item1);
-                Assert.AreEqual(7, skippedBlock.Item2);
+                Assert.AreEqual(4, skippedBlock.Item1);
+                Assert.AreEqual(8, skippedBlock.Item2);
             }
         }
 
@@ -237,16 +233,9 @@ namespace Naggy.Clang.Tests
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
 
                 var skippedBlock = skippedBlocks.First();
-                Assert.AreEqual(7, skippedBlock.Item1);
-                Assert.AreEqual(7, skippedBlock.Item2);
+                Assert.AreEqual(6, skippedBlock.Item1);
+                Assert.AreEqual(12, skippedBlock.Item2);
 
-                skippedBlock = skippedBlocks.ElementAt(1);
-                Assert.AreEqual(9, skippedBlock.Item1);
-                Assert.AreEqual(9, skippedBlock.Item2);
-
-                skippedBlock = skippedBlocks.ElementAt(2);
-                Assert.AreEqual(11, skippedBlock.Item1);
-                Assert.AreEqual(11, skippedBlock.Item2);
             }
         }
 
@@ -325,8 +314,8 @@ int x = 20;
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
                 var skippedBlock = skippedBlocks.First();
-                Assert.AreEqual(2, skippedBlock.Item1);
-                Assert.AreEqual(4, skippedBlock.Item2);
+                Assert.AreEqual(1, skippedBlock.Item1);
+                Assert.AreEqual(5, skippedBlock.Item2);
             }
         }
 
@@ -347,12 +336,12 @@ int x = 20;
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
                 var skippedBlock = skippedBlocks.First();
-                Assert.AreEqual(2, skippedBlock.Item1);
-                Assert.AreEqual(2, skippedBlock.Item2);
+                Assert.AreEqual(1, skippedBlock.Item1);
+                Assert.AreEqual(3, skippedBlock.Item2);
 
                 skippedBlock = skippedBlocks.ElementAt(1);
-                Assert.AreEqual(5, skippedBlock.Item1);
-                Assert.AreEqual(5, skippedBlock.Item2);
+                Assert.AreEqual(4, skippedBlock.Item1);
+                Assert.AreEqual(6, skippedBlock.Item2);
             }
         }
 
@@ -369,8 +358,8 @@ int x = 20;
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
                 var skippedBlock = skippedBlocks.First();
-                Assert.AreEqual(2, skippedBlock.Item1);
-                Assert.AreEqual(2, skippedBlock.Item2);
+                Assert.AreEqual(1, skippedBlock.Item1);
+                Assert.AreEqual(3, skippedBlock.Item2);
             }
         }
 
@@ -392,13 +381,8 @@ int x = 20;
             {
                 var skippedBlocks = preprocessor.GetSkippedBlockLineNumbers();
                 var skippedBlock = skippedBlocks.First();
-                Assert.AreEqual(4, skippedBlock.Item1);
-                Assert.AreEqual(5, skippedBlock.Item2);
-
-                skippedBlock = skippedBlocks.ElementAt(1);
-                Assert.AreEqual(7, skippedBlock.Item1);
-                Assert.AreEqual(7, skippedBlock.Item2);
-
+                Assert.AreEqual(3, skippedBlock.Item1);
+                Assert.AreEqual(8, skippedBlock.Item2);
             }
         }
 

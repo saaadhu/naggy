@@ -14,14 +14,14 @@
 #ifndef LLVM_CODEGEN_PSEUDOSOURCEVALUE_H
 #define LLVM_CODEGEN_PSEUDOSOURCEVALUE_H
 
-#include "llvm/Value.h"
+#include "llvm/IR/Value.h"
 
 namespace llvm {
   class MachineFrameInfo;
   class raw_ostream;
 
   /// PseudoSourceValue - Special value supplied for machine level alias
-  /// analysis. It indicates that the a memory access references the functions
+  /// analysis. It indicates that a memory access references the functions
   /// stack frame (e.g., a spill slot), below the stack frame (e.g., argument
   /// space), or constant pool.
   class PseudoSourceValue : public Value {
@@ -50,7 +50,6 @@ namespace llvm {
     /// classof - Methods for support type inquiry through isa, cast, and
     /// dyn_cast:
     ///
-    static inline bool classof(const PseudoSourceValue *) { return true; }
     static inline bool classof(const Value *V) {
       return V->getValueID() == PseudoSourceValueVal ||
              V->getValueID() == FixedStackPseudoSourceValueVal;
@@ -90,9 +89,6 @@ namespace llvm {
     /// classof - Methods for support type inquiry through isa, cast, and
     /// dyn_cast:
     ///
-    static inline bool classof(const FixedStackPseudoSourceValue *) {
-      return true;
-    }
     static inline bool classof(const Value *V) {
       return V->getValueID() == FixedStackPseudoSourceValueVal;
     }

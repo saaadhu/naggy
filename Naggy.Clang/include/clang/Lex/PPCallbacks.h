@@ -6,16 +6,19 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-//
-//  This file defines the PPCallbacks interface.
-//
+///
+/// \file
+/// \brief Defines the PPCallbacks interface.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_CLANG_LEX_PPCALLBACKS_H
 #define LLVM_CLANG_LEX_PPCALLBACKS_H
 
-#include "clang/Lex/DirectoryLookup.h"
+#include "clang/Basic/DiagnosticIDs.h"
 #include "clang/Basic/SourceLocation.h"
+#include "clang/Lex/DirectoryLookup.h"
+#include "clang/Lex/ModuleLoader.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 
@@ -25,9 +28,10 @@ namespace clang {
   class IdentifierInfo;
   class MacroInfo;
 
-/// PPCallbacks - This interface provides a way to observe the actions of the
-/// preprocessor as it does its thing.  Clients can define their hooks here to
-/// implement preprocessor level tools.
+/// \brief This interface provides a way to observe the actions of the
+/// preprocessor as it does its thing.
+///
+/// Clients can define their hooks here to implement preprocessor level tools.
 class PPCallbacks {
 public:
   virtual ~PPCallbacks();
@@ -36,26 +40,46 @@ public:
     EnterFile, ExitFile, SystemHeaderPragma, RenameFile
   };
 
-  /// FileChanged - This callback is invoked whenever a source file is
-  /// entered or exited.  The SourceLocation indicates the new location, and
-  /// EnteringFile indicates whether this is because we are entering a new
-  /// #include'd file (when true) or whether we're exiting one because we ran
-  /// off the end (when false).
+  /// \brief Callback invoked whenever a source file is entered or exited.
+  ///
+  /// \param Loc Indicates the new location.
+  /// \param PrevFID the file that was exited if \p Reason is ExitFile.
   virtual void FileChanged(SourceLocation Loc, FileChangeReason Reason,
-                           SrcMgr::CharacteristicKind FileType) {
+                           SrcMgr::CharacteristicKind FileType,
+                           FileID PrevFID = FileID()) {
   }
 
-  /// FileSkipped - This callback is invoked whenever a source file is
-  /// skipped as the result of header guard optimization.  ParentFile
-  /// is the file that #includes the skipped file.  FilenameTok is the
-  /// token in ParentFile that indicates the skipped file.
+  /// \brief Callback invoked whenever a source file is skipped as the result
+  /// of header guard optimization.
+  ///
+  /// \param ParentFile The file that \#included the skipped file.
+  ///
+  /// \param FilenameTok The token in ParentFile that indicates the
+  /// skipped file.
   virtual void FileSkipped(const FileEntry &ParentFile,
                            const Token &FilenameTok,
                            SrcMgr::CharacteristicKind FileType) {
   }
 
-  /// \brief This callback is invoked whenever an inclusion directive of
-  /// any kind (\c #include, \c #import, etc.) has been processed, regardless
+  /// \brief Callback invoked whenever an inclusion directive results in a
+  /// file-not-found error.
+  ///
+  /// \param FileName The name of the file being included, as written in the 
+  /// source code.
+  ///
+  /// \param RecoveryPath If this client indicates that it can recover from 
+  /// this missing file, the client should set this as an additional header
+  /// search patch.
+  ///
+  /// \returns true to indicate that the preprocessor should attempt to recover
+  /// by adding \p RecoveryPath as a header search path.
+  virtual bool FileNotFound(StringRef FileName,
+                            SmallVectorImpl<char> &RecoveryPath) {
+    return false;
+  }
+
+  /// \brief Callback invoked whenever an inclusion directive of
+  /// any kind (\c \#include, \c \#import, etc.) has been processed, regardless
   /// of whether the inclusion will actually result in an inclusion.
   ///
   /// \param HashLoc The location of the '#' that starts the inclusion 
@@ -70,10 +94,10 @@ public:
   /// \param IsAngled Whether the file name was enclosed in angle brackets;
   /// otherwise, it was enclosed in quotes.
   ///
-  /// \param File The actual file that may be included by this inclusion 
-  /// directive.
+  /// \param FilenameRange The character range of the quotes or angle brackets
+  /// for the written file name.
   ///
-  /// \param EndLoc The location of the last token within the inclusion
+  /// \param File The actual file that may be included by this inclusion 
   /// directive.
   ///
   /// \param SearchPath Contains the search path which was used to find the file
@@ -87,93 +111,153 @@ public:
   ///
   /// \param RelativePath The path relative to SearchPath, at which the include
   /// file was found. This is equal to FileName except for framework includes.
+  ///
+  /// \param Imported The module, whenever an inclusion directive was
+  /// automatically turned into a module import or null otherwise.
+  ///
   virtual void InclusionDirective(SourceLocation HashLoc,
                                   const Token &IncludeTok,
-                                  llvm::StringRef FileName,
+                                  StringRef FileName,
                                   bool IsAngled,
+                                  CharSourceRange FilenameRange,
                                   const FileEntry *File,
-                                  SourceLocation EndLoc,
-                                  llvm::StringRef SearchPath,
-                                  llvm::StringRef RelativePath) {
+                                  StringRef SearchPath,
+                                  StringRef RelativePath,
+                                  const Module *Imported) {
   }
 
-  /// EndOfMainFile - This callback is invoked when the end of the main file is
-  /// reach, no subsequent callbacks will be made.
+  /// \brief Callback invoked whenever there was an explicit module-import
+  /// syntax.
+  ///
+  /// \param ImportLoc The location of import directive token.
+  ///
+  /// \param Path The identifiers (and their locations) of the module
+  /// "path", e.g., "std.vector" would be split into "std" and "vector".
+  ///
+  /// \param Imported The imported module; can be null if importing failed.
+  ///
+  virtual void moduleImport(SourceLocation ImportLoc,
+                            ModuleIdPath Path,
+                            const Module *Imported) {
+  }
+
+  /// \brief Callback invoked when the end of the main file is reached.
+  ///
+  /// No subsequent callbacks will be made.
   virtual void EndOfMainFile() {
   }
 
-  /// Ident - This callback is invoked when a #ident or #sccs directive is read.
+  /// \brief Callback invoked when a \#ident or \#sccs directive is read.
   /// \param Loc The location of the directive.
   /// \param str The text of the directive.
   ///
   virtual void Ident(SourceLocation Loc, const std::string &str) {
   }
 
-  /// PragmaComment - This callback is invoked when a #pragma comment directive
-  /// is read.
-  ///
+  /// \brief Callback invoked when a \#pragma comment directive is read.
   virtual void PragmaComment(SourceLocation Loc, const IdentifierInfo *Kind,
                              const std::string &Str) {
   }
 
-  /// PragmaMessage - This callback is invoked when a #pragma message directive
-  /// is read.
+  /// \brief Callback invoked when a \#pragma message directive is read.
   /// \param Loc The location of the message directive.
-  /// \param str The text of the message directive.
-  ///
-  virtual void PragmaMessage(SourceLocation Loc, llvm::StringRef Str) {
+  /// \param Str The text of the message directive.
+  virtual void PragmaMessage(SourceLocation Loc, StringRef Str) {
   }
 
-  /// MacroExpands - This is called by
-  /// Preprocessor::HandleMacroExpandedIdentifier when a macro invocation is
-  /// found.
-  virtual void MacroExpands(const Token &MacroNameTok, const MacroInfo* MI) {
+  /// \brief Callback invoked when a \#pragma gcc dianostic push directive
+  /// is read.
+  virtual void PragmaDiagnosticPush(SourceLocation Loc,
+                                    StringRef Namespace) {
   }
 
-  /// MacroDefined - This hook is called whenever a macro definition is seen.
+  /// \brief Callback invoked when a \#pragma gcc dianostic pop directive
+  /// is read.
+  virtual void PragmaDiagnosticPop(SourceLocation Loc,
+                                   StringRef Namespace) {
+  }
+
+  /// \brief Callback invoked when a \#pragma gcc dianostic directive is read.
+  virtual void PragmaDiagnostic(SourceLocation Loc, StringRef Namespace,
+                                diag::Mapping mapping, StringRef Str) {
+  }
+
+  /// \brief Called by Preprocessor::HandleMacroExpandedIdentifier when a
+  /// macro invocation is found.
+  virtual void MacroExpands(const Token &MacroNameTok, const MacroInfo* MI,
+                            SourceRange Range) {
+  }
+
+  /// \brief Hook called whenever a macro definition is seen.
   virtual void MacroDefined(const Token &MacroNameTok, const MacroInfo *MI) {
   }
 
-  /// MacroUndefined - This hook is called whenever a macro #undef is seen.
+  /// \brief Hook called whenever a macro \#undef is seen.
+  ///
   /// MI is released immediately following this callback.
   virtual void MacroUndefined(const Token &MacroNameTok, const MacroInfo *MI) {
   }
+  
+  /// \brief Hook called whenever the 'defined' operator is seen.
+  /// \param MI The MacroInfo if the name was a macro, null otherwise.
+  virtual void Defined(const Token &MacroNameTok, const MacroInfo *MI) {
+  }
+  
+  /// \brief Hook called when a source range is skipped.
+  /// \param Range The SourceRange that was skipped. The range begins at the
+  /// \#if/\#else directive and ends after the \#endif/\#else directive.
+  virtual void SourceRangeSkipped(SourceRange Range) {
+  }
 
-  /// If -- This hook is called whenever an #if is seen.
-  /// \param Range The SourceRange of the expression being tested.
+  /// \brief Hook called whenever an \#if is seen.
+  /// \param Loc the source location of the directive.
+  /// \param ConditionRange The SourceRange of the expression being tested.
+  ///
   // FIXME: better to pass in a list (or tree!) of Tokens.
-  virtual void If(SourceRange Range, bool Entering=false) {
+  virtual void If(SourceLocation Loc, SourceRange ConditionRange) {
   }
 
-  /// Elif -- This hook is called whenever an #elif is seen.
-  /// \param Range The SourceRange of the expression being tested.
+  /// \brief Hook called whenever an \#elif is seen.
+  /// \param Loc the source location of the directive.
+  /// \param ConditionRange The SourceRange of the expression being tested.
+  /// \param IfLoc the source location of the \#if/\#ifdef/\#ifndef directive.
   // FIXME: better to pass in a list (or tree!) of Tokens.
-  virtual void Elif(SourceRange Range, bool Entering=false) {
+  virtual void Elif(SourceLocation Loc, SourceRange ConditionRange,
+                    SourceLocation IfLoc) {
   }
 
-  /// Ifdef -- This hook is called whenever an #ifdef is seen.
-  /// \param Loc The location of the token being tested.
-  /// \param II Information on the token being tested.
-  virtual void Ifdef(const Token &MacroNameTok, bool Entering=false) {
+  /// \brief Hook called whenever an \#ifdef is seen.
+  /// \param Loc the source location of the directive.
+  /// \param MacroNameTok Information on the token being tested.
+  /// \param MI The MacroInfo if the name was a macro, null otherwise.
+  virtual void Ifdef(SourceLocation Loc, const Token &MacroNameTok,
+                     const MacroInfo *MI) {
   }
 
-  /// Ifndef -- This hook is called whenever an #ifndef is seen.
-  /// \param Loc The location of the token being tested.
-  /// \param II Information on the token being tested.
-  virtual void Ifndef(const Token &MacroNameTok, bool Entering=false) {
+  /// \brief Hook called whenever an \#ifndef is seen.
+  /// \param Loc the source location of the directive.
+  /// \param MacroNameTok Information on the token being tested.
+  /// \param MI The MacroInfo if the name was a macro, null otherwise.
+  virtual void Ifndef(SourceLocation Loc, const Token &MacroNameTok,
+                      const MacroInfo *MI) {
   }
 
-  /// Else -- This hook is called whenever an #else is seen.
-  virtual void Else(SourceRange Range, bool Entering=false) {
+  /// \brief Hook called whenever an \#else is seen.
+  /// \param Loc the source location of the directive.
+  /// \param IfLoc the source location of the \#if/\#ifdef/\#ifndef directive.
+  virtual void Else(SourceLocation Loc, SourceLocation IfLoc) {
   }
 
-  /// Endif -- This hook is called whenever an #endif is seen.
-  virtual void Endif(bool Entering=false) {
+  /// \brief Hook called whenever an \#endif is seen.
+  /// \param Loc the source location of the directive.
+  /// \param IfLoc the source location of the \#if/\#ifdef/\#ifndef directive.
+  virtual void Endif(SourceLocation Loc, SourceLocation IfLoc) {
   }
 };
 
-/// PPChainedCallbacks - Simple wrapper class for chaining callbacks.
+/// \brief Simple wrapper class for chaining callbacks.
 class PPChainedCallbacks : public PPCallbacks {
+  virtual void anchor();
   PPCallbacks *First, *Second;
 
 public:
@@ -185,9 +269,10 @@ public:
   }
 
   virtual void FileChanged(SourceLocation Loc, FileChangeReason Reason,
-                           SrcMgr::CharacteristicKind FileType) {
-    First->FileChanged(Loc, Reason, FileType);
-    Second->FileChanged(Loc, Reason, FileType);
+                           SrcMgr::CharacteristicKind FileType,
+                           FileID PrevFID) {
+    First->FileChanged(Loc, Reason, FileType, PrevFID);
+    Second->FileChanged(Loc, Reason, FileType, PrevFID);
   }
 
   virtual void FileSkipped(const FileEntry &ParentFile,
@@ -197,18 +282,34 @@ public:
     Second->FileSkipped(ParentFile, FilenameTok, FileType);
   }
 
+  virtual bool FileNotFound(StringRef FileName,
+                            SmallVectorImpl<char> &RecoveryPath) {
+    return First->FileNotFound(FileName, RecoveryPath) ||
+           Second->FileNotFound(FileName, RecoveryPath);
+  }
+
   virtual void InclusionDirective(SourceLocation HashLoc,
                                   const Token &IncludeTok,
-                                  llvm::StringRef FileName,
+                                  StringRef FileName,
                                   bool IsAngled,
+                                  CharSourceRange FilenameRange,
                                   const FileEntry *File,
-                                  SourceLocation EndLoc,
-                                  llvm::StringRef SearchPath,
-                                  llvm::StringRef RelativePath) {
-    First->InclusionDirective(HashLoc, IncludeTok, FileName, IsAngled, File,
-                              EndLoc, SearchPath, RelativePath);
-    Second->InclusionDirective(HashLoc, IncludeTok, FileName, IsAngled, File,
-                               EndLoc, SearchPath, RelativePath);
+                                  StringRef SearchPath,
+                                  StringRef RelativePath,
+                                  const Module *Imported) {
+    First->InclusionDirective(HashLoc, IncludeTok, FileName, IsAngled,
+                              FilenameRange, File, SearchPath, RelativePath,
+                              Imported);
+    Second->InclusionDirective(HashLoc, IncludeTok, FileName, IsAngled,
+                               FilenameRange, File, SearchPath, RelativePath,
+                               Imported);
+  }
+
+  virtual void moduleImport(SourceLocation ImportLoc,
+                            ModuleIdPath Path,
+                            const Module *Imported) {
+    First->moduleImport(ImportLoc, Path, Imported);
+    Second->moduleImport(ImportLoc, Path, Imported);
   }
 
   virtual void EndOfMainFile() {
@@ -227,14 +328,33 @@ public:
     Second->PragmaComment(Loc, Kind, Str);
   }
 
-  virtual void PragmaMessage(SourceLocation Loc, llvm::StringRef Str) {
+  virtual void PragmaMessage(SourceLocation Loc, StringRef Str) {
     First->PragmaMessage(Loc, Str);
     Second->PragmaMessage(Loc, Str);
   }
 
-  virtual void MacroExpands(const Token &MacroNameTok, const MacroInfo* MI) {
-    First->MacroExpands(MacroNameTok, MI);
-    Second->MacroExpands(MacroNameTok, MI);
+  virtual void PragmaDiagnosticPush(SourceLocation Loc,
+                                    StringRef Namespace) {
+    First->PragmaDiagnosticPush(Loc, Namespace);
+    Second->PragmaDiagnosticPush(Loc, Namespace);
+  }
+
+  virtual void PragmaDiagnosticPop(SourceLocation Loc,
+                                    StringRef Namespace) {
+    First->PragmaDiagnosticPop(Loc, Namespace);
+    Second->PragmaDiagnosticPop(Loc, Namespace);
+  }
+
+  virtual void PragmaDiagnostic(SourceLocation Loc, StringRef Namespace,
+                                diag::Mapping mapping, StringRef Str) {
+    First->PragmaDiagnostic(Loc, Namespace, mapping, Str);
+    Second->PragmaDiagnostic(Loc, Namespace, mapping, Str);
+  }
+
+  virtual void MacroExpands(const Token &MacroNameTok, const MacroInfo* MI,
+                            SourceRange Range) {
+    First->MacroExpands(MacroNameTok, MI, Range);
+    Second->MacroExpands(MacroNameTok, MI, Range);
   }
 
   virtual void MacroDefined(const Token &MacroNameTok, const MacroInfo *MI) {
@@ -247,40 +367,53 @@ public:
     Second->MacroUndefined(MacroNameTok, MI);
   }
 
-  /// If -- This hook is called whenever an #if is seen.
-  virtual void If(SourceRange Range, bool Entering=false) {
-    First->If(Range, Entering);
-    Second->If(Range, Entering);
+  virtual void Defined(const Token &MacroNameTok, const MacroInfo *MI) {
+    First->Defined(MacroNameTok, MI);
+    Second->Defined(MacroNameTok, MI);
   }
 
-  /// Elif -- This hook is called whenever an #if is seen.
-  virtual void Elif(SourceRange Range, bool Entering=false) {
-    First->Elif(Range, Entering);
-    Second->Elif(Range, Entering);
+  virtual void SourceRangeSkipped(SourceRange Range) {
+    First->SourceRangeSkipped(Range);
+    Second->SourceRangeSkipped(Range);
   }
 
-  /// Ifdef -- This hook is called whenever an #ifdef is seen.
-  virtual void Ifdef(const Token &MacroNameTok, bool Entering=false) {
-    First->Ifdef(MacroNameTok, Entering);
-    Second->Ifdef(MacroNameTok, Entering);
+  /// \brief Hook called whenever an \#if is seen.
+  virtual void If(SourceLocation Loc, SourceRange ConditionRange) {
+    First->If(Loc, ConditionRange);
+    Second->If(Loc, ConditionRange);
   }
 
-  /// Ifndef -- This hook is called whenever an #ifndef is seen.
-  virtual void Ifndef(const Token &MacroNameTok, bool Entering=false) {
-    First->Ifndef(MacroNameTok, Entering);
-    Second->Ifndef(MacroNameTok, Entering);
+  /// \brief Hook called whenever an \#if is seen.
+  virtual void Elif(SourceLocation Loc, SourceRange ConditionRange,
+                    SourceLocation IfLoc) {
+    First->Elif(Loc, ConditionRange, IfLoc);
+    Second->Elif(Loc, ConditionRange, IfLoc);
   }
 
-  /// Else -- This hook is called whenever an #else is seen.
-  virtual void Else(SourceRange Range, bool Entering=false) {
-    First->Else(Range, Entering);
-    Second->Else(Range, Entering);
+  /// \brief Hook called whenever an \#ifdef is seen.
+  virtual void Ifdef(SourceLocation Loc, const Token &MacroNameTok,
+                     const MacroInfo *MI) {
+    First->Ifdef(Loc, MacroNameTok, MI);
+    Second->Ifdef(Loc, MacroNameTok, MI);
   }
 
-  /// Endif -- This hook is called whenever an #endif is seen.
-  virtual void Endif(bool Entering=false) {
-    First->Endif(Entering);
-    Second->Endif(Entering);
+  /// \brief Hook called whenever an \#ifndef is seen.
+  virtual void Ifndef(SourceLocation Loc, const Token &MacroNameTok,
+                      const MacroInfo *MI) {
+    First->Ifndef(Loc, MacroNameTok, MI);
+    Second->Ifndef(Loc, MacroNameTok, MI);
+  }
+
+  /// \brief Hook called whenever an \#else is seen.
+  virtual void Else(SourceLocation Loc, SourceLocation IfLoc) {
+    First->Else(Loc, IfLoc);
+    Second->Else(Loc, IfLoc);
+  }
+
+  /// \brief Hook called whenever an \#endif is seen.
+  virtual void Endif(SourceLocation Loc, SourceLocation IfLoc) {
+    First->Endif(Loc, IfLoc);
+    Second->Endif(Loc, IfLoc);
   }
 };
 

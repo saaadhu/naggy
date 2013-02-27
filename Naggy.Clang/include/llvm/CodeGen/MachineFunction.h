@@ -18,10 +18,11 @@
 #ifndef LLVM_CODEGEN_MACHINEFUNCTION_H
 #define LLVM_CODEGEN_MACHINEFUNCTION_H
 
-#include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/ADT/ilist.h"
-#include "llvm/Support/DebugLoc.h"
+#include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/ArrayRecycler.h"
+#include "llvm/Support/DebugLoc.h"
 #include "llvm/Support/Recycler.h"
 
 namespace llvm {
@@ -105,6 +106,9 @@ class MachineFunction {
   // Allocation management for instructions in function.
   Recycler<MachineInstr> InstructionRecycler;
 
+  // Allocation management for operand arrays on instructions.
+  ArrayRecycler<MachineOperand> OperandRecycler;
+
   // Allocation management for basic blocks in function.
   Recycler<MachineBasicBlock> BasicBlockRecycler;
 
@@ -120,13 +124,15 @@ class MachineFunction {
   /// Alignment - The alignment of the function.
   unsigned Alignment;
 
-  /// CallsSetJmp - True if the function calls setjmp or sigsetjmp. This is used
-  /// to limit optimizations which cannot reason about the control flow of
-  /// setjmp.
-  bool CallsSetJmp;
+  /// ExposesReturnsTwice - True if the function calls setjmp or related
+  /// functions with attribute "returns twice", but doesn't have
+  /// the attribute itself.
+  /// This is used to limit optimizations which cannot reason
+  /// about the control flow of such functions.
+  bool ExposesReturnsTwice;
 
-  MachineFunction(const MachineFunction &); // DO NOT IMPLEMENT
-  void operator=(const MachineFunction&);   // DO NOT IMPLEMENT
+  MachineFunction(const MachineFunction &) LLVM_DELETED_FUNCTION;
+  void operator=(const MachineFunction&) LLVM_DELETED_FUNCTION;
 public:
   MachineFunction(const Function *Fn, const TargetMachine &TM,
                   unsigned FunctionNum, MachineModuleInfo &MMI,
@@ -136,15 +142,19 @@ public:
   MachineModuleInfo &getMMI() const { return MMI; }
   GCModuleInfo *getGMI() const { return GMI; }
   MCContext &getContext() const { return Ctx; }
-  
+
   /// getFunction - Return the LLVM function that this machine code represents
   ///
   const Function *getFunction() const { return Fn; }
 
+  /// getName - Return the name of the corresponding LLVM function.
+  ///
+  StringRef getName() const;
+
   /// getFunctionNumber - Return a unique ID for the current function.
   ///
   unsigned getFunctionNumber() const { return FunctionNumber; }
-  
+
   /// getTarget - Return the target machine this machine code is compiled with
   ///
   const TargetMachine &getTarget() const { return Target; }
@@ -187,20 +197,22 @@ public:
   ///
   void setAlignment(unsigned A) { Alignment = A; }
 
-  /// EnsureAlignment - Make sure the function is at least 'A' bits aligned.
-  void EnsureAlignment(unsigned A) {
+  /// ensureAlignment - Make sure the function is at least 1 << A bytes aligned.
+  void ensureAlignment(unsigned A) {
     if (Alignment < A) Alignment = A;
   }
 
-  /// callsSetJmp - Returns true if the function calls setjmp or sigsetjmp.
-  bool callsSetJmp() const {
-    return CallsSetJmp;
+  /// exposesReturnsTwice - Returns true if the function calls setjmp or
+  /// any other similar functions with attribute "returns twice" without
+  /// having the attribute itself.
+  bool exposesReturnsTwice() const {
+    return ExposesReturnsTwice;
   }
 
-  /// setCallsSetJmp - Set a flag that indicates if there's a call to setjmp or
-  /// sigsetjmp.
-  void setCallsSetJmp(bool B) {
-    CallsSetJmp = B;
+  /// setCallsSetJmp - Set a flag that indicates if there's a call to
+  /// a "returns twice" function.
+  void setExposesReturnsTwice(bool B) {
+    ExposesReturnsTwice = B;
   }
   
   /// getInfo - Keep track of various per-function pieces of information for
@@ -345,7 +357,7 @@ public:
   /// CreateMachineInstr - Allocate a new MachineInstr. Use this instead
   /// of `new MachineInstr'.
   ///
-  MachineInstr *CreateMachineInstr(const TargetInstrDesc &TID,
+  MachineInstr *CreateMachineInstr(const MCInstrDesc &MCID,
                                    DebugLoc DL,
                                    bool NoImp = false);
 
@@ -376,7 +388,8 @@ public:
   MachineMemOperand *getMachineMemOperand(MachinePointerInfo PtrInfo,
                                           unsigned f, uint64_t s,
                                           unsigned base_alignment,
-                                          const MDNode *TBAAInfo = 0);
+                                          const MDNode *TBAAInfo = 0,
+                                          const MDNode *Ranges = 0);
   
   /// getMachineMemOperand - Allocate a new MachineMemOperand by copying
   /// an existing one, adjusting by an offset and using the given size.
@@ -384,6 +397,21 @@ public:
   /// explicitly deallocated.
   MachineMemOperand *getMachineMemOperand(const MachineMemOperand *MMO,
                                           int64_t Offset, uint64_t Size);
+
+  typedef ArrayRecycler<MachineOperand>::Capacity OperandCapacity;
+
+  /// Allocate an array of MachineOperands. This is only intended for use by
+  /// internal MachineInstr functions.
+  MachineOperand *allocateOperandArray(OperandCapacity Cap) {
+    return OperandRecycler.allocate(Cap, Allocator);
+  }
+
+  /// Dellocate an array of MachineOperands and recycle the memory. This is
+  /// only intended for use by internal MachineInstr functions.
+  /// Cap must be the same capacity that was used to allocate the array.
+  void deallocateOperandArray(OperandCapacity Cap, MachineOperand *Array) {
+    OperandRecycler.deallocate(Cap, Array);
+  }
 
   /// allocateMemRefsArray - Allocate an array to hold MachineMemOperand
   /// pointers.  This array is owned by the MachineFunction.
@@ -437,6 +465,7 @@ template <> struct GraphTraits<MachineFunction*> :
   typedef MachineFunction::iterator nodes_iterator;
   static nodes_iterator nodes_begin(MachineFunction *F) { return F->begin(); }
   static nodes_iterator nodes_end  (MachineFunction *F) { return F->end(); }
+  static unsigned       size       (MachineFunction *F) { return F->size(); }
 };
 template <> struct GraphTraits<const MachineFunction*> :
   public GraphTraits<const MachineBasicBlock*> {
@@ -451,6 +480,9 @@ template <> struct GraphTraits<const MachineFunction*> :
   }
   static nodes_iterator nodes_end  (const MachineFunction *F) {
     return F->end();
+  }
+  static unsigned       size       (const MachineFunction *F)  {
+    return F->size();
   }
 };
 

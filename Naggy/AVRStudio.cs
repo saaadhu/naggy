@@ -40,12 +40,13 @@ namespace Naggy
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
             IEnumerable<string> defaultIncludePaths = toolchainOptions.CCompiler.DefaultIncludePaths;
 
-            var adjustedDefaultIncludePaths = defaultIncludePaths.Select(p => p.Replace("bin\\", string.Empty));
-
+            var adjustedDefaultIncludePaths = defaultIncludePaths
+                .Select(p => p.Replace("bin\\", string.Empty));
+            
             IEnumerable<string> projectSpecificIncludePaths = toolchainOptions.CCompiler.IncludePaths;
             string outputFolder = ((dynamic)project.Object).GetProjectProperty("OutputDirectory");
-            var absoluteProjectSpecificFolderPaths =
-                projectSpecificIncludePaths.Select(p => Path.IsPathRooted(p) ? p : Path.Combine(outputFolder, p));
+            var absoluteProjectSpecificFolderPaths = projectSpecificIncludePaths
+                .Select(p => Path.IsPathRooted(p) ? p : Path.Combine(outputFolder, p));
             
             return adjustedDefaultIncludePaths.Concat(absoluteProjectSpecificFolderPaths);
         }

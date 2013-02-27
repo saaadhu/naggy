@@ -14,6 +14,7 @@
 
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclVisitor.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallVector.h"
 #include <cassert>
 #include <utility>
@@ -45,7 +46,7 @@ namespace clang {
   private:
     /// \brief The template argument lists, stored from the innermost template
     /// argument list (first) to the outermost template argument list (last).
-    llvm::SmallVector<ArgList, 4> TemplateArgumentLists;
+    SmallVector<ArgList, 4> TemplateArgumentLists;
     
   public:
     /// \brief Construct an empty set of template argument lists.
@@ -152,10 +153,11 @@ namespace clang {
 
     /// \brief Construct an integral non-type template argument that
     /// has been deduced, possibly from an array bound.
-    DeducedTemplateArgument(const llvm::APSInt &Value,
+    DeducedTemplateArgument(ASTContext &Ctx,
+                            const llvm::APSInt &Value,
                             QualType ValueType,
                             bool DeducedFromArrayBound)
-      : TemplateArgument(Value, ValueType), 
+      : TemplateArgument(Ctx, Value, ValueType),
         DeducedFromArrayBound(DeducedFromArrayBound) { }
 
     /// \brief For a non-type template argument, determine whether the
@@ -178,7 +180,7 @@ namespace clang {
   class LocalInstantiationScope {
   public:
     /// \brief A set of declarations.
-    typedef llvm::SmallVector<Decl *, 4> DeclArgumentPack;
+    typedef SmallVector<Decl *, 4> DeclArgumentPack;
     
   private:
     /// \brief Reference to the semantic analysis that is performing
@@ -210,7 +212,7 @@ namespace clang {
     LocalDeclsMap LocalDecls;
 
     /// \brief The set of argument packs we've allocated.
-    llvm::SmallVector<DeclArgumentPack *, 1> ArgumentPacks;
+    SmallVector<DeclArgumentPack *, 1> ArgumentPacks;
     
     /// \brief The outer scope, which contains local variable
     /// definitions from some other instantiation (that may not be
@@ -238,8 +240,9 @@ namespace clang {
     unsigned NumArgsInPartiallySubstitutedPack;
 
     // This class is non-copyable
-    LocalInstantiationScope(const LocalInstantiationScope &);
-    LocalInstantiationScope &operator=(const LocalInstantiationScope &);
+    LocalInstantiationScope(
+      const LocalInstantiationScope &) LLVM_DELETED_FUNCTION;
+    void operator=(const LocalInstantiationScope &) LLVM_DELETED_FUNCTION;
 
   public:
     LocalInstantiationScope(Sema &SemaRef, bool CombineWithOuterScope = false)
@@ -266,6 +269,50 @@ namespace clang {
         
       SemaRef.CurrentInstantiationScope = Outer;
       Exited = true;
+    }
+
+    /// \brief Clone this scope, and all outer scopes, down to the given
+    /// outermost scope.
+    LocalInstantiationScope *cloneScopes(LocalInstantiationScope *Outermost) {
+      if (this == Outermost) return this;
+      LocalInstantiationScope *newScope =
+        new LocalInstantiationScope(SemaRef, CombineWithOuterScope);
+
+      newScope->Outer = 0;
+      if (Outer)
+        newScope->Outer = Outer->cloneScopes(Outermost);
+
+      newScope->PartiallySubstitutedPack = PartiallySubstitutedPack;
+      newScope->ArgsInPartiallySubstitutedPack = ArgsInPartiallySubstitutedPack;
+      newScope->NumArgsInPartiallySubstitutedPack =
+        NumArgsInPartiallySubstitutedPack;
+
+      for (LocalDeclsMap::iterator I = LocalDecls.begin(), E = LocalDecls.end();
+           I != E; ++I) {
+        const Decl *D = I->first;
+        llvm::PointerUnion<Decl *, DeclArgumentPack *> &Stored =
+          newScope->LocalDecls[D];
+        if (I->second.is<Decl *>()) {
+          Stored = I->second.get<Decl *>();
+        } else {
+          DeclArgumentPack *OldPack = I->second.get<DeclArgumentPack *>();
+          DeclArgumentPack *NewPack = new DeclArgumentPack(*OldPack);
+          Stored = NewPack;
+          newScope->ArgumentPacks.push_back(NewPack);
+        }
+      }
+      return newScope;
+    }
+
+    /// \brief deletes the given scope, and all otuer scopes, down to the
+    /// given outermost scope.
+    static void deleteScopes(LocalInstantiationScope *Scope,
+                             LocalInstantiationScope *Outermost) {
+      while (Scope && Scope != Outermost) {
+        LocalInstantiationScope *Out = Scope->Outer;
+        delete Scope;
+        Scope = Out;
+      }
     }
 
     /// \brief Find the instantiation of the declaration D within the current
@@ -298,7 +345,16 @@ namespace clang {
     void SetPartiallySubstitutedPack(NamedDecl *Pack, 
                                      const TemplateArgument *ExplicitArgs,
                                      unsigned NumExplicitArgs);
-    
+
+    /// \brief Reset the partially-substituted pack when it is no longer of
+    /// interest.
+    void ResetPartiallySubstitutedPack() {
+      assert(PartiallySubstitutedPack && "No partially-substituted pack");
+      PartiallySubstitutedPack = 0;
+      ArgsInPartiallySubstitutedPack = 0;
+      NumArgsInPartiallySubstitutedPack = 0;
+    }
+
     /// \brief Retrieve the partially-substitued template parameter pack.
     ///
     /// If there is no partially-substituted parameter pack, returns NULL.
@@ -314,19 +370,23 @@ namespace clang {
     Sema::ArgumentPackSubstitutionIndexRAII SubstIndex;
     DeclContext *Owner;
     const MultiLevelTemplateArgumentList &TemplateArgs;
+    Sema::LateInstantiatedAttrVec* LateAttrs;
+    LocalInstantiationScope *StartingScope;
 
     /// \brief A list of out-of-line class template partial
     /// specializations that will need to be instantiated after the
     /// enclosing class's instantiation is complete.
-    llvm::SmallVector<std::pair<ClassTemplateDecl *,
+    SmallVector<std::pair<ClassTemplateDecl *,
                                 ClassTemplatePartialSpecializationDecl *>, 4>
       OutOfLinePartialSpecs;
 
   public:
     TemplateDeclInstantiator(Sema &SemaRef, DeclContext *Owner,
                              const MultiLevelTemplateArgumentList &TemplateArgs)
-      : SemaRef(SemaRef), SubstIndex(SemaRef, -1), Owner(Owner), 
-        TemplateArgs(TemplateArgs) { }
+      : SemaRef(SemaRef),
+        SubstIndex(SemaRef, SemaRef.ArgumentPackSubstitutionIndex),
+        Owner(Owner), TemplateArgs(TemplateArgs), LateAttrs(0), StartingScope(0)
+    { }
 
     // FIXME: Once we get closer to completion, replace these manually-written
     // declarations with automatically-generated ones from
@@ -335,9 +395,9 @@ namespace clang {
     Decl *VisitLabelDecl(LabelDecl *D);
     Decl *VisitNamespaceDecl(NamespaceDecl *D);
     Decl *VisitNamespaceAliasDecl(NamespaceAliasDecl *D);
-    Decl *VisitTypedefNameDecl(TypedefNameDecl *D, bool IsTypeAlias);
     Decl *VisitTypedefDecl(TypedefDecl *D);
     Decl *VisitTypeAliasDecl(TypeAliasDecl *D);
+    Decl *VisitTypeAliasTemplateDecl(TypeAliasTemplateDecl *D);
     Decl *VisitVarDecl(VarDecl *D);
     Decl *VisitAccessSpecDecl(AccessSpecDecl *D);
     Decl *VisitFieldDecl(FieldDecl *D);
@@ -350,7 +410,8 @@ namespace clang {
                             TemplateParameterList *TemplateParams = 0);
     Decl *VisitCXXRecordDecl(CXXRecordDecl *D);
     Decl *VisitCXXMethodDecl(CXXMethodDecl *D,
-                             TemplateParameterList *TemplateParams = 0);
+                             TemplateParameterList *TemplateParams = 0,
+                             bool IsClassScopeSpecialization = false);
     Decl *VisitCXXConstructorDecl(CXXConstructorDecl *D);
     Decl *VisitCXXDestructorDecl(CXXDestructorDecl *D);
     Decl *VisitCXXConversionDecl(CXXConversionDecl *D);
@@ -367,11 +428,13 @@ namespace clang {
     Decl *VisitUsingShadowDecl(UsingShadowDecl *D);
     Decl *VisitUnresolvedUsingValueDecl(UnresolvedUsingValueDecl *D);
     Decl *VisitUnresolvedUsingTypenameDecl(UnresolvedUsingTypenameDecl *D);
+    Decl *VisitClassScopeFunctionSpecializationDecl(
+                                      ClassScopeFunctionSpecializationDecl *D);
 
     // Base case. FIXME: Remove once we can instantiate everything.
     Decl *VisitDecl(Decl *D) {
       unsigned DiagID = SemaRef.getDiagnostics().getCustomDiagID(
-                                                            Diagnostic::Error,
+                                                   DiagnosticsEngine::Error,
                                                    "cannot instantiate %0 yet");
       SemaRef.Diag(D->getLocation(), DiagID)
         << D->getDeclKindName();
@@ -379,8 +442,23 @@ namespace clang {
       return 0;
     }
     
+    // Enable late instantiation of attributes.  Late instantiated attributes
+    // will be stored in LA.
+    void enableLateAttributeInstantiation(Sema::LateInstantiatedAttrVec *LA) {
+      LateAttrs = LA;
+      StartingScope = SemaRef.CurrentInstantiationScope;
+    }
+
+    // Disable late instantiation of attributes.
+    void disableLateAttributeInstantiation() {
+      LateAttrs = 0;
+      StartingScope = 0;
+    }
+
+    LocalInstantiationScope *getStartingScope() const { return StartingScope; }
+
     typedef 
-      llvm::SmallVectorImpl<std::pair<ClassTemplateDecl *,
+      SmallVectorImpl<std::pair<ClassTemplateDecl *,
                                      ClassTemplatePartialSpecializationDecl *> >
         ::iterator
       delayed_partial_spec_iterator;
@@ -403,7 +481,7 @@ namespace clang {
 
     // Helper functions for instantiating methods.
     TypeSourceInfo *SubstFunctionType(FunctionDecl *D,
-                             llvm::SmallVectorImpl<ParmVarDecl *> &Params);
+                             SmallVectorImpl<ParmVarDecl *> &Params);
     bool InitFunctionInstantiation(FunctionDecl *New, FunctionDecl *Tmpl);
     bool InitMethodInstantiation(CXXMethodDecl *New, CXXMethodDecl *Tmpl);
 
@@ -415,10 +493,12 @@ namespace clang {
     bool SubstQualifier(const TagDecl *OldDecl,
                         TagDecl *NewDecl);
       
+    Decl *InstantiateTypedefNameDecl(TypedefNameDecl *D, bool IsTypeAlias);
     ClassTemplatePartialSpecializationDecl *
     InstantiateClassTemplatePartialSpecialization(
                                               ClassTemplateDecl *ClassTemplate,
                            ClassTemplatePartialSpecializationDecl *PartialSpec);
+    void InstantiateEnumDefinition(EnumDecl *Enum, EnumDecl *Pattern);
   };  
 }
 

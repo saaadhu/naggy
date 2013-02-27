@@ -13,19 +13,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SUPPORT_SOURCEMGR_H
-#define SUPPORT_SOURCEMGR_H
+#ifndef LLVM_SUPPORT_SOURCEMGR_H
+#define LLVM_SUPPORT_SOURCEMGR_H
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/SMLoc.h"
-
 #include <string>
-#include <vector>
-#include <cassert>
 
 namespace llvm {
   class MemoryBuffer;
   class SourceMgr;
   class SMDiagnostic;
+  class SMFixIt;
   class Twine;
   class raw_ostream;
 
@@ -33,10 +34,16 @@ namespace llvm {
 /// and handles diagnostic wrangling.
 class SourceMgr {
 public:
+  enum DiagKind {
+    DK_Error,
+    DK_Warning,
+    DK_Note
+  };
+  
   /// DiagHandlerTy - Clients that want to handle their own diagnostics in a
   /// custom way can register a function pointer+context as a diagnostic
   /// handler.  It gets called each time PrintMessage is invoked.
-  typedef void (*DiagHandlerTy)(const SMDiagnostic&, void *Context);
+  typedef void (*DiagHandlerTy)(const SMDiagnostic &, void *Context);
 private:
   struct SrcBuffer {
     /// Buffer - The memory buffer for the file.
@@ -60,9 +67,9 @@ private:
 
   DiagHandlerTy DiagHandler;
   void *DiagContext;
-  
-  SourceMgr(const SourceMgr&);    // DO NOT IMPLEMENT
-  void operator=(const SourceMgr&); // DO NOT IMPLEMENT
+
+  SourceMgr(const SourceMgr&) LLVM_DELETED_FUNCTION;
+  void operator=(const SourceMgr&) LLVM_DELETED_FUNCTION;
 public:
   SourceMgr() : LineNoCache(0), DiagHandler(0), DiagContext(0) {}
   ~SourceMgr();
@@ -78,6 +85,9 @@ public:
     DiagContext = Ctx;
   }
 
+  DiagHandlerTy getDiagHandler() const { return DiagHandler; }
+  void *getDiagContext() const { return DiagContext; }
+
   const SrcBuffer &getBufferInfo(unsigned i) const {
     assert(i < Buffers.size() && "Invalid Buffer ID!");
     return Buffers[i];
@@ -86,6 +96,10 @@ public:
   const MemoryBuffer *getMemoryBuffer(unsigned i) const {
     assert(i < Buffers.size() && "Invalid Buffer ID!");
     return Buffers[i].Buffer;
+  }
+
+  unsigned getNumBuffers() const {
+    return Buffers.size();
   }
 
   SMLoc getParentIncludeLoc(unsigned i) const {
@@ -106,7 +120,9 @@ public:
   /// AddIncludeFile - Search for a file with the specified name in the current
   /// directory or in one of the IncludeDirs.  If no file is found, this returns
   /// ~0, otherwise it returns the buffer ID of the stacked file.
-  unsigned AddIncludeFile(const std::string &Filename, SMLoc IncludeLoc);
+  /// The full path to the included file can be found in IncludedFile.
+  unsigned AddIncludeFile(const std::string &Filename, SMLoc IncludeLoc,
+                          std::string &IncludedFile);
 
   /// FindBufferContainingLoc - Return the ID of the buffer containing the
   /// specified location, returning -1 if not found.
@@ -114,31 +130,74 @@ public:
 
   /// FindLineNumber - Find the line number for the specified location in the
   /// specified file.  This is not a fast method.
-  unsigned FindLineNumber(SMLoc Loc, int BufferID = -1) const;
+  unsigned FindLineNumber(SMLoc Loc, int BufferID = -1) const {
+    return getLineAndColumn(Loc, BufferID).first;
+  }
+
+  /// getLineAndColumn - Find the line and column number for the specified
+  /// location in the specified file.  This is not a fast method.
+  std::pair<unsigned, unsigned>
+    getLineAndColumn(SMLoc Loc, int BufferID = -1) const;
 
   /// PrintMessage - Emit a message about the specified location with the
   /// specified string.
   ///
-  /// @param Type - If non-null, the kind of message (e.g., "error") which is
-  /// prefixed to the message.
-  /// @param ShowLine - Should the diagnostic show the source line.
-  void PrintMessage(SMLoc Loc, const Twine &Msg, const char *Type,
-                    bool ShowLine = true) const;
+  /// @param ShowColors - Display colored messages if output is a terminal and
+  /// the default error handler is used.
+  void PrintMessage(SMLoc Loc, DiagKind Kind, const Twine &Msg,
+                    ArrayRef<SMRange> Ranges = ArrayRef<SMRange>(),
+                    ArrayRef<SMFixIt> FixIts = ArrayRef<SMFixIt>(),
+                    bool ShowColors = true) const;
 
 
   /// GetMessage - Return an SMDiagnostic at the specified location with the
   /// specified string.
   ///
-  /// @param Type - If non-null, the kind of message (e.g., "error") which is
+  /// @param Msg If non-null, the kind of message (e.g., "error") which is
   /// prefixed to the message.
-  /// @param ShowLine - Should the diagnostic show the source line.
-  SMDiagnostic GetMessage(SMLoc Loc,
-                          const Twine &Msg, const char *Type,
-                          bool ShowLine = true) const;
+  SMDiagnostic GetMessage(SMLoc Loc, DiagKind Kind, const Twine &Msg, 
+                          ArrayRef<SMRange> Ranges = ArrayRef<SMRange>(),
+                          ArrayRef<SMFixIt> FixIts = ArrayRef<SMFixIt>()) const;
 
-
-private:
+  /// PrintIncludeStack - Prints the names of included files and the line of the
+  /// file they were included from.  A diagnostic handler can use this before
+  /// printing its custom formatted message.
+  ///
+  /// @param IncludeLoc - The line of the include.
+  /// @param OS the raw_ostream to print on.
   void PrintIncludeStack(SMLoc IncludeLoc, raw_ostream &OS) const;
+};
+
+
+/// Represents a single fixit, a replacement of one range of text with another.
+class SMFixIt {
+  SMRange Range;
+
+  std::string Text;
+
+public:
+  // FIXME: Twine.str() is not very efficient.
+  SMFixIt(SMLoc Loc, const Twine &Insertion)
+    : Range(Loc, Loc), Text(Insertion.str()) {
+    assert(Loc.isValid());
+  }
+
+  // FIXME: Twine.str() is not very efficient.
+  SMFixIt(SMRange R, const Twine &Replacement)
+    : Range(R), Text(Replacement.str()) {
+    assert(R.isValid());
+  }
+
+  StringRef getText() const { return Text; }
+  SMRange getRange() const { return Range; }
+
+  bool operator<(const SMFixIt &Other) const {
+    if (Range.Start.getPointer() != Other.Range.Start.getPointer())
+      return Range.Start.getPointer() < Other.Range.Start.getPointer();
+    if (Range.End.getPointer() != Other.Range.End.getPointer())
+      return Range.End.getPointer() < Other.Range.End.getPointer();
+    return Text < Other.Text;
+  }
 };
 
 
@@ -149,35 +208,49 @@ class SMDiagnostic {
   SMLoc Loc;
   std::string Filename;
   int LineNo, ColumnNo;
+  SourceMgr::DiagKind Kind;
   std::string Message, LineContents;
-  unsigned ShowLine : 1;
+  std::vector<std::pair<unsigned, unsigned> > Ranges;
+  SmallVector<SMFixIt, 4> FixIts;
 
 public:
   // Null diagnostic.
-  SMDiagnostic() : SM(0), LineNo(0), ColumnNo(0), ShowLine(0) {}
+  SMDiagnostic()
+    : SM(0), LineNo(0), ColumnNo(0), Kind(SourceMgr::DK_Error) {}
   // Diagnostic with no location (e.g. file not found, command line arg error).
-  SMDiagnostic(const std::string &filename, const std::string &Msg)
-    : SM(0), Filename(filename), LineNo(-1), ColumnNo(-1),
-      Message(Msg), ShowLine(false) {}
+  SMDiagnostic(StringRef filename, SourceMgr::DiagKind Knd, StringRef Msg)
+    : SM(0), Filename(filename), LineNo(-1), ColumnNo(-1), Kind(Knd),
+      Message(Msg) {}
   
   // Diagnostic with a location.
-  SMDiagnostic(const SourceMgr &sm, SMLoc L, const std::string &FN,
-               int Line, int Col,
-               const std::string &Msg, const std::string &LineStr,
-               bool showline = true)
-    : SM(&sm), Loc(L), Filename(FN), LineNo(Line), ColumnNo(Col), Message(Msg),
-      LineContents(LineStr), ShowLine(showline) {}
+  SMDiagnostic(const SourceMgr &sm, SMLoc L, StringRef FN,
+               int Line, int Col, SourceMgr::DiagKind Kind,
+               StringRef Msg, StringRef LineStr,
+               ArrayRef<std::pair<unsigned,unsigned> > Ranges,
+               ArrayRef<SMFixIt> FixIts = ArrayRef<SMFixIt>());
 
   const SourceMgr *getSourceMgr() const { return SM; }
   SMLoc getLoc() const { return Loc; }
-  const std::string &getFilename() const { return Filename; }
+  StringRef getFilename() const { return Filename; }
   int getLineNo() const { return LineNo; }
   int getColumnNo() const { return ColumnNo; }
-  const std::string &getMessage() const { return Message; }
-  const std::string &getLineContents() const { return LineContents; }
-  bool getShowLine() const { return ShowLine; }
-  
-  void Print(const char *ProgName, raw_ostream &S) const;
+  SourceMgr::DiagKind getKind() const { return Kind; }
+  StringRef getMessage() const { return Message; }
+  StringRef getLineContents() const { return LineContents; }
+  ArrayRef<std::pair<unsigned, unsigned> > getRanges() const {
+    return Ranges;
+  }
+
+  void addFixIt(const SMFixIt &Hint) {
+    FixIts.push_back(Hint);
+  }
+
+  ArrayRef<SMFixIt> getFixIts() const {
+    return FixIts;
+  }
+
+  void print(const char *ProgName, raw_ostream &S,
+             bool ShowColors = true) const;
 };
 
 }  // end llvm namespace

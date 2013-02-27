@@ -6,18 +6,20 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-//
-//  This file defines the FileSystemStatCache interface.
-//
+///
+/// \file
+/// \brief Defines the FileSystemStatCache interface.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_CLANG_FILESYSTEMSTATCACHE_H
 #define LLVM_CLANG_FILESYSTEMSTATCACHE_H
 
+#include "clang/Basic/LLVM.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringMap.h"
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 namespace clang {
 
@@ -25,28 +27,30 @@ namespace clang {
 /// system calls, which is used by precompiled and pretokenized headers to
 /// improve performance.
 class FileSystemStatCache {
+  virtual void anchor();
 protected:
-  llvm::OwningPtr<FileSystemStatCache> NextStatCache;
+  OwningPtr<FileSystemStatCache> NextStatCache;
   
 public:
   virtual ~FileSystemStatCache() {}
   
   enum LookupResult {
-    CacheExists,   //< We know the file exists and its cached stat data.
-    CacheMissing   //< We know that the file doesn't exist.
+    CacheExists,   ///< We know the file exists and its cached stat data.
+    CacheMissing   ///< We know that the file doesn't exist.
   };
 
-  /// FileSystemStatCache::get - Get the 'stat' information for the specified
-  /// path, using the cache to accellerate it if possible.  This returns true if
-  /// the path does not exist or false if it exists.
+  /// \brief Get the 'stat' information for the specified path, using the cache
+  /// to accelerate it if possible.
   ///
-  /// If FileDescriptor is non-null, then this lookup should only return success
-  /// for files (not directories).  If it is null this lookup should only return
+  /// \returns \c true if the path does not exist or \c false if it exists.
+  ///
+  /// If isFile is true, then this lookup should only return success for files
+  /// (not directories).  If it is false this lookup should only return
   /// success for directories (not files).  On a successful file lookup, the
   /// implementation can optionally fill in FileDescriptor with a valid
   /// descriptor and the client guarantees that it will close it.
-  static bool get(const char *Path, struct stat &StatBuf, int *FileDescriptor,
-                  FileSystemStatCache *Cache);
+  static bool get(const char *Path, struct stat &StatBuf,
+                  bool isFile, int *FileDescriptor, FileSystemStatCache *Cache);
   
   
   /// \brief Sets the next stat call cache in the chain of stat caches.
@@ -65,16 +69,17 @@ public:
   
 protected:
   virtual LookupResult getStat(const char *Path, struct stat &StatBuf,
-                               int *FileDescriptor) = 0;
+                               bool isFile, int *FileDescriptor) = 0;
 
   LookupResult statChained(const char *Path, struct stat &StatBuf,
-                           int *FileDescriptor) {
+                           bool isFile, int *FileDescriptor) {
     if (FileSystemStatCache *Next = getNextStatCache())
-      return Next->getStat(Path, StatBuf, FileDescriptor);
+      return Next->getStat(Path, StatBuf, isFile, FileDescriptor);
     
     // If we hit the end of the list of stat caches to try, just compute and
     // return it without a cache.
-    return get(Path, StatBuf, FileDescriptor, 0) ? CacheMissing : CacheExists;
+    return get(Path, StatBuf,
+               isFile, FileDescriptor, 0) ? CacheMissing : CacheExists;
   }
 };
 
@@ -93,7 +98,7 @@ public:
   iterator end() const { return StatCalls.end(); }
   
   virtual LookupResult getStat(const char *Path, struct stat &StatBuf,
-                               int *FileDescriptor);
+                               bool isFile, int *FileDescriptor);
 };
 
 } // end namespace clang

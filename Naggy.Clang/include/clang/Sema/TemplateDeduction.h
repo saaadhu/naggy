@@ -13,24 +13,20 @@
 #ifndef LLVM_CLANG_SEMA_TEMPLATE_DEDUCTION_H
 #define LLVM_CLANG_SEMA_TEMPLATE_DEDUCTION_H
 
-#include "clang/Basic/PartialDiagnostic.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/Basic/PartialDiagnostic.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace clang {
 
-class ASTContext;
 class TemplateArgumentList;
 
 namespace sema {
-  
+
 /// \brief Provides information about an attempted template argument
 /// deduction, whose success or failure was described by a
 /// TemplateDeductionResult value.
 class TemplateDeductionInfo {
-  /// \brief The context in which the template arguments are stored.
-  ASTContext &Context;
-
   /// \brief The deduced template argument list.
   ///
   TemplateArgumentList *Deduced;
@@ -39,21 +35,19 @@ class TemplateDeductionInfo {
   /// deduction is occurring.
   SourceLocation Loc;
 
-  /// \brief Warnings (and follow-on notes) that were suppressed due to 
+  /// \brief Have we suppressed an error during deduction?
+  bool HasSFINAEDiagnostic;
+
+  /// \brief Warnings (and follow-on notes) that were suppressed due to
   /// SFINAE while performing template argument deduction.
-  llvm::SmallVector<PartialDiagnosticAt, 4> SuppressedDiagnostics;
-  
-  // do not implement these
-  TemplateDeductionInfo(const TemplateDeductionInfo&);
-  TemplateDeductionInfo &operator=(const TemplateDeductionInfo&);
+  SmallVector<PartialDiagnosticAt, 4> SuppressedDiagnostics;
+
+  TemplateDeductionInfo(const TemplateDeductionInfo &) LLVM_DELETED_FUNCTION;
+  void operator=(const TemplateDeductionInfo &) LLVM_DELETED_FUNCTION;
 
 public:
-  TemplateDeductionInfo(ASTContext &Context, SourceLocation Loc)
-    : Context(Context), Deduced(0), Loc(Loc) { }
-
-  ~TemplateDeductionInfo() {
-    // FIXME: if (Deduced) Deduced->Destroy(Context);
-  }
+  TemplateDeductionInfo(SourceLocation Loc)
+    : Deduced(0), Loc(Loc), HasSFINAEDiagnostic(false), Expression(0) { }
 
   /// \brief Returns the location at which template argument is
   /// occurring.
@@ -68,30 +62,60 @@ public:
     return Result;
   }
 
+  /// \brief Take ownership of the SFINAE diagnostic.
+  void takeSFINAEDiagnostic(PartialDiagnosticAt &PD) {
+    assert(HasSFINAEDiagnostic);
+    PD.first = SuppressedDiagnostics.front().first;
+    PD.second.swap(SuppressedDiagnostics.front().second);
+    SuppressedDiagnostics.clear();
+    HasSFINAEDiagnostic = false;
+  }
+
   /// \brief Provide a new template argument list that contains the
   /// results of template argument deduction.
   void reset(TemplateArgumentList *NewDeduced) {
-    // FIXME: if (Deduced) Deduced->Destroy(Context);
     Deduced = NewDeduced;
   }
 
-  /// \brief Add a new diagnostic to the set of diagnostics 
-  void addSuppressedDiagnostic(SourceLocation Loc, const PartialDiagnostic &PD) {
-    SuppressedDiagnostics.push_back(std::make_pair(Loc, PD));
+  /// \brief Is a SFINAE diagnostic available?
+  bool hasSFINAEDiagnostic() const {
+    return HasSFINAEDiagnostic;
   }
-  
+
+  /// \brief Set the diagnostic which caused the SFINAE failure.
+  void addSFINAEDiagnostic(SourceLocation Loc, PartialDiagnostic PD) {
+    // Only collect the first diagnostic.
+    if (HasSFINAEDiagnostic)
+      return;
+    SuppressedDiagnostics.clear();
+    SuppressedDiagnostics.push_back(
+        std::make_pair(Loc, PartialDiagnostic::NullDiagnostic()));
+    SuppressedDiagnostics.back().second.swap(PD);
+    HasSFINAEDiagnostic = true;
+  }
+
+  /// \brief Add a new diagnostic to the set of diagnostics
+  void addSuppressedDiagnostic(SourceLocation Loc,
+                               PartialDiagnostic PD) {
+    if (HasSFINAEDiagnostic)
+      return;
+    SuppressedDiagnostics.push_back(
+        std::make_pair(Loc, PartialDiagnostic::NullDiagnostic()));
+    SuppressedDiagnostics.back().second.swap(PD);
+  }
+
   /// \brief Iterator over the set of suppressed diagnostics.
-  typedef llvm::SmallVectorImpl<PartialDiagnosticAt>::const_iterator 
+  typedef SmallVectorImpl<PartialDiagnosticAt>::const_iterator
     diag_iterator;
-  
+
   /// \brief Returns an iterator at the beginning of the sequence of suppressed
   /// diagnostics.
   diag_iterator diag_begin() const { return SuppressedDiagnostics.begin(); }
-  
+
   /// \brief Returns an iterator at the end of the sequence of suppressed
   /// diagnostics.
   diag_iterator diag_end() const { return SuppressedDiagnostics.end(); }
-  
+
   /// \brief The template parameter to which a template argument
   /// deduction failure refers.
   ///
@@ -117,15 +141,25 @@ public:
   ///   TDK_SubstitutionFailure: this argument is the template
   ///   argument we were instantiating when we encountered an error.
   ///
-  ///   TDK_NonDeducedMismatch: this is the template argument
-  ///   provided in the source code.
+  ///   TDK_NonDeducedMismatch: this is the component of the 'parameter'
+  ///   of the deduction, directly provided in the source code.
   TemplateArgument FirstArg;
 
   /// \brief The second template argument to which the template
   /// argument deduction failure refers.
   ///
+  ///   TDK_NonDeducedMismatch: this is the mismatching component of the
+  ///   'argument' of the deduction, from which we are deducing arguments.
+  ///
   /// FIXME: Finish documenting this.
   TemplateArgument SecondArg;
+
+  /// \brief The expression which caused a deduction failure.
+  ///
+  ///   TDK_FailedOverloadResolution: this argument is the reference to
+  //    an overloaded function which could not be resolved to a specific
+  //    function.
+  Expr *Expression;
 };
 
 }

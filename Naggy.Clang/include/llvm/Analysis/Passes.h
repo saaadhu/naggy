@@ -88,11 +88,26 @@ namespace llvm {
 
   //===--------------------------------------------------------------------===//
   //
+  // createObjCARCAliasAnalysisPass - This pass implements ObjC-ARC-based
+  // alias analysis.
+  //
+  ImmutablePass *createObjCARCAliasAnalysisPass();
+
+  //===--------------------------------------------------------------------===//
+  //
   // createProfileLoaderPass - This pass loads information from a profile dump
   // file.
   //
   ModulePass *createProfileLoaderPass();
   extern char &ProfileLoaderPassID;
+
+  //===--------------------------------------------------------------------===//
+  //
+  // createProfileMetadataLoaderPass - This pass loads information from a
+  // profile dump file and sets branch weight metadata.
+  //
+  ModulePass *createProfileMetadataLoaderPass();
+  extern char &ProfileMetadataLoaderPassID;
 
   //===--------------------------------------------------------------------===//
   //
@@ -165,11 +180,20 @@ namespace llvm {
 
   //===--------------------------------------------------------------------===//
   //
-  // createLoopDependenceAnalysisPass - This creates an instance of the
-  // LoopDependenceAnalysis pass.
+  // createDependenceAnalysisPass - This creates an instance of the
+  // DependenceAnalysis pass.
   //
-  LoopPass *createLoopDependenceAnalysisPass();
+  FunctionPass *createDependenceAnalysisPass();
 
+  //===--------------------------------------------------------------------===//
+  //
+  // createCostModelAnalysisPass - This creates an instance of the
+  // CostModelAnalysis pass.
+  //
+  FunctionPass *createCostModelAnalysisPass();
+
+  //===--------------------------------------------------------------------===//
+  //
   // Minor pass prototypes, allowing us to expose them through bugpoint and
   // analyze.
   FunctionPass *createInstCountPass();

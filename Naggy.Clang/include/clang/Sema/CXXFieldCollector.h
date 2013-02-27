@@ -15,6 +15,7 @@
 #ifndef LLVM_CLANG_SEMA_CXXFIELDCOLLECTOR_H
 #define LLVM_CLANG_SEMA_CXXFIELDCOLLECTOR_H
 
+#include "clang/Basic/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace clang {
@@ -26,12 +27,12 @@ class CXXFieldCollector {
   /// Fields - Contains all FieldDecls collected during parsing of a C++
   /// class. When a nested class is entered, its fields are appended to the
   /// fields of its parent class, when it is exited its fields are removed.
-  llvm::SmallVector<FieldDecl*, 32> Fields;
+  SmallVector<FieldDecl*, 32> Fields;
 
   /// FieldCount - Each entry represents the number of fields collected during
   /// the parsing of a C++ class. When a nested class is entered, a new field
   /// count is pushed, when it is exited, the field count is popped.
-  llvm::SmallVector<size_t, 4> FieldCount;
+  SmallVector<size_t, 4> FieldCount;
 
   // Example:
   //

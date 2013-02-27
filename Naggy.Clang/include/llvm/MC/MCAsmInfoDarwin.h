@@ -12,23 +12,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_DARWIN_TARGET_ASM_INFO_H
-#define LLVM_DARWIN_TARGET_ASM_INFO_H
+#ifndef LLVM_MC_MCASMINFODARWIN_H
+#define LLVM_MC_MCASMINFODARWIN_H
 
 #include "llvm/MC/MCAsmInfo.h"
 
 namespace llvm {
-  class GlobalValue;
-  class GlobalVariable;
-  class Type;
-  class Mangler;
-
-  struct MCAsmInfoDarwin : public MCAsmInfo {
+  class MCAsmInfoDarwin : public MCAsmInfo {
+    virtual void anchor();
+  public:
     explicit MCAsmInfoDarwin();
-    virtual const MCExpr *
-    getExprForFDESymbol(const MCSymbol *Sym, MCStreamer &Streamer) const;
   };
 }
 
 
-#endif // LLVM_DARWIN_TARGET_ASM_INFO_H
+#endif // LLVM_MC_MCASMINFODARWIN_H

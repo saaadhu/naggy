@@ -30,11 +30,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_INTERVAL_ITERATOR_H
-#define LLVM_INTERVAL_ITERATOR_H
+#ifndef LLVM_ANALYSIS_INTERVALITERATOR_H
+#define LLVM_ANALYSIS_INTERVALITERATOR_H
 
 #include "llvm/Analysis/IntervalPartition.h"
-#include "llvm/Function.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Support/CFG.h"
 #include <algorithm>
 #include <set>
@@ -101,14 +101,14 @@ public:
   IntervalIterator(Function *M, bool OwnMemory) : IOwnMem(OwnMemory) {
     OrigContainer = M;
     if (!ProcessInterval(&M->front())) {
-      assert(0 && "ProcessInterval should never fail for first interval!");
+      llvm_unreachable("ProcessInterval should never fail for first interval!");
     }
   }
 
   IntervalIterator(IntervalPartition &IP, bool OwnMemory) : IOwnMem(OwnMemory) {
     OrigContainer = &IP;
     if (!ProcessInterval(IP.getRootInterval())) {
-      assert(0 && "ProcessInterval should never fail for first interval!");
+      llvm_unreachable("ProcessInterval should never fail for first interval!");
     }
   }
 

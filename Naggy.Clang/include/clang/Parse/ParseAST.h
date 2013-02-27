@@ -14,6 +14,8 @@
 #ifndef LLVM_CLANG_PARSE_PARSEAST_H
 #define LLVM_CLANG_PARSE_PARSEAST_H
 
+#include "clang/Basic/LangOptions.h"
+
 namespace clang {
   class Preprocessor;
   class ASTConsumer;
@@ -27,20 +29,20 @@ namespace clang {
   /// This operation inserts the parsed decls into the translation
   /// unit held by Ctx.
   ///
-  /// \param CompleteTranslationUnit When true, the parsed file is
-  /// considered to be a complete translation unit, and any
-  /// end-of-translation-unit wrapup will be performed.
+  /// \param TUKind The kind of translation unit being parsed.
   ///
   /// \param CompletionConsumer If given, an object to consume code completion
   /// results.
   void ParseAST(Preprocessor &pp, ASTConsumer *C,
                 ASTContext &Ctx, bool PrintStats = false,
-                bool CompleteTranslationUnit = true,
-                CodeCompleteConsumer *CompletionConsumer = 0);
+                TranslationUnitKind TUKind = TU_Complete,
+                CodeCompleteConsumer *CompletionConsumer = 0,
+                bool SkipFunctionBodies = false);
 
   /// \brief Parse the main file known to the preprocessor, producing an 
   /// abstract syntax tree.
-  void ParseAST(Sema &S, bool PrintStats = false);
+  void ParseAST(Sema &S, bool PrintStats = false,
+                bool SkipFunctionBodies = false);
   
 }  // end namespace clang
 

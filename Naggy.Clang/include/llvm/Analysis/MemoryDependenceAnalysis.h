@@ -11,17 +11,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_ANALYSIS_MEMORY_DEPENDENCE_H
-#define LLVM_ANALYSIS_MEMORY_DEPENDENCE_H
+#ifndef LLVM_ANALYSIS_MEMORYDEPENDENCEANALYSIS_H
+#define LLVM_ANALYSIS_MEMORYDEPENDENCEANALYSIS_H
 
-#include "llvm/BasicBlock.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/ValueHandle.h"
-#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/ValueHandle.h"
 
 namespace llvm {
   class Function;
@@ -29,19 +29,19 @@ namespace llvm {
   class Instruction;
   class CallSite;
   class AliasAnalysis;
-  class TargetData;
+  class DataLayout;
   class MemoryDependenceAnalysis;
   class PredIteratorCache;
   class DominatorTree;
   class PHITransAddr;
-  
+
   /// MemDepResult - A memory dependence query can return one of three different
   /// answers, described below.
   class MemDepResult {
     enum DepType {
       /// Invalid - Clients of MemDep never see this.
       Invalid = 0,
-      
+
       /// Clobber - This is a dependence on the specified instruction which
       /// clobbers the desired value.  The pointer member of the MemDepResult
       /// pair holds the instruction that clobbers the memory.  For example,
@@ -52,9 +52,6 @@ namespace llvm {
       ///   1. Loads are clobbered by may-alias stores.
       ///   2. Loads are considered clobbered by partially-aliased loads.  The
       ///      client may choose to analyze deeper into these cases.
-      ///
-      /// A dependence query on the first instruction of the entry block will
-      /// return a clobber(self) result.
       Clobber,
 
       /// Def - This is a dependence on the specified instruction which
@@ -75,47 +72,94 @@ namespace llvm {
       ///      and no intervening clobbers.  No validation is done that the
       ///      operands to the calls are the same.
       Def,
-      
+
+      /// Other - This marker indicates that the query has no known dependency
+      /// in the specified block.  More detailed state info is encoded in the
+      /// upper part of the pair (i.e. the Instruction*)
+      Other
+    };
+    /// If DepType is "Other", the upper part of the pair
+    /// (i.e. the Instruction* part) is instead used to encode more detailed
+    /// type information as follows
+    enum OtherType {
       /// NonLocal - This marker indicates that the query has no dependency in
       /// the specified block.  To find out more, the client should query other
       /// predecessor blocks.
-      NonLocal
+      NonLocal = 0x4,
+      /// NonFuncLocal - This marker indicates that the query has no
+      /// dependency in the specified function.
+      NonFuncLocal = 0x8,
+      /// Unknown - This marker indicates that the query dependency
+      /// is unknown.
+      Unknown = 0xc
     };
+
     typedef PointerIntPair<Instruction*, 2, DepType> PairTy;
     PairTy Value;
     explicit MemDepResult(PairTy V) : Value(V) {}
   public:
     MemDepResult() : Value(0, Invalid) {}
-    
+
     /// get methods: These are static ctor methods for creating various
     /// MemDepResult kinds.
     static MemDepResult getDef(Instruction *Inst) {
+      assert(Inst && "Def requires inst");
       return MemDepResult(PairTy(Inst, Def));
     }
     static MemDepResult getClobber(Instruction *Inst) {
+      assert(Inst && "Clobber requires inst");
       return MemDepResult(PairTy(Inst, Clobber));
     }
     static MemDepResult getNonLocal() {
-      return MemDepResult(PairTy(0, NonLocal));
+      return MemDepResult(
+        PairTy(reinterpret_cast<Instruction*>(NonLocal), Other));
+    }
+    static MemDepResult getNonFuncLocal() {
+      return MemDepResult(
+        PairTy(reinterpret_cast<Instruction*>(NonFuncLocal), Other));
+    }
+    static MemDepResult getUnknown() {
+      return MemDepResult(
+        PairTy(reinterpret_cast<Instruction*>(Unknown), Other));
     }
 
     /// isClobber - Return true if this MemDepResult represents a query that is
-    /// a instruction clobber dependency.
+    /// an instruction clobber dependency.
     bool isClobber() const { return Value.getInt() == Clobber; }
 
     /// isDef - Return true if this MemDepResult represents a query that is
-    /// a instruction definition dependency.
+    /// an instruction definition dependency.
     bool isDef() const { return Value.getInt() == Def; }
-    
+
     /// isNonLocal - Return true if this MemDepResult represents a query that
     /// is transparent to the start of the block, but where a non-local hasn't
     /// been done.
-    bool isNonLocal() const { return Value.getInt() == NonLocal; }
-    
+    bool isNonLocal() const {
+      return Value.getInt() == Other
+        && Value.getPointer() == reinterpret_cast<Instruction*>(NonLocal);
+    }
+
+    /// isNonFuncLocal - Return true if this MemDepResult represents a query
+    /// that is transparent to the start of the function.
+    bool isNonFuncLocal() const {
+      return Value.getInt() == Other
+        && Value.getPointer() == reinterpret_cast<Instruction*>(NonFuncLocal);
+    }
+
+    /// isUnknown - Return true if this MemDepResult represents a query which
+    /// cannot and/or will not be computed.
+    bool isUnknown() const {
+      return Value.getInt() == Other
+        && Value.getPointer() == reinterpret_cast<Instruction*>(Unknown);
+    }
+
     /// getInst() - If this is a normal dependency, return the instruction that
     /// is depended on.  Otherwise, return null.
-    Instruction *getInst() const { return Value.getPointer(); }
-    
+    Instruction *getInst() const {
+      if (Value.getInt() == Other) return NULL;
+      return Value.getPointer();
+    }
+
     bool operator==(const MemDepResult &M) const { return Value == M.Value; }
     bool operator!=(const MemDepResult &M) const { return Value != M.Value; }
     bool operator<(const MemDepResult &M) const { return Value < M.Value; }
@@ -131,11 +175,11 @@ namespace llvm {
     /// In a default-constructed MemDepResult object, the type will be Dirty
     /// and the instruction pointer will be null.
     ///
-         
+
     /// isDirty - Return true if this is a MemDepResult in its dirty/invalid.
     /// state.
     bool isDirty() const { return Value.getInt() == Invalid; }
-    
+
     static MemDepResult getDirty(Instruction *Inst) {
       return MemDepResult(PairTy(Inst, Invalid));
     }
@@ -155,16 +199,16 @@ namespace llvm {
 
     // BB is the sort key, it can't be changed.
     BasicBlock *getBB() const { return BB; }
-    
+
     void setResult(const MemDepResult &R) { Result = R; }
 
     const MemDepResult &getResult() const { return Result; }
-    
+
     bool operator<(const NonLocalDepEntry &RHS) const {
       return BB < RHS.BB;
     }
   };
-  
+
   /// NonLocalDepResult - This is a result from a NonLocal dependence query.
   /// For each BasicBlock (the BB entry) it keeps a MemDepResult and the
   /// (potentially phi translated) address that was live in the block.
@@ -174,17 +218,17 @@ namespace llvm {
   public:
     NonLocalDepResult(BasicBlock *bb, MemDepResult result, Value *address)
       : Entry(bb, result), Address(address) {}
-    
+
     // BB is the sort key, it can't be changed.
     BasicBlock *getBB() const { return Entry.getBB(); }
-    
+
     void setResult(const MemDepResult &R, Value *Addr) {
       Entry.setResult(R);
       Address = Addr;
     }
-    
+
     const MemDepResult &getResult() const { return Entry.getResult(); }
-    
+
     /// getAddress - Return the address of this pointer in this block.  This can
     /// be different than the address queried for the non-local result because
     /// of phi translation.  This returns null if the address was not available
@@ -194,7 +238,7 @@ namespace llvm {
     /// The address is always null for a non-local 'call' dependence.
     Value *getAddress() const { return Address; }
   };
-  
+
   /// MemoryDependenceAnalysis - This is an analysis that determines, for a
   /// given memory operation, what preceding memory operations it depends on.
   /// It builds on alias analysis information, and tries to provide a lazy,
@@ -253,33 +297,34 @@ namespace llvm {
     CachedNonLocalPointerInfo NonLocalPointerDeps;
 
     // A map from instructions to their non-local pointer dependencies.
-    typedef DenseMap<Instruction*, 
+    typedef DenseMap<Instruction*,
                      SmallPtrSet<ValueIsLoadPair, 4> > ReverseNonLocalPtrDepTy;
     ReverseNonLocalPtrDepTy ReverseNonLocalPtrDeps;
 
-    
+
     /// PerInstNLInfo - This is the instruction we keep for each cached access
     /// that we have for an instruction.  The pointer is an owning pointer and
     /// the bool indicates whether we have any dirty bits in the set.
     typedef std::pair<NonLocalDepInfo, bool> PerInstNLInfo;
-    
+
     // A map from instructions to their non-local dependencies.
     typedef DenseMap<Instruction*, PerInstNLInfo> NonLocalDepMapType;
-      
+
     NonLocalDepMapType NonLocalDeps;
-    
+
     // A reverse mapping from dependencies to the dependees.  This is
     // used when removing instructions to keep the cache coherent.
     typedef DenseMap<Instruction*,
                      SmallPtrSet<Instruction*, 4> > ReverseDepMapType;
     ReverseDepMapType ReverseLocalDeps;
-    
+
     // A reverse mapping from dependencies to the non-local dependees.
     ReverseDepMapType ReverseNonLocalDeps;
-    
+
     /// Current AA implementation, just a cache.
     AliasAnalysis *AA;
-    TargetData *TD;
+    DataLayout *TD;
+    DominatorTree *DT;
     OwningPtr<PredIteratorCache> PredCache;
   public:
     MemoryDependenceAnalysis();
@@ -288,15 +333,15 @@ namespace llvm {
 
     /// Pass Implementation stuff.  This doesn't do any analysis eagerly.
     bool runOnFunction(Function &);
-    
+
     /// Clean up memory in between runs
     void releaseMemory();
-    
+
     /// getAnalysisUsage - Does not modify anything.  It uses Value Numbering
     /// and Alias Analysis.
     ///
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;
-    
+
     /// getDependency - Return the instruction on which a memory operation
     /// depends.  See the class comment for more details.  It is illegal to call
     /// this on non-memory instructions.
@@ -315,8 +360,8 @@ namespace llvm {
     /// removed.  Clients must copy this data if they want it around longer than
     /// that.
     const NonLocalDepInfo &getNonLocalCallDependency(CallSite QueryCS);
-    
-    
+
+
     /// getNonLocalPointerDependency - Perform a full dependency query for an
     /// access to the specified (non-volatile) memory location, returning the
     /// set of instructions that either define or clobber the value.
@@ -329,7 +374,7 @@ namespace llvm {
     /// removeInstruction - Remove an instruction from the dependence analysis,
     /// updating the dependence of instructions that previously depended on it.
     void removeInstruction(Instruction *InstToRemove);
-    
+
     /// invalidateCachedPointerInfo - This method is used to invalidate cached
     /// information about the specified pointer, because it may be too
     /// conservative in memdep.  This is an optional call that can be used when
@@ -342,7 +387,7 @@ namespace llvm {
     /// This needs to be done when the CFG changes, e.g., due to splitting
     /// critical edges.
     void invalidateCachedPredecessors();
-    
+
     /// getPointerDependencyFrom - Return the instruction on which a memory
     /// location depends.  If isLoad is true, this routine ignores may-aliases
     /// with read-only operations.  If isLoad is false, this routine ignores
@@ -351,11 +396,11 @@ namespace llvm {
     /// Note that this is an uncached query, and thus may be inefficient.
     ///
     MemDepResult getPointerDependencyFrom(const AliasAnalysis::Location &Loc,
-                                          bool isLoad, 
+                                          bool isLoad,
                                           BasicBlock::iterator ScanIt,
                                           BasicBlock *BB);
-    
-    
+
+
     /// getLoadLoadClobberFullWidthSize - This is a little bit of analysis that
     /// looks at a memory location for a load (specified by MemLocBase, Offs,
     /// and Size) and compares it against a load.  If the specified load could
@@ -367,8 +412,8 @@ namespace llvm {
                                                     int64_t MemLocOffs,
                                                     unsigned MemLocSize,
                                                     const LoadInst *LI,
-                                                    const TargetData &TD);
-    
+                                                    const DataLayout &TD);
+
   private:
     MemDepResult getCallSiteDependencyFrom(CallSite C, bool isReadOnlyCall,
                                            BasicBlock::iterator ScanIt,
@@ -385,11 +430,11 @@ namespace llvm {
                                          unsigned NumSortedEntries);
 
     void RemoveCachedNonLocalPointerDependencies(ValueIsLoadPair P);
-    
+
     /// verifyRemoved - Verify that the specified instruction does not occur
     /// in our internal data structures.
     void verifyRemoved(Instruction *Inst) const;
-    
+
   };
 
 } // End llvm namespace

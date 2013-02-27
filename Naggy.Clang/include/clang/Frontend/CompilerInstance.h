@@ -10,16 +10,21 @@
 #ifndef LLVM_CLANG_FRONTEND_COMPILERINSTANCE_H_
 #define LLVM_CLANG_FRONTEND_COMPILERINSTANCE_H_
 
+#include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/SourceManager.h"
 #include "clang/Frontend/CompilerInvocation.h"
+#include "clang/Lex/ModuleLoader.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <list>
 #include <string>
+#include <utility>
 
 namespace llvm {
-class raw_ostream;
 class raw_fd_ostream;
 class Timer;
 }
@@ -27,13 +32,15 @@ class Timer;
 namespace clang {
 class ASTContext;
 class ASTConsumer;
+class ASTReader;
 class CodeCompleteConsumer;
-class Diagnostic;
-class DiagnosticClient;
+class DiagnosticsEngine;
+class DiagnosticConsumer;
 class ExternalASTSource;
+class FileEntry;
 class FileManager;
 class FrontendAction;
-class ASTReader;
+class Module;
 class Preprocessor;
 class Sema;
 class SourceManager;
@@ -57,39 +64,61 @@ class TargetInfo;
 /// in to the compiler instance for everything. When possible, utility functions
 /// come in two forms; a short form that reuses the CompilerInstance objects,
 /// and a long form that takes explicit instances of any required objects.
-class CompilerInstance {
+class CompilerInstance : public ModuleLoader {
   /// The options used in this compiler instance.
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> Invocation;
+  IntrusiveRefCntPtr<CompilerInvocation> Invocation;
 
   /// The diagnostics engine instance.
-  llvm::IntrusiveRefCntPtr<Diagnostic> Diagnostics;
+  IntrusiveRefCntPtr<DiagnosticsEngine> Diagnostics;
 
   /// The target being compiled for.
-  llvm::IntrusiveRefCntPtr<TargetInfo> Target;
+  IntrusiveRefCntPtr<TargetInfo> Target;
 
   /// The file manager.
-  llvm::IntrusiveRefCntPtr<FileManager> FileMgr;
+  IntrusiveRefCntPtr<FileManager> FileMgr;
 
   /// The source manager.
-  llvm::IntrusiveRefCntPtr<SourceManager> SourceMgr;
+  IntrusiveRefCntPtr<SourceManager> SourceMgr;
 
   /// The preprocessor.
-  llvm::IntrusiveRefCntPtr<Preprocessor> PP;
+  IntrusiveRefCntPtr<Preprocessor> PP;
 
   /// The AST context.
-  llvm::IntrusiveRefCntPtr<ASTContext> Context;
+  IntrusiveRefCntPtr<ASTContext> Context;
 
   /// The AST consumer.
-  llvm::OwningPtr<ASTConsumer> Consumer;
+  OwningPtr<ASTConsumer> Consumer;
 
   /// The code completion consumer.
-  llvm::OwningPtr<CodeCompleteConsumer> CompletionConsumer;
+  OwningPtr<CodeCompleteConsumer> CompletionConsumer;
 
   /// \brief The semantic analysis object.
-  llvm::OwningPtr<Sema> TheSema;
+  OwningPtr<Sema> TheSema;
+
+  /// \brief The frontend timer
+  OwningPtr<llvm::Timer> FrontendTimer;
+
+  /// \brief Non-owning reference to the ASTReader, if one exists.
+  ASTReader *ModuleManager;
+
+  /// \brief The set of top-level modules that has already been loaded,
+  /// along with the module map
+  llvm::DenseMap<const IdentifierInfo *, Module *> KnownModules;
   
-  /// The frontend timer
-  llvm::OwningPtr<llvm::Timer> FrontendTimer;
+  /// \brief The location of the module-import keyword for the last module
+  /// import. 
+  SourceLocation LastModuleImportLoc;
+  
+  /// \brief The result of the last module import.
+  ///
+  ModuleLoadResult LastModuleImportResult;
+
+  /// \brief Whether we should (re)build the global module index once we
+  /// have finished with this translation unit.
+  bool BuildGlobalModuleIndex;
+
+  /// \brief One or more modules failed to build.
+  bool ModuleBuildFailed;
 
   /// \brief Holds information about the output file.
   ///
@@ -99,18 +128,18 @@ class CompilerInstance {
   struct OutputFile {
     std::string Filename;
     std::string TempFilename;
-    llvm::raw_ostream *OS;
+    raw_ostream *OS;
 
     OutputFile(const std::string &filename, const std::string &tempFilename,
-               llvm::raw_ostream *os)
+               raw_ostream *os)
       : Filename(filename), TempFilename(tempFilename), OS(os) { }
   };
 
   /// The list of active output files.
   std::list<OutputFile> OutputFiles;
 
-  void operator=(const CompilerInstance &);  // DO NOT IMPLEMENT
-  CompilerInstance(const CompilerInstance&); // DO NOT IMPLEMENT
+  CompilerInstance(const CompilerInstance &) LLVM_DELETED_FUNCTION;
+  void operator=(const CompilerInstance &) LLVM_DELETED_FUNCTION;
 public:
   CompilerInstance();
   ~CompilerInstance();
@@ -164,14 +193,20 @@ public:
   /// setInvocation - Replace the current invocation.
   void setInvocation(CompilerInvocation *Value);
 
+  /// \brief Indicates whether we should (re)build the global module index.
+  bool shouldBuildGlobalModuleIndex() const;
+  
+  /// \brief Set the flag indicating whether we should (re)build the global
+  /// module index.
+  void setBuildGlobalModuleIndex(bool Build) {
+    BuildGlobalModuleIndex = Build;
+  }
+
   /// }
   /// @name Forwarding Methods
   /// {
 
-  AnalyzerOptions &getAnalyzerOpts() {
-    return Invocation->getAnalyzerOpts();
-  }
-  const AnalyzerOptions &getAnalyzerOpts() const {
+  AnalyzerOptionsRef getAnalyzerOpts() {
     return Invocation->getAnalyzerOpts();
   }
 
@@ -215,10 +250,10 @@ public:
   }
 
   LangOptions &getLangOpts() {
-    return Invocation->getLangOpts();
+    return *Invocation->getLangOpts();
   }
   const LangOptions &getLangOpts() const {
-    return Invocation->getLangOpts();
+    return *Invocation->getLangOpts();
   }
 
   PreprocessorOptions &getPreprocessorOpts() {
@@ -249,15 +284,15 @@ public:
   bool hasDiagnostics() const { return Diagnostics != 0; }
 
   /// Get the current diagnostics engine.
-  Diagnostic &getDiagnostics() const {
+  DiagnosticsEngine &getDiagnostics() const {
     assert(Diagnostics && "Compiler instance has no diagnostics!");
     return *Diagnostics;
   }
 
   /// setDiagnostics - Replace the current diagnostics engine.
-  void setDiagnostics(Diagnostic *Value);
+  void setDiagnostics(DiagnosticsEngine *Value);
 
-  DiagnosticClient &getDiagnosticClient() const {
+  DiagnosticConsumer &getDiagnosticClient() const {
     assert(Diagnostics && Diagnostics->getClient() && 
            "Compiler instance has no diagnostic client!");
     return *Diagnostics->getClient();
@@ -372,7 +407,7 @@ public:
   ASTConsumer *takeASTConsumer() { return Consumer.take(); }
 
   /// setASTConsumer - Replace the current AST consumer; the compiler instance
-  /// takes ownership of \arg Value.
+  /// takes ownership of \p Value.
   void setASTConsumer(ASTConsumer *Value);
 
   /// }
@@ -387,6 +422,12 @@ public:
   
   Sema *takeSema() { return TheSema.take(); }
   
+  /// }
+  /// @name Module Management
+  /// {
+
+  ASTReader *getModuleManager() const { return ModuleManager; }
+
   /// }
   /// @name Code Completion
   /// {
@@ -406,7 +447,7 @@ public:
   }
 
   /// setCodeCompletionConsumer - Replace the current code completion consumer;
-  /// the compiler instance takes ownership of \arg Value.
+  /// the compiler instance takes ownership of \p Value.
   void setCodeCompletionConsumer(CodeCompleteConsumer *Value);
 
   /// }
@@ -446,38 +487,41 @@ public:
   /// allocating one if one is not provided.
   ///
   /// \param Client If non-NULL, a diagnostic client that will be
-  /// attached to (and, then, owned by) the Diagnostic inside this AST
+  /// attached to (and, then, owned by) the DiagnosticsEngine inside this AST
   /// unit.
-  void createDiagnostics(int Argc, const char* const *Argv,
-                         DiagnosticClient *Client = 0);
-
-  /// Create a Diagnostic object with a the TextDiagnosticPrinter.
   ///
-  /// The \arg Argc and \arg Argv arguments are used only for logging purposes,
-  /// when the diagnostic options indicate that the compiler should output
-  /// logging information.
+  /// \param ShouldOwnClient If Client is non-NULL, specifies whether 
+  /// the diagnostic object should take ownership of the client.
+  ///
+  /// \param ShouldCloneClient If Client is non-NULL, specifies whether that
+  /// client should be cloned.
+  void createDiagnostics(DiagnosticConsumer *Client = 0,
+                         bool ShouldOwnClient = true,
+                         bool ShouldCloneClient = true);
+
+  /// Create a DiagnosticsEngine object with a the TextDiagnosticPrinter.
   ///
   /// If no diagnostic client is provided, this creates a
-  /// DiagnosticClient that is owned by the returned diagnostic
+  /// DiagnosticConsumer that is owned by the returned diagnostic
   /// object, if using directly the caller is responsible for
-  /// releasing the returned Diagnostic's client eventually.
+  /// releasing the returned DiagnosticsEngine's client eventually.
   ///
   /// \param Opts - The diagnostic options; note that the created text
-  /// diagnostic object contains a reference to these options and its lifetime
-  /// must extend past that of the diagnostic engine.
+  /// diagnostic object contains a reference to these options.
   ///
   /// \param Client If non-NULL, a diagnostic client that will be
-  /// attached to (and, then, owned by) the returned Diagnostic
+  /// attached to (and, then, owned by) the returned DiagnosticsEngine
   /// object.
   ///
   /// \param CodeGenOpts If non-NULL, the code gen options in use, which may be
   /// used by some diagnostics printers (for logging purposes only).
   ///
   /// \return The new object on success, or null on failure.
-  static llvm::IntrusiveRefCntPtr<Diagnostic> 
-  createDiagnostics(const DiagnosticOptions &Opts, int Argc,
-                    const char* const *Argv,
-                    DiagnosticClient *Client = 0,
+  static IntrusiveRefCntPtr<DiagnosticsEngine>
+  createDiagnostics(DiagnosticOptions *Opts,
+                    DiagnosticConsumer *Client = 0,
+                    bool ShouldOwnClient = true,
+                    bool ShouldCloneClient = true,
                     const CodeGenOptions *CodeGenOpts = 0);
 
   /// Create the file manager and replace any existing one with it.
@@ -490,39 +534,26 @@ public:
   /// and replace any existing one with it.
   void createPreprocessor();
 
-  /// Create a Preprocessor object.
-  ///
-  /// Note that this also creates a new HeaderSearch object which will be owned
-  /// by the resulting Preprocessor.
-  ///
-  /// \return The new object on success, or null on failure.
-  static Preprocessor *createPreprocessor(Diagnostic &, const LangOptions &,
-                                          const PreprocessorOptions &,
-                                          const HeaderSearchOptions &,
-                                          const DependencyOutputOptions &,
-                                          const TargetInfo &,
-                                          const FrontendOptions &,
-                                          SourceManager &, FileManager &);
-
   /// Create the AST context.
   void createASTContext();
 
   /// Create an external AST source to read a PCH file and attach it to the AST
   /// context.
-  void createPCHExternalASTSource(llvm::StringRef Path,
+  void createPCHExternalASTSource(StringRef Path,
                                   bool DisablePCHValidation,
-                                  bool DisableStatCache,
+                                  bool AllowPCHWithCompilerErrors,
                                   void *DeserializationListener);
 
   /// Create an external AST source to read a PCH file.
   ///
   /// \return - The new object on success, or null on failure.
   static ExternalASTSource *
-  createPCHExternalASTSource(llvm::StringRef Path, const std::string &Sysroot,
+  createPCHExternalASTSource(StringRef Path, const std::string &Sysroot,
                              bool DisablePCHValidation,
-                             bool DisableStatCache,
+                             bool AllowPCHWithCompilerErrors,
                              Preprocessor &PP, ASTContext &Context,
-                             void *DeserializationListener, bool Preamble);
+                             void *DeserializationListener, bool Preamble,
+                             bool UseGlobalModuleIndex);
 
   /// Create a code completion consumer using the invocation; note that this
   /// will cause the source manager to truncate the input source file at the
@@ -530,17 +561,15 @@ public:
   void createCodeCompletionConsumer();
 
   /// Create a code completion consumer to print code completion results, at
-  /// \arg Filename, \arg Line, and \arg Column, to the given output stream \arg
-  /// OS.
+  /// \p Filename, \p Line, and \p Column, to the given output stream \p OS.
   static CodeCompleteConsumer *
   createCodeCompletionConsumer(Preprocessor &PP, const std::string &Filename,
                                unsigned Line, unsigned Column,
-                               bool ShowMacros,
-                               bool ShowCodePatterns, bool ShowGlobals,
-                               llvm::raw_ostream &OS);
+                               const CodeCompleteOptions &Opts,
+                               raw_ostream &OS);
 
   /// \brief Create the Sema object to be used for parsing.
-  void createSema(bool CompleteTranslationUnit,
+  void createSema(TranslationUnitKind TUKind,
                   CodeCompleteConsumer *CompletionConsumer);
   
   /// Create the frontend timer and replace any existing one with it.
@@ -549,46 +578,59 @@ public:
   /// Create the default output file (from the invocation's options) and add it
   /// to the list of tracked output files.
   ///
+  /// The files created by this function always use temporary files to write to
+  /// their result (that is, the data is written to a temporary file which will
+  /// atomically replace the target output on success).
+  ///
   /// \return - Null on error.
   llvm::raw_fd_ostream *
-  createDefaultOutputFile(bool Binary = true, llvm::StringRef BaseInput = "",
-                          llvm::StringRef Extension = "");
+  createDefaultOutputFile(bool Binary = true, StringRef BaseInput = "",
+                          StringRef Extension = "");
 
   /// Create a new output file and add it to the list of tracked output files,
   /// optionally deriving the output path name.
   ///
   /// \return - Null on error.
   llvm::raw_fd_ostream *
-  createOutputFile(llvm::StringRef OutputPath,
+  createOutputFile(StringRef OutputPath,
                    bool Binary = true, bool RemoveFileOnSignal = true,
-                   llvm::StringRef BaseInput = "",
-                   llvm::StringRef Extension = "");
+                   StringRef BaseInput = "",
+                   StringRef Extension = "",
+                   bool UseTemporary = false,
+                   bool CreateMissingDirectories = false);
 
   /// Create a new output file, optionally deriving the output path name.
   ///
-  /// If \arg OutputPath is empty, then createOutputFile will derive an output
-  /// path location as \arg BaseInput, with any suffix removed, and \arg
-  /// Extension appended. If OutputPath is not stdout createOutputFile will
-  /// create a new temporary file that must be renamed to OutputPath in the end.
+  /// If \p OutputPath is empty, then createOutputFile will derive an output
+  /// path location as \p BaseInput, with any suffix removed, and \p Extension
+  /// appended. If \p OutputPath is not stdout and \p UseTemporary
+  /// is true, createOutputFile will create a new temporary file that must be
+  /// renamed to \p OutputPath in the end.
   ///
   /// \param OutputPath - If given, the path to the output file.
   /// \param Error [out] - On failure, the error message.
-  /// \param BaseInput - If \arg OutputPath is empty, the input path name to use
+  /// \param BaseInput - If \p OutputPath is empty, the input path name to use
   /// for deriving the output path.
   /// \param Extension - The extension to use for derived output names.
   /// \param Binary - The mode to open the file in.
   /// \param RemoveFileOnSignal - Whether the file should be registered with
   /// llvm::sys::RemoveFileOnSignal. Note that this is not safe for
   /// multithreaded use, as the underlying signal mechanism is not reentrant
+  /// \param UseTemporary - Create a new temporary file that must be renamed to
+  /// OutputPath in the end.
+  /// \param CreateMissingDirectories - When \p UseTemporary is true, create
+  /// missing directories in the output path.
   /// \param ResultPathName [out] - If given, the result path name will be
   /// stored here on success.
   /// \param TempPathName [out] - If given, the temporary file path name
   /// will be stored here on success.
   static llvm::raw_fd_ostream *
-  createOutputFile(llvm::StringRef OutputPath, std::string &Error,
+  createOutputFile(StringRef OutputPath, std::string &Error,
                    bool Binary = true, bool RemoveFileOnSignal = true,
-                   llvm::StringRef BaseInput = "",
-                   llvm::StringRef Extension = "",
+                   StringRef BaseInput = "",
+                   StringRef Extension = "",
+                   bool UseTemporary = false,
+                   bool CreateMissingDirectories = false,
                    std::string *ResultPathName = 0,
                    std::string *TempPathName = 0);
 
@@ -600,19 +642,29 @@ public:
   /// as the main file.
   ///
   /// \return True on success.
-  bool InitializeSourceManager(llvm::StringRef InputFile);
+  bool InitializeSourceManager(const FrontendInputFile &Input);
 
   /// InitializeSourceManager - Initialize the source manager to set InputFile
   /// as the main file.
   ///
   /// \return True on success.
-  static bool InitializeSourceManager(llvm::StringRef InputFile,
-                                      Diagnostic &Diags,
-                                      FileManager &FileMgr,
-                                      SourceManager &SourceMgr,
-                                      const FrontendOptions &Opts);
+  static bool InitializeSourceManager(const FrontendInputFile &Input,
+                DiagnosticsEngine &Diags,
+                FileManager &FileMgr,
+                SourceManager &SourceMgr,
+                const FrontendOptions &Opts);
 
   /// }
+  
+  virtual ModuleLoadResult loadModule(SourceLocation ImportLoc,
+                                      ModuleIdPath Path,
+                                      Module::NameVisibilityKind Visibility,
+                                      bool IsInclusionDirective);
+
+  virtual void makeModuleVisible(Module *Mod,
+                                 Module::NameVisibilityKind Visibility,
+                                 SourceLocation ImportLoc);
+
 };
 
 } // end namespace clang

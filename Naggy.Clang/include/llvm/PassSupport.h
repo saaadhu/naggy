@@ -18,13 +18,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_PASS_SUPPORT_H
-#define LLVM_PASS_SUPPORT_H
+#ifndef LLVM_PASSSUPPORT_H
+#define LLVM_PASSSUPPORT_H
 
 #include "Pass.h"
-#include "llvm/PassRegistry.h"
 #include "llvm/InitializePasses.h"
+#include "llvm/PassRegistry.h"
 #include "llvm/Support/Atomic.h"
+#include "llvm/Support/Valgrind.h"
 #include <vector>
 
 namespace llvm {
@@ -125,8 +126,8 @@ public:
   }
 
 private:
-  void operator=(const PassInfo &); // do not implement
-  PassInfo(const PassInfo &);       // do not implement
+  void operator=(const PassInfo &) LLVM_DELETED_FUNCTION;
+  PassInfo(const PassInfo &) LLVM_DELETED_FUNCTION;
 };
 
 #define CALL_ONCE_INITIALIZATION(function) \
@@ -135,7 +136,10 @@ private:
   if (old_val == 0) { \
     function(Registry); \
     sys::MemoryFence(); \
+    TsanIgnoreWritesBegin(); \
+    TsanHappensBefore(&initialized); \
     initialized = 2; \
+    TsanIgnoreWritesEnd(); \
   } else { \
     sys::cas_flag tmp = initialized; \
     sys::MemoryFence(); \
@@ -143,7 +147,8 @@ private:
       tmp = initialized; \
       sys::MemoryFence(); \
     } \
-  }
+  } \
+  TsanHappensAfter(&initialized);
 
 #define INITIALIZE_PASS(passName, arg, name, cfg, analysis) \
   static void* initialize##passName##PassOnce(PassRegistry &Registry) { \
@@ -300,7 +305,7 @@ struct RegisterAnalysisGroup : public RegisterAGBase {
 /// clients that are interested in which passes get registered and unregistered
 /// at runtime (which can be because of the RegisterPass constructors being run
 /// as the program starts up, or may be because a shared object just got
-/// loaded).  Deriving from the PassRegistationListener class automatically
+/// loaded).  Deriving from the PassRegistrationListener class automatically
 /// registers your object to receive callbacks indicating when passes are loaded
 /// and removed.
 ///

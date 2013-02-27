@@ -14,23 +14,28 @@
 #define LLVM_CLANG_AST_DECLARATIONNAME_H
 
 #include "clang/Basic/IdentifierTable.h"
-#include "clang/AST/Type.h"
-#include "clang/AST/CanonicalType.h"
 #include "clang/Basic/PartialDiagnostic.h"
+#include "llvm/Support/Compiler.h"
 
 namespace llvm {
   template <typename T> struct DenseMapInfo;
 }
 
 namespace clang {
-  class CXXSpecialName;
-  class CXXOperatorIdName;
+  class ASTContext;
   class CXXLiteralOperatorIdName;
+  class CXXOperatorIdName;
+  class CXXSpecialName;
   class DeclarationNameExtra;
   class IdentifierInfo;
   class MultiKeywordSelector;
-  class UsingDirectiveDecl;
+  class QualType;
+  class Type;
   class TypeSourceInfo;
+  class UsingDirectiveDecl;
+
+  template <typename> class CanQual;
+  typedef CanQual<Type> CanQualType;
 
 /// DeclarationName - The name of a declaration. In the common case,
 /// this just stores an IdentifierInfo pointer to a normal
@@ -57,11 +62,14 @@ public:
 private:
   /// StoredNameKind - The kind of name that is actually stored in the
   /// upper bits of the Ptr field. This is only used internally.
+  ///
+  /// Note: The entries here are synchronized with the entries in Selector,
+  /// for efficient translation between the two.
   enum StoredNameKind {
     StoredIdentifier = 0,
-    StoredObjCZeroArgSelector,
-    StoredObjCOneArgSelector,
-    StoredDeclarationNameExtra,
+    StoredObjCZeroArgSelector = 0x01,
+    StoredObjCOneArgSelector = 0x02,
+    StoredDeclarationNameExtra = 0x03,
     PtrMask = 0x03
   };
 
@@ -105,8 +113,8 @@ private:
   /// CXXSpecialName, returns a pointer to it. Otherwise, returns
   /// a NULL pointer.
   CXXSpecialName *getAsCXXSpecialName() const {
-    if (getNameKind() >= CXXConstructorName &&
-        getNameKind() <= CXXConversionFunctionName)
+    NameKind Kind = getNameKind();
+    if (Kind >= CXXConstructorName && Kind <= CXXConversionFunctionName)
       return reinterpret_cast<CXXSpecialName *>(Ptr & ~PtrMask);
     return 0;
   }
@@ -152,9 +160,9 @@ private:
   friend class DeclarationNameTable;
   friend class NamedDecl;
 
-  /// getFETokenInfoAsVoid - Retrieves the front end-specified pointer
-  /// for this name as a void pointer.
-  void *getFETokenInfoAsVoid() const;
+  /// getFETokenInfoAsVoidSlow - Retrieves the front end-specified pointer
+  /// for this name as a void pointer if it's not an identifier.
+  void *getFETokenInfoAsVoidSlow() const;
 
 public:
   /// DeclarationName - Used to create an empty selector.
@@ -167,7 +175,7 @@ public:
   }
 
   // Construct a declaration name from an Objective-C selector.
-  DeclarationName(Selector Sel);
+  DeclarationName(Selector Sel) : Ptr(Sel.InfoPtr) { }
 
   /// getUsingDirectiveName - Return name for all using-directives.
   static DeclarationName getUsingDirectiveName();
@@ -203,7 +211,7 @@ public:
   std::string getAsString() const;
 
   /// printName - Print the human-readable name to a stream.
-  void printName(llvm::raw_ostream &OS) const;
+  void printName(raw_ostream &OS) const;
 
   /// getAsIdentifierInfo - Retrieve the IdentifierInfo * stored in
   /// this declaration name, or NULL if this declaration name isn't a
@@ -250,14 +258,24 @@ public:
 
   /// getObjCSelector - Get the Objective-C selector stored in this
   /// declaration name.
-  Selector getObjCSelector() const;
+  Selector getObjCSelector() const {
+    assert((getNameKind() == ObjCZeroArgSelector ||
+            getNameKind() == ObjCOneArgSelector ||
+            getNameKind() == ObjCMultiArgSelector ||
+            Ptr == 0) && "Not a selector!");
+    return Selector(Ptr);
+  }
 
   /// getFETokenInfo/setFETokenInfo - The language front-end is
   /// allowed to associate arbitrary metadata with some kinds of
   /// declaration names, including normal identifiers and C++
   /// constructors, destructors, and conversion functions.
   template<typename T>
-  T *getFETokenInfo() const { return static_cast<T*>(getFETokenInfoAsVoid()); }
+  T *getFETokenInfo() const {
+    if (const IdentifierInfo *Info = getAsIdentifierInfo())
+      return Info->getFETokenInfo<T>();
+    return static_cast<T*>(getFETokenInfoAsVoidSlow());
+  }
 
   void setFETokenInfo(void *T);
 
@@ -320,8 +338,8 @@ class DeclarationNameTable {
   CXXOperatorIdName *CXXOperatorNames; // Operator names
   void *CXXLiteralOperatorNames; // Actually a CXXOperatorIdName*
 
-  DeclarationNameTable(const DeclarationNameTable&);            // NONCOPYABLE
-  DeclarationNameTable& operator=(const DeclarationNameTable&); // NONCOPYABLE
+  DeclarationNameTable(const DeclarationNameTable&) LLVM_DELETED_FUNCTION;
+  void operator=(const DeclarationNameTable&) LLVM_DELETED_FUNCTION;
 
 public:
   DeclarationNameTable(const ASTContext &C);
@@ -335,23 +353,15 @@ public:
 
   /// getCXXConstructorName - Returns the name of a C++ constructor
   /// for the given Type.
-  DeclarationName getCXXConstructorName(CanQualType Ty) {
-    return getCXXSpecialName(DeclarationName::CXXConstructorName, 
-                             Ty.getUnqualifiedType());
-  }
+  DeclarationName getCXXConstructorName(CanQualType Ty);
 
   /// getCXXDestructorName - Returns the name of a C++ destructor
   /// for the given Type.
-  DeclarationName getCXXDestructorName(CanQualType Ty) {
-    return getCXXSpecialName(DeclarationName::CXXDestructorName, 
-                             Ty.getUnqualifiedType());
-  }
+  DeclarationName getCXXDestructorName(CanQualType Ty);
 
   /// getCXXConversionFunctionName - Returns the name of a C++
   /// conversion function for the given Type.
-  DeclarationName getCXXConversionFunctionName(CanQualType Ty) {
-    return getCXXSpecialName(DeclarationName::CXXConversionFunctionName, Ty);
-  }
+  DeclarationName getCXXConversionFunctionName(CanQualType Ty);
 
   /// getCXXSpecialName - Returns a declaration name for special kind
   /// of C++ name, e.g., for a constructor, destructor, or conversion
@@ -492,6 +502,9 @@ public:
     LocInfo.CXXLiteralOperatorName.OpNameLoc = Loc.getRawEncoding();
   }
 
+  /// \brief Determine whether this name involves a template parameter.
+  bool isInstantiationDependent() const;
+  
   /// \brief Determine whether this name contains an unexpanded
   /// parameter pack.
   bool containsUnexpandedParameterPack() const;
@@ -500,15 +513,22 @@ public:
   std::string getAsString() const;
 
   /// printName - Print the human-readable name to a stream.
-  void printName(llvm::raw_ostream &OS) const;
+  void printName(raw_ostream &OS) const;
 
   /// getBeginLoc - Retrieve the location of the first token.
   SourceLocation getBeginLoc() const { return NameLoc; }
   /// getEndLoc - Retrieve the location of the last token.
   SourceLocation getEndLoc() const;
   /// getSourceRange - The range of the declaration name.
-  SourceRange getSourceRange() const {
-    return SourceRange(getBeginLoc(), getEndLoc());
+  SourceRange getSourceRange() const LLVM_READONLY {
+    return SourceRange(getLocStart(), getLocEnd());
+  }
+  SourceLocation getLocStart() const LLVM_READONLY {
+    return getBeginLoc();
+  }
+  SourceLocation getLocEnd() const LLVM_READONLY {
+    SourceLocation EndLoc = getEndLoc();
+    return EndLoc.isValid() ? EndLoc : getLocStart();
   }
 };
 
@@ -517,7 +537,7 @@ public:
 inline const DiagnosticBuilder &operator<<(const DiagnosticBuilder &DB,
                                            DeclarationName N) {
   DB.AddTaggedVal(N.getAsOpaqueInteger(),
-                  Diagnostic::ak_declarationname);
+                  DiagnosticsEngine::ak_declarationname);
   return DB;
 }
 
@@ -526,11 +546,11 @@ inline const DiagnosticBuilder &operator<<(const DiagnosticBuilder &DB,
 inline const PartialDiagnostic &operator<<(const PartialDiagnostic &PD,
                                            DeclarationName N) {
   PD.AddTaggedVal(N.getAsOpaqueInteger(),
-                  Diagnostic::ak_declarationname);
+                  DiagnosticsEngine::ak_declarationname);
   return PD;
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+inline raw_ostream &operator<<(raw_ostream &OS,
                                      DeclarationNameInfo DNInfo) {
   DNInfo.printName(OS);
   return OS;
@@ -551,7 +571,9 @@ struct DenseMapInfo<clang::DeclarationName> {
     return clang::DeclarationName::getTombstoneMarker();
   }
 
-  static unsigned getHashValue(clang::DeclarationName);
+  static unsigned getHashValue(clang::DeclarationName Name) {
+    return DenseMapInfo<void*>::getHashValue(Name.getAsOpaquePtr());
+  }
 
   static inline bool
   isEqual(clang::DeclarationName LHS, clang::DeclarationName RHS) {

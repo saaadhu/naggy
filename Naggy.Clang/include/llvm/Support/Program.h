@@ -11,12 +11,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SYSTEM_PROGRAM_H
-#define LLVM_SYSTEM_PROGRAM_H
+#ifndef LLVM_SUPPORT_PROGRAM_H
+#define LLVM_SUPPORT_PROGRAM_H
 
 #include "llvm/Support/Path.h"
 
 namespace llvm {
+class error_code;
 namespace sys {
 
   // TODO: Add operations to communicate with the process, redirect its I/O,
@@ -33,18 +34,14 @@ namespace sys {
     void *Data_;
 
     // Noncopyable.
-    Program(const Program& other);
-    Program& operator=(const Program& other);
+    Program(const Program& other) LLVM_DELETED_FUNCTION;
+    Program& operator=(const Program& other) LLVM_DELETED_FUNCTION;
 
     /// @name Methods
     /// @{
-  public:
 
     Program();
     ~Program();
-
-    /// Return process ID of this program.
-    unsigned GetPid() const;
 
     /// This function executes the program using the \p arguments provided.  The
     /// invoked program will inherit the stdin, stdout, and stderr file
@@ -85,8 +82,9 @@ namespace sys {
     /// This function waits for the program to exit. This function will block
     /// the current program until the invoked program exits.
     /// @returns an integer result code indicating the status of the program.
-    /// A zero or positive value indicates the result code of the program. A
-    /// negative value is the signal number on which it terminated.
+    /// A zero or positive value indicates the result code of the program.
+    /// -1 indicates failure to execute
+    /// -2 indicates a crash during execution or timeout
     /// @see Execute
     /// @brief Waits for the program to exit.
     int Wait
@@ -101,17 +99,7 @@ namespace sys {
       ///< is non-empty upon return an error occurred while waiting.
       );
 
-    /// This function terminates the program.
-    /// @returns true if an error occurred.
-    /// @see Execute
-    /// @brief Terminates the program.
-    bool Kill
-    ( std::string* ErrMsg = 0 ///< If non-zero, provides a pointer to a string
-      ///< instance in which error messages will be returned. If the string
-      ///< is non-empty upon return an error occurred while killing the
-      ///< program.
-      );
-
+  public:
     /// This static constructor (factory) will attempt to locate a program in
     /// the operating system's file system using some pre-determined set of
     /// locations to search (e.g. the PATH on Unix). Paths with slashes are
@@ -121,12 +109,12 @@ namespace sys {
     /// @brief Construct a Program by finding it by name.
     static Path FindProgramByName(const std::string& name);
 
-    // These methods change the specified standard stream (stdin,
-    // stdout, or stderr) to binary mode. They return true if an error
-    // occurred
-    static bool ChangeStdinToBinary();
-    static bool ChangeStdoutToBinary();
-    static bool ChangeStderrToBinary();
+    // These methods change the specified standard stream (stdin, stdout, or
+    // stderr) to binary mode. They return errc::success if the specified stream
+    // was changed. Otherwise a platform dependent error is returned.
+    static error_code ChangeStdinToBinary();
+    static error_code ChangeStdoutToBinary();
+    static error_code ChangeStderrToBinary();
 
     /// A convenience function equivalent to Program prg; prg.Execute(..);
     /// prg.Wait(..);

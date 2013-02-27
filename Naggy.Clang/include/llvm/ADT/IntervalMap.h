@@ -99,8 +99,8 @@
 #ifndef LLVM_ADT_INTERVALMAP_H
 #define LLVM_ADT_INTERVALMAP_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/RecyclingAllocator.h"
 #include <iterator>
@@ -147,6 +147,26 @@ struct IntervalMapInfo {
   /// This is a+1 == b for closed intervals, a == b for half-open intervals.
   static inline bool adjacent(const T &a, const T &b) {
     return a+1 == b;
+  }
+
+};
+
+template <typename T>
+struct IntervalMapHalfOpenInfo {
+
+  /// startLess - Return true if x is not in [a;b).
+  static inline bool startLess(const T &x, const T &a) {
+    return x < a;
+  }
+
+  /// stopLess - Return true if x is not in [a;b).
+  static inline bool stopLess(const T &b, const T &x) {
+    return b <= x;
+  }
+
+  /// adjacent - Return true when the intervals [x;a) and [b;y) can coalesce.
+  static inline bool adjacent(const T &a, const T &b) {
+    return a == b;
   }
 
 };
@@ -739,7 +759,7 @@ public:
 // A Path is used by iterators to represent a position in a B+-tree, and the
 // path to get there from the root.
 //
-// The Path class also constains the tree navigation code that doesn't have to
+// The Path class also contains the tree navigation code that doesn't have to
 // be templatized.
 //
 //===----------------------------------------------------------------------===//
@@ -1334,6 +1354,9 @@ public:
 
   /// valid - Return true if the current position is valid, false for end().
   bool valid() const { return path.valid(); }
+
+  /// atBegin - Return true if the current position is the first map entry.
+  bool atBegin() const { return path.atBegin(); }
 
   /// start - Return the beginning of the current interval.
   const KeyT &start() const { return unsafeStart(); }
@@ -1974,7 +1997,7 @@ iterator::overflow(unsigned Level) {
     CurSize[Nodes] = CurSize[NewNode];
     Node[Nodes] = Node[NewNode];
     CurSize[NewNode] = 0;
-    Node[NewNode] = this->map->newNode<NodeT>();
+    Node[NewNode] = this->map->template newNode<NodeT>();
     ++Nodes;
   }
 

@@ -17,11 +17,11 @@
 #ifndef LLVM_CODEGEN_JITCODEEMITTER_H
 #define LLVM_CODEGEN_JITCODEEMITTER_H
 
-#include <string>
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/CodeGen/MachineCodeEmitter.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/CodeGen/MachineCodeEmitter.h"
-#include "llvm/ADT/DenseMap.h"
+#include <string>
 
 namespace llvm {
 
@@ -51,6 +51,7 @@ class Function;
 /// occurred, more memory is allocated, and we reemit the code into it.
 /// 
 class JITCodeEmitter : public MachineCodeEmitter {
+  virtual void anchor();
 public:
   virtual ~JITCodeEmitter() {}
 
@@ -206,8 +207,7 @@ public:
   /// emitString - This callback is invoked when a String needs to be
   /// written to the output stream.
   void emitString(const std::string &String) {
-    for (unsigned i = 0, N = static_cast<unsigned>(String.size());
-         i < N; ++i) {
+    for (size_t i = 0, N = String.size(); i < N; ++i) {
       uint8_t C = String[i];
       emitByte(C);
     }

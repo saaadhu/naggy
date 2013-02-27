@@ -15,11 +15,11 @@
 #ifndef LLVM_CODEGEN_MACHINEDOMINATORS_H
 #define LLVM_CODEGEN_MACHINEDOMINATORS_H
 
+#include "llvm/Analysis/DominatorInternals.h"
+#include "llvm/Analysis/Dominators.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/Analysis/Dominators.h"
-#include "llvm/Analysis/DominatorInternals.h"
 
 namespace llvm {
 
@@ -84,7 +84,8 @@ public:
 
     // Loop through the basic block until we find A or B.
     MachineBasicBlock::iterator I = BBA->begin();
-    for (; &*I != A && &*I != B; ++I) /*empty*/;
+    for (; &*I != A && &*I != B; ++I)
+      /*empty*/ ;
 
     //if(!DT.IsPostDominators) {
       // A dominates B if it is found first in the basic block.

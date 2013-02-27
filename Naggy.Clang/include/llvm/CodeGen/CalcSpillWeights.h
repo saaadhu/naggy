@@ -11,8 +11,8 @@
 #ifndef LLVM_CODEGEN_CALCSPILLWEIGHTS_H
 #define LLVM_CODEGEN_CALCSPILLWEIGHTS_H
 
-#include "llvm/CodeGen/SlotIndexes.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/CodeGen/SlotIndexes.h"
 
 namespace llvm {
 
@@ -48,11 +48,6 @@ namespace llvm {
     VirtRegAuxInfo(MachineFunction &mf, LiveIntervals &lis,
                    const MachineLoopInfo &loops) :
       MF(mf), LIS(lis), Loops(loops) {}
-
-    /// CalculateRegClass - recompute the register class for reg from its uses.
-    /// Since the register class can affect the allocation hint, this function
-    /// should be called before CalculateWeightAndHint if both are called.
-    void CalculateRegClass(unsigned reg);
 
     /// CalculateWeightAndHint - (re)compute li's spill weight and allocation
     /// hint.

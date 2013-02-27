@@ -125,6 +125,12 @@ namespace clang {
       /// isNegative - Test whether the quantity is less than zero.
       bool isNegative() const { return Quantity  < 0; }
 
+      /// isPowerOfTwo - Test whether the quantity is a power of two.
+      /// Zero is not a power of two.
+      bool isPowerOfTwo() const {
+        return (Quantity & -Quantity) == Quantity;
+      }
+
       // Arithmetic operators.
       CharUnits operator* (QuantityType N) const {
         return CharUnits(Quantity * N);
@@ -158,8 +164,8 @@ namespace clang {
       QuantityType getQuantity() const { return Quantity; }
 
       /// RoundUpToAlignment - Returns the next integer (mod 2**64) that is
-      /// greater than or equal to this quantity and is a multiple of \arg
-      /// Align. Align must be non-zero.
+      /// greater than or equal to this quantity and is a multiple of \p Align.
+      /// Align must be non-zero.
       CharUnits RoundUpToAlignment(const CharUnits &Align) {
         return CharUnits(llvm::RoundUpToAlignment(Quantity, 
                                                   Align.Quantity));

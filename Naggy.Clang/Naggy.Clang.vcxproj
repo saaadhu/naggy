@@ -55,7 +55,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib;clang.lib;clangAST.lib;libclang.lib;clangLex.lib;clangBasic.lib;clangParse.lib;clangFrontend.lib;clangCodeGen.lib;clangAnalysis.lib;clangSema.lib;clangSerialization.lib;clangDriver.lib;LLVMCore.lib;LLVMMC.lib;LLVMSupport.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib;clang.lib;clangAST.lib;libclang.lib;clangLex.lib;clangBasic.lib;clangParse.lib;clangFrontend.lib;clangCodeGen.lib;clangAnalysis.lib;clangSema.lib;clangSerialization.lib;clangDriver.lib;clangEdit.lib;LLVMCore.lib;LLVMMC.lib;LLVMSupport.lib;LLVMMCParser.lib;LLVMBitReader.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -69,7 +69,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib;clang.lib;clangAST.lib;libclang.lib;clangLex.lib;clangBasic.lib;clangParse.lib;clangFrontend.lib;clangCodeGen.lib;clangAnalysis.lib;clangSema.lib;clangSerialization.lib;clangDriver.lib;LLVMCore.lib;LLVMMC.lib;LLVMSupport.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib;clangAST.lib;libclang.lib;clangLex.lib;clangBasic.lib;clangParse.lib;clangFrontend.lib;clangCodeGen.lib;clangAnalysis.lib;clangSema.lib;clangSerialization.lib;clangDriver.lib;clangEdit.lib;LLVMCore.lib;LLVMMC.lib;LLVMSupport.lib;LLVMMCParser.lib;LLVMBitReader.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -81,7 +81,6 @@
   <ItemGroup>
     <ClInclude Include="ClangAdapter.h" />
     <ClInclude Include="ClangPreprocessor.h" />
-    <ClInclude Include="IfBuilder.h" />
     <ClInclude Include="PreprocessorAdapter.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Stdafx.h" />
@@ -91,7 +90,6 @@
     <ClCompile Include="AssemblyInfo.cpp" />
     <ClCompile Include="ClangAdapter.cpp" />
     <ClCompile Include="ClangPreprocessor.cpp" />
-    <ClCompile Include="IfBuilder.cpp" />
     <ClCompile Include="PreprocessorAdapter.cpp" />
     <ClCompile Include="Stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

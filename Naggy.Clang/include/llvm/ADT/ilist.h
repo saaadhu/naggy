@@ -38,6 +38,7 @@
 #ifndef LLVM_ADT_ILIST_H
 #define LLVM_ADT_ILIST_H
 
+#include "llvm/Support/Compiler.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -331,8 +332,8 @@ class iplist : public Traits {
 
   // No fundamental reason why iplist can't be copyable, but the default
   // copy/copy-assign won't do.
-  iplist(const iplist &);         // do not implement
-  void operator=(const iplist &); // do not implement
+  iplist(const iplist &) LLVM_DELETED_FUNCTION;
+  void operator=(const iplist &) LLVM_DELETED_FUNCTION;
 
 public:
   typedef NodeTy *pointer;
@@ -464,6 +465,17 @@ public:
     return where;
   }
 
+  /// Remove all nodes from the list like clear(), but do not call
+  /// removeNodeFromList() or deleteNode().
+  ///
+  /// This should only be used immediately before freeing nodes in bulk to
+  /// avoid traversing the list and bringing all the nodes into cache.
+  void clearAndLeakNodesUnsafely() {
+    if (Head) {
+      Head = getTail();
+      this->setPrev(Head, Head);
+    }
+  }
 
 private:
   // transfer - The heart of the splice function.  Move linked list nodes from
@@ -471,6 +483,10 @@ private:
   //
   void transfer(iterator position, iplist &L2, iterator first, iterator last) {
     assert(first != last && "Should be checked by callers");
+    // Position cannot be contained in the range to be transferred.
+    // Check for the most common mistake.
+    assert(position != first &&
+           "Insertion point can't be one of the transferred nodes");
 
     if (position != last) {
       // Note: we have to be careful about the case when we move the first node
@@ -652,10 +668,6 @@ struct ilist : public iplist<NodeTy> {
   void push_front(const NodeTy &val) { insert(this->begin(), val); }
   void push_back(const NodeTy &val) { insert(this->end(), val); }
 
-  // Special forms of insert...
-  template<class InIt> void insert(iterator where, InIt first, InIt last) {
-    for (; first != last; ++first) insert(where, *first);
-  }
   void insert(iterator where, size_type count, const NodeTy &val) {
     for (; count != 0; --count) insert(where, val);
   }

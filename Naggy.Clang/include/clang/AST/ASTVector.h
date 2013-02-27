@@ -18,12 +18,13 @@
 #ifndef LLVM_CLANG_AST_VECTOR
 #define LLVM_CLANG_AST_VECTOR
 
-#include "llvm/Support/type_traits.h"
-#include "llvm/Support/Allocator.h"
+#include "clang/AST/AttrIterator.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/type_traits.h"
 #include <algorithm>
-#include <memory>
 #include <cstring>
+#include <memory>
 
 #ifdef _MSC_VER
 namespace std {
@@ -50,6 +51,7 @@ namespace std {
 #endif
 
 namespace clang {
+  class ASTContext;
 
 template<typename T>
 class ASTVector {
@@ -59,7 +61,9 @@ class ASTVector {
 
 public:
   // Default ctor - Initialize to empty.
-  explicit ASTVector(ASTContext &C, unsigned N = 0)
+  ASTVector() : Begin(NULL), End(NULL), Capacity(NULL) { }
+
+  ASTVector(ASTContext &C, unsigned N)
   : Begin(NULL), End(NULL), Capacity(NULL) {
     reserve(C, N);
   }
@@ -374,7 +378,7 @@ void ASTVector<T>::grow(ASTContext &C, size_t MinSize) {
     NewCapacity = MinSize;
 
   // Allocate the memory from the ASTContext.
-  T *NewElts = new (C) T[NewCapacity];
+  T *NewElts = new (C, llvm::alignOf<T>()) T[NewCapacity];
 
   // Copy the elements over.
   if (llvm::is_class<T>::value) {
@@ -387,7 +391,7 @@ void ASTVector<T>::grow(ASTContext &C, size_t MinSize) {
     memcpy(NewElts, Begin, CurSize * sizeof(T));
   }
 
-  C.Deallocate(Begin);
+  // ASTContext never frees any memory.
   Begin = NewElts;
   End = NewElts+CurSize;
   Capacity = Begin+NewCapacity;

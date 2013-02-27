@@ -29,8 +29,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SUPPORT_CONSTANT_RANGE_H
-#define LLVM_SUPPORT_CONSTANT_RANGE_H
+#ifndef LLVM_SUPPORT_CONSTANTRANGE_H
+#define LLVM_SUPPORT_CONSTANTRANGE_H
 
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/DataTypes.h"
@@ -154,6 +154,10 @@ public:
   /// subtract - Subtract the specified constant from the endpoints of this
   /// constant range.
   ConstantRange subtract(const APInt &CI) const;
+
+  /// \brief Subtract the specified range from this range (aka relative
+  /// complement of the sets).
+  ConstantRange difference(const ConstantRange &CR) const;
 
   /// intersectWith - Return the range that results from the intersection of
   /// this range with another range.  The resultant range is guaranteed to

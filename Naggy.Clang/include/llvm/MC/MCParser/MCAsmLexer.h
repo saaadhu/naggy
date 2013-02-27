@@ -7,17 +7,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MC_MCASMLEXER_H
-#define LLVM_MC_MCASMLEXER_H
+#ifndef LLVM_MC_MCPARSER_MCASMLEXER_H
+#define LLVM_MC_MCPARSER_MCASMLEXER_H
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/SMLoc.h"
 
 namespace llvm {
-class MCAsmLexer;
-class MCInst;
-class Target;
 
 /// AsmToken - Target independent representation for an assembler token.
 class AsmToken {
@@ -36,14 +34,13 @@ public:
     // Real values.
     Real,
 
-    // Register values (stored in IntVal).  Only used by TargetAsmLexer.
-    Register,
-
     // No-value.
     EndOfStatement,
     Colon,
+    Space,
     Plus, Minus, Tilde,
     Slash,    // '/'
+    BackSlash, // '\'
     LParen, RParen, LBrac, RBrac, LCurly, RCurly,
     Star, Dot, Comma, Dollar, Equal, EqualEqual,
 
@@ -53,6 +50,7 @@ public:
     Greater, GreaterEqual, GreaterGreater, At
   };
 
+private:
   TokenKind Kind;
 
   /// A reference to the entire token contents; this is always a pointer into
@@ -71,6 +69,7 @@ public:
   bool isNot(TokenKind K) const { return Kind != K; }
 
   SMLoc getLoc() const;
+  SMLoc getEndLoc() const;
 
   /// getStringContents - Get the contents of a string token (without quotes).
   StringRef getStringContents() const {
@@ -102,13 +101,6 @@ public:
     assert(Kind == Integer && "This token isn't an integer!");
     return IntVal;
   }
-
-  /// getRegVal - Get the register number for the current token, which should
-  /// be a register.
-  unsigned getRegVal() const {
-    assert(Kind == Register && "This token isn't a register!");
-    return static_cast<unsigned>(IntVal);
-  }
 };
 
 /// MCAsmLexer - Generic assembler lexer interface, for use by target specific
@@ -121,10 +113,11 @@ class MCAsmLexer {
   SMLoc ErrLoc;
   std::string Err;
 
-  MCAsmLexer(const MCAsmLexer &);   // DO NOT IMPLEMENT
-  void operator=(const MCAsmLexer &);  // DO NOT IMPLEMENT
+  MCAsmLexer(const MCAsmLexer &) LLVM_DELETED_FUNCTION;
+  void operator=(const MCAsmLexer &) LLVM_DELETED_FUNCTION;
 protected: // Can only create subclasses.
   const char *TokStart;
+  bool SkipSpace;
 
   MCAsmLexer();
 
@@ -169,11 +162,14 @@ public:
   /// getKind - Get the kind of current token.
   AsmToken::TokenKind getKind() const { return CurTok.getKind(); }
 
-  /// is - Check if the current token has kind \arg K.
+  /// is - Check if the current token has kind \p K.
   bool is(AsmToken::TokenKind K) const { return CurTok.is(K); }
 
-  /// isNot - Check if the current token has kind \arg K.
+  /// isNot - Check if the current token has kind \p K.
   bool isNot(AsmToken::TokenKind K) const { return CurTok.isNot(K); }
+
+  /// setSkipSpace - Set whether spaces should be ignored by the lexer
+  void setSkipSpace(bool val) { SkipSpace = val; }
 };
 
 } // End llvm namespace

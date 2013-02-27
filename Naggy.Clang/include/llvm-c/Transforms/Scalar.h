@@ -25,6 +25,13 @@
 extern "C" {
 #endif
 
+/**
+ * @defgroup LLVMCTransformsScalar Scalar transformations
+ * @ingroup LLVMCTransforms
+ *
+ * @{
+ */
+
 /** See llvm::createAggressiveDCEPass function. */
 void LLVMAddAggressiveDCEPass(LLVMPassManagerRef PM);
 
@@ -107,12 +114,18 @@ void LLVMAddCorrelatedValuePropagationPass(LLVMPassManagerRef PM);
 /** See llvm::createEarlyCSEPass function */
 void LLVMAddEarlyCSEPass(LLVMPassManagerRef PM);
 
+/** See llvm::createLowerExpectIntrinsicPass function */
+void LLVMAddLowerExpectIntrinsicPass(LLVMPassManagerRef PM);
+
 /** See llvm::createTypeBasedAliasAnalysisPass function */
 void LLVMAddTypeBasedAliasAnalysisPass(LLVMPassManagerRef PM);
 
 /** See llvm::createBasicAliasAnalysisPass function */
 void LLVMAddBasicAliasAnalysisPass(LLVMPassManagerRef PM);
 
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }

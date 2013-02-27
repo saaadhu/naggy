@@ -10,8 +10,8 @@
 #ifndef LLVM_ANALYSIS_DOMINATOR_INTERNALS_H
 #define LLVM_ANALYSIS_DOMINATOR_INTERNALS_H
 
-#include "llvm/Analysis/Dominators.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Analysis/Dominators.h"
 
 //===----------------------------------------------------------------------===//
 //
@@ -171,7 +171,7 @@ void Calculate(DominatorTreeBase<typename GraphTraits<NodeT>::NodeType>& DT,
 
   // it might be that some blocks did not get a DFS number (e.g., blocks of 
   // infinite loops). In these cases an artificial exit node is required.
-  MultipleRoots |= (DT.isPostDominator() && N != F.size());
+  MultipleRoots |= (DT.isPostDominator() && N != GraphTraits<FuncT*>::size(&F));
 
   // When naively implemented, the Lengauer-Tarjan algorithm requires a separate
   // bucket for each vertex. However, this is unnecessary, because each vertex

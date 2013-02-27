@@ -10,9 +10,10 @@
 #ifndef LLVM_MC_MCOBJECTWRITER_H
 #define LLVM_MC_MCOBJECTWRITER_H
 
-#include "llvm/ADT/Triple.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
 
 namespace llvm {
@@ -20,11 +21,9 @@ class MCAsmLayout;
 class MCAssembler;
 class MCFixup;
 class MCFragment;
-class MCSymbol;
 class MCSymbolData;
 class MCSymbolRefExpr;
 class MCValue;
-class raw_ostream;
 
 /// MCObjectWriter - Defines the object file and target independent interfaces
 /// used by the assembler backend to write native file format object files.
@@ -38,8 +37,8 @@ class raw_ostream;
 /// The object writer also contains a number of helper methods for writing
 /// binary data to the output stream.
 class MCObjectWriter {
-  MCObjectWriter(const MCObjectWriter &); // DO NOT IMPLEMENT
-  void operator=(const MCObjectWriter &); // DO NOT IMPLEMENT
+  MCObjectWriter(const MCObjectWriter &) LLVM_DELETED_FUNCTION;
+  void operator=(const MCObjectWriter &) LLVM_DELETED_FUNCTION;
 
 protected:
   raw_ostream &OS;
@@ -53,6 +52,9 @@ protected: // Can only create subclasses.
 public:
   virtual ~MCObjectWriter();
 
+  /// lifetime management
+  virtual void reset() { }
+
   bool isLittleEndian() const { return IsLittleEndian; }
 
   raw_ostream &getStream() { return OS; }
@@ -60,15 +62,15 @@ public:
   /// @name High-Level API
   /// @{
 
-  /// Perform any late binding of symbols (for example, to assign symbol indices
-  /// for use when generating relocations).
+  /// \brief Perform any late binding of symbols (for example, to assign symbol
+  /// indices for use when generating relocations).
   ///
   /// This routine is called by the assembler after layout and relaxation is
   /// complete.
   virtual void ExecutePostLayoutBinding(MCAssembler &Asm,
                                         const MCAsmLayout &Layout) = 0;
 
-  /// Record a relocation entry.
+  /// \brief Record a relocation entry.
   ///
   /// This routine is called by the assembler after layout and relaxation, and
   /// post layout binding. The implementation is responsible for storing
@@ -98,8 +100,7 @@ public:
                                          bool InSet,
                                          bool IsPCRel) const;
 
-
-  /// Write the object file.
+  /// \brief Write the object file.
   ///
   /// This routine is called by the assembler after layout and relaxation is
   /// complete, fixups have been evaluated and applied, and relocations
@@ -175,7 +176,13 @@ public:
     OS << StringRef(Zeros, N % 16);
   }
 
+  void WriteBytes(SmallVectorImpl<char> &ByteVec, unsigned ZeroFillSize = 0) {
+    WriteBytes(StringRef(ByteVec.data(), ByteVec.size()), ZeroFillSize);
+  }
+
   void WriteBytes(StringRef Str, unsigned ZeroFillSize = 0) {
+    // TODO: this version may need to go away once all fragment contents are
+    // converted to SmallVector<char, N>
     assert((ZeroFillSize == 0 || Str.size () <= ZeroFillSize) &&
       "data size greater than fill size, unexpected large write will occur");
     OS << Str;
@@ -185,13 +192,7 @@ public:
 
   /// @}
 
-  /// Utility function to encode a SLEB128 value.
-  static void EncodeSLEB128(int64_t Value, raw_ostream &OS);
-  /// Utility function to encode a ULEB128 value.
-  static void EncodeULEB128(uint64_t Value, raw_ostream &OS);
 };
-
-MCObjectWriter *createWinCOFFObjectWriter(raw_ostream &OS, bool is64Bit);
 
 } // End llvm namespace
 

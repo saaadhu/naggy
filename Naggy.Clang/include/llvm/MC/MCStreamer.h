@@ -14,13 +14,16 @@
 #ifndef LLVM_MC_MCSTREAMER_H
 #define LLVM_MC_MCSTREAMER_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/DataTypes.h"
 #include "llvm/MC/MCDirectives.h"
 #include "llvm/MC/MCDwarf.h"
+#include "llvm/MC/MCWin64EH.h"
+#include "llvm/Support/DataTypes.h"
+#include <string>
 
 namespace llvm {
-  class MCAsmInfo;
+  class MCAsmBackend;
   class MCCodeEmitter;
   class MCContext;
   class MCExpr;
@@ -29,8 +32,6 @@ namespace llvm {
   class MCSection;
   class MCSymbol;
   class StringRef;
-  class TargetAsmBackend;
-  class TargetLoweringObjectFile;
   class Twine;
   class raw_ostream;
   class formatted_raw_ostream;
@@ -45,30 +46,75 @@ namespace llvm {
   /// a .s file, and implementations that write out .o files of various formats.
   ///
   class MCStreamer {
+  public:
+    enum StreamerKind {
+      SK_AsmStreamer,
+      SK_NullStreamer,
+      SK_RecordStreamer,
+
+      // MCObjectStreamer subclasses.
+      SK_ELFStreamer,
+      SK_ARMELFStreamer,
+      SK_MachOStreamer,
+      SK_PureStreamer,
+      SK_MipsELFStreamer,
+      SK_WinCOFFStreamer
+    };
+
+  private:
+    const StreamerKind Kind;
     MCContext &Context;
 
-    MCStreamer(const MCStreamer&); // DO NOT IMPLEMENT
-    MCStreamer &operator=(const MCStreamer&); // DO NOT IMPLEMENT
+    MCStreamer(const MCStreamer&) LLVM_DELETED_FUNCTION;
+    MCStreamer &operator=(const MCStreamer&) LLVM_DELETED_FUNCTION;
 
-    void EmitSymbolValue(const MCSymbol *Sym, unsigned Size,
-                         bool isPCRel, unsigned AddrSpace);
+    bool EmitEHFrame;
+    bool EmitDebugFrame;
 
     std::vector<MCDwarfFrameInfo> FrameInfos;
     MCDwarfFrameInfo *getCurrentFrameInfo();
+    MCSymbol *EmitCFICommon();
     void EnsureValidFrame();
 
-    const MCSymbol* LastNonPrivate;
+    std::vector<MCWin64EHUnwindInfo *> W64UnwindInfos;
+    MCWin64EHUnwindInfo *CurrentW64UnwindInfo;
+    void setCurrentW64UnwindInfo(MCWin64EHUnwindInfo *Frame);
+    void EnsureValidW64UnwindInfo();
+
+    MCSymbol* LastSymbol;
 
     /// SectionStack - This is stack of current and previous section
     /// values saved by PushSection.
     SmallVector<std::pair<const MCSection *,
                 const MCSection *>, 4> SectionStack;
 
+    bool AutoInitSections;
+
   protected:
-    MCStreamer(MCContext &Ctx);
+    MCStreamer(StreamerKind Kind, MCContext &Ctx);
+
+    const MCExpr *BuildSymbolDiff(MCContext &Context, const MCSymbol *A,
+                                  const MCSymbol *B);
+
+    const MCExpr *ForceExpAbs(const MCExpr* Expr);
+
+    void RecordProcStart(MCDwarfFrameInfo &Frame);
+    virtual void EmitCFIStartProcImpl(MCDwarfFrameInfo &Frame);
+    void RecordProcEnd(MCDwarfFrameInfo &Frame);
+    virtual void EmitCFIEndProcImpl(MCDwarfFrameInfo &CurFrame);
+    void EmitFrames(bool usingCFI);
+
+    MCWin64EHUnwindInfo *getCurrentW64UnwindInfo(){return CurrentW64UnwindInfo;}
+    void EmitW64Tables();
 
   public:
     virtual ~MCStreamer();
+
+    StreamerKind getKind() const { return Kind; }
+
+    /// State management
+    ///
+    virtual void reset();
 
     MCContext &getContext() const { return Context; }
 
@@ -78,6 +124,18 @@ namespace llvm {
 
     const MCDwarfFrameInfo &getFrameInfo(unsigned i) {
       return FrameInfos[i];
+    }
+
+    ArrayRef<MCDwarfFrameInfo> getFrameInfos() {
+      return FrameInfos;
+    }
+
+    unsigned getNumW64UnwindInfos() {
+      return W64UnwindInfos.size();
+    }
+
+    MCWin64EHUnwindInfo &getW64UnwindInfo(unsigned i) {
+      return *W64UnwindInfos[i];
     }
 
     /// @name Assembly File Formatting.
@@ -171,8 +229,33 @@ namespace llvm {
       }
     }
 
+    /// SwitchSectionNoChange - Set the current section where code is being
+    /// emitted to @p Section.  This is required to update CurSection. This
+    /// version does not call ChangeSection.
+    void SwitchSectionNoChange(const MCSection *Section) {
+      assert(Section && "Cannot switch to a null section!");
+      const MCSection *curSection = SectionStack.back().first;
+      SectionStack.back().second = curSection;
+      if (Section != curSection)
+        SectionStack.back().first = Section;
+    }
+
+    /// Initialize the streamer.
+    void InitStreamer() {
+      if (AutoInitSections)
+        InitSections();
+    }
+
+    /// Tell this MCStreamer to call InitSections upon initialization.
+    void setAutoInitSections(bool AutoInitSections) {
+      this->AutoInitSections = AutoInitSections;
+    }
+
     /// InitSections - Create the default sections and set the initial one.
     virtual void InitSections() = 0;
+
+    /// InitToTextSection - Create a text section and switch the streamer to it.
+    virtual void InitToTextSection() = 0;
 
     /// EmitLabel - Emit a label for @p Symbol into the current section.
     ///
@@ -184,11 +267,20 @@ namespace llvm {
     /// used in an assignment.
     virtual void EmitLabel(MCSymbol *Symbol);
 
+    virtual void EmitDebugLabel(MCSymbol *Symbol);
+
     virtual void EmitEHSymAttributes(const MCSymbol *Symbol,
                                      MCSymbol *EHSymbol);
 
-    /// EmitAssemblerFlag - Note in the output the specified @p Flag
+    /// EmitAssemblerFlag - Note in the output the specified @p Flag.
     virtual void EmitAssemblerFlag(MCAssemblerFlag Flag) = 0;
+
+    /// EmitLinkerOptions - Emit the given list @p Options of strings as linker
+    /// options into the output.
+    virtual void EmitLinkerOptions(ArrayRef<std::string> Kind) {}
+
+    /// EmitDataRegion - Note in the output the specified region @p Kind.
+    virtual void EmitDataRegion(MCDataRegionType Kind) {}
 
     /// EmitThumbFunc - Note in the output that the specified @p Func is
     /// a Thumb mode function (ARM target only).
@@ -244,6 +336,11 @@ namespace llvm {
     /// EndCOFFSymbolDef - Marks the end of the symbol definition.
     virtual void EndCOFFSymbolDef() = 0;
 
+    /// EmitCOFFSecRel32 - Emits a COFF section relative relocation.
+    ///
+    /// @param Symbol - Symbol the section relative realocation should point to.
+    virtual void EmitCOFFSecRel32(MCSymbol const *Symbol);
+
     /// EmitELFSize - Emit an ELF .size directive.
     ///
     /// This corresponds to an assembler statement such as:
@@ -264,7 +361,9 @@ namespace llvm {
     ///
     /// @param Symbol - The common symbol to emit.
     /// @param Size - The size of the common symbol.
-    virtual void EmitLocalCommonSymbol(MCSymbol *Symbol, uint64_t Size) = 0;
+    /// @param ByteAlignment - The alignment of the common symbol in bytes.
+    virtual void EmitLocalCommonSymbol(MCSymbol *Symbol, uint64_t Size,
+                                       unsigned ByteAlignment) = 0;
 
     /// EmitZerofill - Emit the zerofill section and an optional symbol.
     ///
@@ -274,7 +373,7 @@ namespace llvm {
     /// @param ByteAlignment - The alignment of the zerofill symbol if
     /// non-zero. This must be a power of 2 on some targets.
     virtual void EmitZerofill(const MCSection *Section, MCSymbol *Symbol = 0,
-                              unsigned Size = 0,unsigned ByteAlignment = 0) = 0;
+                              uint64_t Size = 0,unsigned ByteAlignment = 0) = 0;
 
     /// EmitTBSSSymbol - Emit a thread local bss (.tbss) symbol.
     ///
@@ -285,15 +384,16 @@ namespace llvm {
     /// if non-zero.  This must be a power of 2 on some targets.
     virtual void EmitTBSSSymbol(const MCSection *Section, MCSymbol *Symbol,
                                 uint64_t Size, unsigned ByteAlignment = 0) = 0;
+
     /// @}
     /// @name Generating Data
     /// @{
 
-    /// EmitBytes - Emit the bytes in \arg Data into the output.
+    /// EmitBytes - Emit the bytes in \p Data into the output.
     ///
     /// This is used to implement assembler directives such as .byte, .ascii,
     /// etc.
-    virtual void EmitBytes(StringRef Data, unsigned AddrSpace) = 0;
+    virtual void EmitBytes(StringRef Data, unsigned AddrSpace = 0) = 0;
 
     /// EmitValue - Emit the expression @p Value into the output as a native
     /// integer of the given @p Size bytes.
@@ -305,12 +405,9 @@ namespace llvm {
     /// @param Size - The size of the integer (in bytes) to emit. This must
     /// match a native machine width.
     virtual void EmitValueImpl(const MCExpr *Value, unsigned Size,
-                               bool isPCRel, unsigned AddrSpace) = 0;
+                               unsigned AddrSpace) = 0;
 
     void EmitValue(const MCExpr *Value, unsigned Size, unsigned AddrSpace = 0);
-
-    void EmitPCRelValue(const MCExpr *Value, unsigned Size,
-                        unsigned AddrSpace = 0);
 
     /// EmitIntValue - Special case of EmitValue that avoids the client having
     /// to pass in a MCExpr for constant integers.
@@ -330,7 +427,8 @@ namespace llvm {
 
     /// EmitULEB128Value - Special case of EmitULEB128Value that avoids the
     /// client having to pass in a MCExpr for constant integers.
-    void EmitULEB128IntValue(uint64_t Value, unsigned AddrSpace = 0);
+    void EmitULEB128IntValue(uint64_t Value, unsigned Padding = 0,
+			     unsigned AddrSpace = 0);
 
     /// EmitSLEB128Value - Special case of EmitSLEB128Value that avoids the
     /// client having to pass in a MCExpr for constant integers.
@@ -341,8 +439,12 @@ namespace llvm {
     void EmitSymbolValue(const MCSymbol *Sym, unsigned Size,
                          unsigned AddrSpace = 0);
 
-    void EmitPCRelSymbolValue(const MCSymbol *Sym, unsigned Size,
-                              unsigned AddrSpace = 0);
+    /// EmitGPRel64Value - Emit the expression @p Value into the output as a
+    /// gprel64 (64-bit GP relative) value.
+    ///
+    /// This is used to implement assembler directives such as .gpdword on
+    /// targets that support them.
+    virtual void EmitGPRel64Value(const MCExpr *Value);
 
     /// EmitGPRel32Value - Emit the expression @p Value into the output as a
     /// gprel32 (32-bit GP relative) value.
@@ -354,14 +456,13 @@ namespace llvm {
     /// EmitFill - Emit NumBytes bytes worth of the value specified by
     /// FillValue.  This implements directives such as '.space'.
     virtual void EmitFill(uint64_t NumBytes, uint8_t FillValue,
-                          unsigned AddrSpace);
+                          unsigned AddrSpace = 0);
 
     /// EmitZeros - Emit NumBytes worth of zeros.  This is a convenience
     /// function that just wraps EmitFill.
-    void EmitZeros(uint64_t NumBytes, unsigned AddrSpace) {
+    void EmitZeros(uint64_t NumBytes, unsigned AddrSpace = 0) {
       EmitFill(NumBytes, 0, AddrSpace);
     }
-
 
     /// EmitValueToAlignment - Emit some number of copies of @p Value until
     /// the byte alignment @p ByteAlignment is reached.
@@ -406,7 +507,8 @@ namespace llvm {
     /// @param Offset - The offset to reach. This may be an expression, but the
     /// expression must be associated with the current section.
     /// @param Value - The value to use when filling bytes.
-    virtual void EmitValueToOffset(const MCExpr *Offset,
+    /// @return false on success, true if the offset was invalid.
+    virtual bool EmitValueToOffset(const MCExpr *Offset,
                                    unsigned char Value = 0) = 0;
 
     /// @}
@@ -418,7 +520,8 @@ namespace llvm {
     /// EmitDwarfFileDirective - Associate a filename with a specified logical
     /// file number.  This implements the DWARF2 '.file 4 "foo.c"' assembler
     /// directive.
-    virtual bool EmitDwarfFileDirective(unsigned FileNo,StringRef Filename);
+    virtual bool EmitDwarfFileDirective(unsigned FileNo, StringRef Directory,
+                                        StringRef Filename);
 
     /// EmitDwarfLocDirective - This implements the DWARF2
     // '.loc fileno lineno ...' assembler directive.
@@ -430,7 +533,8 @@ namespace llvm {
 
     virtual void EmitDwarfAdvanceLineAddr(int64_t LineDelta,
                                           const MCSymbol *LastLabel,
-                                          const MCSymbol *Label) = 0;
+                                          const MCSymbol *Label,
+                                          unsigned PointerSize) = 0;
 
     virtual void EmitDwarfAdvanceFrameAddr(const MCSymbol *LastLabel,
                                            const MCSymbol *Label) {
@@ -439,8 +543,10 @@ namespace llvm {
     void EmitDwarfSetLineAddr(int64_t LineDelta, const MCSymbol *Label,
                               int PointerSize);
 
-    virtual void EmitCFIStartProc();
-    virtual void EmitCFIEndProc();
+    virtual void EmitCompactUnwindEncoding(uint32_t CompactUnwindEncoding);
+    virtual void EmitCFISections(bool EH, bool Debug);
+    void EmitCFIStartProc();
+    void EmitCFIEndProc();
     virtual void EmitCFIDefCfa(int64_t Register, int64_t Offset);
     virtual void EmitCFIDefCfaOffset(int64_t Offset);
     virtual void EmitCFIDefCfaRegister(int64_t Register);
@@ -450,12 +556,46 @@ namespace llvm {
     virtual void EmitCFIRememberState();
     virtual void EmitCFIRestoreState();
     virtual void EmitCFISameValue(int64_t Register);
+    virtual void EmitCFIRestore(int64_t Register);
     virtual void EmitCFIRelOffset(int64_t Register, int64_t Offset);
     virtual void EmitCFIAdjustCfaOffset(int64_t Adjustment);
+    virtual void EmitCFIEscape(StringRef Values);
+    virtual void EmitCFISignalFrame();
+    virtual void EmitCFIUndefined(int64_t Register);
+    virtual void EmitCFIRegister(int64_t Register1, int64_t Register2);
+
+    virtual void EmitWin64EHStartProc(const MCSymbol *Symbol);
+    virtual void EmitWin64EHEndProc();
+    virtual void EmitWin64EHStartChained();
+    virtual void EmitWin64EHEndChained();
+    virtual void EmitWin64EHHandler(const MCSymbol *Sym, bool Unwind,
+                                    bool Except);
+    virtual void EmitWin64EHHandlerData();
+    virtual void EmitWin64EHPushReg(unsigned Register);
+    virtual void EmitWin64EHSetFrame(unsigned Register, unsigned Offset);
+    virtual void EmitWin64EHAllocStack(unsigned Size);
+    virtual void EmitWin64EHSaveReg(unsigned Register, unsigned Offset);
+    virtual void EmitWin64EHSaveXMM(unsigned Register, unsigned Offset);
+    virtual void EmitWin64EHPushFrame(bool Code);
+    virtual void EmitWin64EHEndProlog();
 
     /// EmitInstruction - Emit the given @p Instruction into the current
     /// section.
     virtual void EmitInstruction(const MCInst &Inst) = 0;
+
+    /// \brief Set the bundle alignment mode from now on in the section.
+    /// The argument is the power of 2 to which the alignment is set. The
+    /// value 0 means turn the bundle alignment off.
+    virtual void EmitBundleAlignMode(unsigned AlignPow2) = 0;
+
+    /// \brief The following instructions are a bundle-locked group.
+    ///
+    /// \param AlignToEnd - If true, the bundle-locked group will be aligned to
+    ///                     the end of a bundle.
+    virtual void EmitBundleLock(bool AlignToEnd) = 0;
+
+    /// \brief Ends a bundle-locked group.
+    virtual void EmitBundleUnlock() = 0;
 
     /// EmitRawText - If this file is backed by a assembly streamer, this dumps
     /// the specified string in the output .s file.  This capability is
@@ -476,8 +616,15 @@ namespace llvm {
     virtual void EmitRegSave(const SmallVectorImpl<unsigned> &RegList,
                              bool isVector);
 
+    /// PPC-related methods.
+    /// FIXME: Eventually replace it with some "target MC streamer" and move
+    /// these methods there.
+    virtual void EmitTCEntry(const MCSymbol &S);
+
+    /// FinishImpl - Streamer specific finalization.
+    virtual void FinishImpl() = 0;
     /// Finish - Finish emission of machine code.
-    virtual void Finish() = 0;
+    void Finish();
   };
 
   /// createNullStreamer - Create a dummy machine code streamer, which does
@@ -493,56 +640,52 @@ namespace llvm {
   /// InstPrint.
   ///
   /// \param CE - If given, a code emitter to use to show the instruction
-  /// encoding inline with the assembly. This method takes ownership of \arg CE.
+  /// encoding inline with the assembly. This method takes ownership of \p CE.
   ///
   /// \param TAB - If given, a target asm backend to use to show the fixup
   /// information in conjunction with encoding information. This method takes
-  /// ownership of \arg TAB.
+  /// ownership of \p TAB.
   ///
   /// \param ShowInst - Whether to show the MCInst representation inline with
   /// the assembly.
   MCStreamer *createAsmStreamer(MCContext &Ctx, formatted_raw_ostream &OS,
                                 bool isVerboseAsm,
                                 bool useLoc,
+                                bool useCFI,
+                                bool useDwarfDirectory,
                                 MCInstPrinter *InstPrint = 0,
                                 MCCodeEmitter *CE = 0,
-                                TargetAsmBackend *TAB = 0,
+                                MCAsmBackend *TAB = 0,
                                 bool ShowInst = false);
 
   /// createMachOStreamer - Create a machine code streamer which will generate
   /// Mach-O format object files.
   ///
-  /// Takes ownership of \arg TAB and \arg CE.
-  MCStreamer *createMachOStreamer(MCContext &Ctx, TargetAsmBackend &TAB,
+  /// Takes ownership of \p TAB and \p CE.
+  MCStreamer *createMachOStreamer(MCContext &Ctx, MCAsmBackend &TAB,
                                   raw_ostream &OS, MCCodeEmitter *CE,
                                   bool RelaxAll = false);
 
   /// createWinCOFFStreamer - Create a machine code streamer which will
   /// generate Microsoft COFF format object files.
   ///
-  /// Takes ownership of \arg TAB and \arg CE.
+  /// Takes ownership of \p TAB and \p CE.
   MCStreamer *createWinCOFFStreamer(MCContext &Ctx,
-                                    TargetAsmBackend &TAB,
+                                    MCAsmBackend &TAB,
                                     MCCodeEmitter &CE, raw_ostream &OS,
                                     bool RelaxAll = false);
 
   /// createELFStreamer - Create a machine code streamer which will generate
   /// ELF format object files.
-  MCStreamer *createELFStreamer(MCContext &Ctx, TargetAsmBackend &TAB,
-				raw_ostream &OS, MCCodeEmitter *CE,
-				bool RelaxAll, bool NoExecStack);
-
-  /// createLoggingStreamer - Create a machine code streamer which just logs the
-  /// API calls and then dispatches to another streamer.
-  ///
-  /// The new streamer takes ownership of the \arg Child.
-  MCStreamer *createLoggingStreamer(MCStreamer *Child, raw_ostream &OS);
+  MCStreamer *createELFStreamer(MCContext &Ctx, MCAsmBackend &TAB,
+                                raw_ostream &OS, MCCodeEmitter *CE,
+                                bool RelaxAll, bool NoExecStack);
 
   /// createPureStreamer - Create a machine code streamer which will generate
   /// "pure" MC object files, for use with MC-JIT and testing tools.
   ///
-  /// Takes ownership of \arg TAB and \arg CE.
-  MCStreamer *createPureStreamer(MCContext &Ctx, TargetAsmBackend &TAB,
+  /// Takes ownership of \p TAB and \p CE.
+  MCStreamer *createPureStreamer(MCContext &Ctx, MCAsmBackend &TAB,
                                  raw_ostream &OS, MCCodeEmitter *CE);
 
 } // end namespace llvm
