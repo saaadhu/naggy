@@ -21,6 +21,7 @@ namespace Naggy
         public ITagger<T> CreateTagger<T>(ITextBuffer buffer) where T : ITag
         {
             var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
+            ErrorList.Initialize(ServiceProvider);
             ClangServices.Initialize(dte);
             Func<ITagger<T>> taggerFunc = () => new DiagnosticTagger(dte, buffer) as ITagger<T>;
             return buffer.Properties.GetOrCreateSingletonProperty<ITagger<T>>(taggerFunc);
