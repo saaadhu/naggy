@@ -21,5 +21,6 @@
     <MefComponent>|%CurrentProject%|</MefComponent>
     <CustomExtension Type="BinaryFile">libclang.dll</CustomExtension>
     <CustomExtension Type="LLVM License">LLVM LICENSE.TXT</CustomExtension>
+    <CustomExtension Type="DiagnosticsBlacklist">BlacklistedDiagnostics.txt</CustomExtension>
   </Content>
 </Vsix>

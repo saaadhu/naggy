@@ -27,6 +27,8 @@ namespace Naggy
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
             buffer.Properties.TryGetProperty(typeof(ITextDocument), out document);
             debouncer.Add(0, FindDiagnostics);
+
+            DiagnosticsBlacklist.Initialize();
         }
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
@@ -47,7 +49,7 @@ namespace Naggy
 
             ErrorList.ClearDiagnosticsFromFile(document.FilePath);
 
-            foreach (var diagnostic in ClangServices.GetDiagnostics(buffer))
+            foreach (var diagnostic in ClangServices.GetDiagnostics(buffer).Where(diag => !DiagnosticsBlacklist.Contains(diag)))
             {
                 if (!diagnostic.FilePath.Any(c => Path.GetInvalidPathChars().Contains(c)))
                 {
