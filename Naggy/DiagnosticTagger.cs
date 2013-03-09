@@ -15,7 +15,6 @@ namespace Naggy
     {
         private readonly ITextBuffer buffer;
         private readonly DTE dte;
-        ITextDocument document;
 
         readonly List<Tuple<SnapshotSpan, Diagnostic>> spansAndDiagnostics = new List<Tuple<SnapshotSpan, Diagnostic>>();
         DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1200);
@@ -25,10 +24,7 @@ namespace Naggy
             this.dte = dte;
             this.buffer = buffer;
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
-            buffer.Properties.TryGetProperty(typeof(ITextDocument), out document);
             debouncer.Add(0, FindDiagnostics);
-
-            DiagnosticsBlacklist.Initialize();
         }
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)
@@ -45,34 +41,20 @@ namespace Naggy
             int minPosition = buffer.CurrentSnapshot.Length;
             int maxPosition = 0;
 
-            ClangServices.Process(buffer);
-
-            ErrorList.ClearDiagnosticsFromFile(document.FilePath);
-
-            foreach (var diagnostic in ClangServices.GetDiagnostics(buffer).Where(diag => !DiagnosticsBlacklist.Contains(diag)))
+            foreach (var diagnostic in DiagnosticsFinder.Find(buffer))
             {
-                if (!diagnostic.FilePath.Any(c => Path.GetInvalidPathChars().Contains(c)))
-                {
-                    // Crude check, should find a more sophisticated way to check if two paths are equal, ignoring different directory separator chars.
-                    if (Path.GetFileName(diagnostic.FilePath) == Path.GetFileName(document.FilePath))
-                    {
-                        if (diagnostic.StartLine != 0)
-                            diagnostic.StartLine--;
+                if (diagnostic.StartLine != 0)
+                    diagnostic.StartLine--;
 
-                        var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
-                        var startPosition = textLine.Start.Position;
-                        var endPosition = textLine.End.Position;
+                var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
+                var startPosition = textLine.Start.Position;
+                var endPosition = textLine.End.Position;
 
-                        minPosition = Math.Min(minPosition, startPosition);
-                        maxPosition = Math.Max(maxPosition, endPosition);
+                minPosition = Math.Min(minPosition, startPosition);
+                maxPosition = Math.Max(maxPosition, endPosition);
 
-                        SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
-                        spansAndDiagnostics.Add(Tuple.Create(span, diagnostic));
-
-                        ErrorList.Show(diagnostic);
-                        
-                    }
-                }
+                SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
+                spansAndDiagnostics.Add(Tuple.Create(span, diagnostic));
             }
 
             if (spansAndDiagnostics.Any())

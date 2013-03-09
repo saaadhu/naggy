@@ -13,6 +13,7 @@ namespace Naggy
     {
         private static ErrorListProvider errorListProvider;
         private static DTE dte;
+        private static DocumentEvents documentEvents;
 
         public static void Initialize(IServiceProvider provider, DTE _dte)
         {
@@ -23,6 +24,14 @@ namespace Naggy
             errorListProvider = new ErrorListProvider(provider);
             errorListProvider.ProviderGuid = Guid.Parse("7C2C89EC-D368-4B15-B93A-E506EEA449E4");
             errorListProvider.ProviderName = "Naggy.DiagnosticsProvider";
+
+            documentEvents = dte.Events.DocumentEvents;
+            documentEvents.DocumentClosing += new _dispDocumentEvents_DocumentClosingEventHandler(documentEvents_DocumentClosing);
+        }
+
+        static void documentEvents_DocumentClosing(Document document)
+        {
+            ClearDiagnosticsFromFile(document.FullName);
         }
 
         public static void ClearDiagnosticsFromFile(string filePath)
@@ -34,8 +43,16 @@ namespace Naggy
                     tasksToDelete.Add(task);
             }
 
-            foreach(var task in tasksToDelete)
+            foreach (var task in tasksToDelete)
                 errorListProvider.Tasks.Remove(task);
+        }
+
+        public static void Show(IEnumerable<Diagnostic> diags)
+        {
+            foreach (var diag in diags)
+                Show(diag);
+
+            errorListProvider.Show();
         }
 
         public static void Show(Diagnostic diag)
@@ -49,10 +66,11 @@ namespace Naggy
                                        ? TaskErrorCategory.Warning
                                        : TaskErrorCategory.Error,
                                Column = diag.StartColumn,
-                               Line = diag.StartLine,
+                               Line = diag.StartLine - 1,
                                Document = diag.FilePath,
                                HierarchyItem = (IVsHierarchy)AVRStudio.GetProjectItem(dte, diag.FilePath).Object,
                            };
+
             task.Navigate += (sender, args) =>
                                  {
                                      task.Line++;
@@ -61,7 +79,6 @@ namespace Naggy
                                  };
 
             errorListProvider.Tasks.Add(task);
-            errorListProvider.Show();
         }
     }
 }

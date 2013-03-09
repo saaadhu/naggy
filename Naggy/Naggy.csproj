@@ -89,6 +89,7 @@
     <Compile Include="DelayedRequestExecutor.cs" />
     <Compile Include="DeviceNameToPredefinedSymbolMapper.cs" />
     <Compile Include="DiagnosticsBlacklist.cs" />
+    <Compile Include="DiagnosticsFinder.cs" />
     <Compile Include="DiagnosticTagger.cs" />
     <Compile Include="ErrorList.cs" />
     <Compile Include="ExcludedCodeClassificationDefinition.cs" />
