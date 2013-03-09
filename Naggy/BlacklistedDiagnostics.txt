@@ -1,2 +1,3 @@
-﻿1632
-3711
+﻿1632 : invalid asm constraint
+3711 : unknown attribute
+3292 : use of unknown builtin

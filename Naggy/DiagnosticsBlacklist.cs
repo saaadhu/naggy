@@ -27,8 +27,9 @@ namespace Naggy
         {
             foreach (var line in File.ReadLines(blacklistFilePath))
             {
+                var parts = line.Split(':');
                 int id;
-                if (int.TryParse(line, out id))
+                if (int.TryParse(parts[0], out id))
                     blacklistedDiagIds.Add(id);
             }
         }
