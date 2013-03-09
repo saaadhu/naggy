@@ -26,6 +26,7 @@ namespace NaggyClang {
 	public ref class Diagnostic
 	{
 	public:
+		int ID;
 		String ^Message;
 		String ^FilePath;
 		int StartLine;

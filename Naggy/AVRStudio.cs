@@ -56,12 +56,17 @@ namespace Naggy
             return toolchainOptions.CCompiler.SymbolDefines.ToArray();
         }
 
-        static Project GetProject(DTE dte, string fileName)
+        internal static ProjectItem GetProjectItem(DTE dte, string fileName)
         {
             if (dte.Solution == null)
                 return null;
 
-            var projectItem = dte.Solution.FindProjectItem(fileName);
+            return dte.Solution.FindProjectItem(fileName);
+        }
+
+        static Project GetProject(DTE dte, string fileName)
+        {
+            var projectItem = GetProjectItem(dte, fileName);
             if (projectItem != null && projectItem.ContainingProject != null && projectItem.ContainingProject.Properties != null)
                 return projectItem.ContainingProject;
 

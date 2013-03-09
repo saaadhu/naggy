@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using EnvDTE;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using NaggyClang;
@@ -11,9 +12,11 @@ namespace Naggy
     static class ErrorList
     {
         private static ErrorListProvider errorListProvider;
+        private static DTE dte;
 
-        public static void Initialize(IServiceProvider provider)
+        public static void Initialize(IServiceProvider provider, DTE _dte)
         {
+            dte = _dte;
             if (errorListProvider != null)
                 return;
 
@@ -22,16 +25,24 @@ namespace Naggy
             errorListProvider.ProviderName = "Naggy.DiagnosticsProvider";
         }
 
-        public static void Clear()
+        public static void ClearDiagnosticsFromFile(string filePath)
         {
-            errorListProvider.Tasks.Clear();
+            var tasksToDelete = new List<Task>();
+            foreach (ErrorTask task in errorListProvider.Tasks)
+            {
+                if (task.Document == filePath)
+                    tasksToDelete.Add(task);
+            }
+
+            foreach(var task in tasksToDelete)
+                errorListProvider.Tasks.Remove(task);
         }
 
         public static void Show(Diagnostic diag)
         {
             var task = new ErrorTask
                            {
-                               Text = diag.Message,
+                               Text = diag.ID + " : " + diag.Message,
                                Category = TaskCategory.CodeSense,
                                ErrorCategory =
                                    diag.Level == DiagnosticLevel.Warning
@@ -39,9 +50,15 @@ namespace Naggy
                                        : TaskErrorCategory.Error,
                                Column = diag.StartColumn,
                                Line = diag.StartLine,
-                               Document = diag.FilePath
+                               Document = diag.FilePath,
+                               HierarchyItem = (IVsHierarchy)AVRStudio.GetProjectItem(dte, diag.FilePath).Object,
                            };
-            task.Navigate += (sender, args) => errorListProvider.Navigate(task, Guid.Parse(EnvDTE.Constants.vsViewKindCode));
+            task.Navigate += (sender, args) =>
+                                 {
+                                     task.Line++;
+                                     errorListProvider.Navigate(task, Guid.Parse(EnvDTE.Constants.vsViewKindCode));
+                                     task.Line--;
+                                 };
 
             errorListProvider.Tasks.Add(task);
             errorListProvider.Show();

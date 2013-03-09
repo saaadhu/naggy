@@ -45,10 +45,10 @@ namespace Naggy
 
             ClangServices.Process(buffer);
 
-            ErrorList.Clear();
+            ErrorList.ClearDiagnosticsFromFile(document.FilePath);
+
             foreach (var diagnostic in ClangServices.GetDiagnostics(buffer))
             {
-                ErrorList.Show(diagnostic);
                 if (!diagnostic.FilePath.Any(c => Path.GetInvalidPathChars().Contains(c)))
                 {
                     // Crude check, should find a more sophisticated way to check if two paths are equal, ignoring different directory separator chars.
@@ -67,6 +67,7 @@ namespace Naggy
                         SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
                         spansAndDiagnostics.Add(Tuple.Create(span, diagnostic));
 
+                        ErrorList.Show(diagnostic);
                         
                     }
                 }

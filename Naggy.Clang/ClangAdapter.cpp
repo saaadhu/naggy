@@ -50,6 +50,7 @@ public:
 static NaggyClang::Diagnostic^ ToDiagnostic(clang::StoredDiagnostic& diag)
 {
 	Diagnostic^ managedDiag = gcnew Diagnostic;
+	managedDiag->ID = diag.getID();
 	managedDiag->Message = ToManagedString(diag.getMessage().data());
 
 	const clang::FullSourceLoc &start = diag.getLocation();
