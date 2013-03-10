@@ -36,35 +36,43 @@ namespace Naggy
 
         private void FindDiagnostics()
         {
-            spansAndDiagnostics.Clear();
-
-            int minPosition = buffer.CurrentSnapshot.Length;
-            int maxPosition = 0;
-
-            foreach (var diagnostic in DiagnosticsFinder.Find(buffer))
+            try
             {
-                if (diagnostic.StartLine != 0)
-                    diagnostic.StartLine--;
+                spansAndDiagnostics.Clear();
 
-                var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
-                var startPosition = textLine.Start.Position;
-                var endPosition = textLine.End.Position;
+                int minPosition = buffer.CurrentSnapshot.Length;
+                int maxPosition = 0;
 
-                minPosition = Math.Min(minPosition, startPosition);
-                maxPosition = Math.Max(maxPosition, endPosition);
+                foreach (var diagnostic in DiagnosticsFinder.Find(buffer))
+                {
+                    if (diagnostic.StartLine != 0)
+                        diagnostic.StartLine--;
 
-                SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot, Span.FromBounds(startPosition, endPosition));
-                spansAndDiagnostics.Add(Tuple.Create(span, diagnostic));
+                    var textLine = buffer.CurrentSnapshot.GetLineFromLineNumber(diagnostic.StartLine);
+                    var startPosition = textLine.Start.Position;
+                    var endPosition = textLine.End.Position;
+
+                    minPosition = Math.Min(minPosition, startPosition);
+                    maxPosition = Math.Max(maxPosition, endPosition);
+
+                    SnapshotSpan span = new SnapshotSpan(buffer.CurrentSnapshot,
+                                                         Span.FromBounds(startPosition, endPosition));
+                    spansAndDiagnostics.Add(Tuple.Create(span, diagnostic));
+                }
+
+                if (spansAndDiagnostics.Any())
+                {
+                    RaiseTagsChanged(minPosition, maxPosition);
+                }
+                else
+                {
+                    if (TagsChanged != null && !lastTotalDiagnosticsSpan.IsEmpty)
+                        TagsChanged(this, new SnapshotSpanEventArgs(lastTotalDiagnosticsSpan));
+                }
             }
-
-            if (spansAndDiagnostics.Any())
+            catch (Exception e)
             {
-                RaiseTagsChanged(minPosition, maxPosition);
-            }
-            else
-            {
-                if (TagsChanged != null)
-                    TagsChanged(this, new SnapshotSpanEventArgs(lastTotalDiagnosticsSpan));
+                dte.StatusBar.Text = "Naggy Error: " + e.Message;
             }
         }
 
