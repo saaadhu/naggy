@@ -59,7 +59,7 @@ namespace Naggy
         {
             var task = new ErrorTask
                            {
-                               Text = diag.ID + " : " + diag.Message,
+                               Text = string.Format(@"{0,4} : {1}", diag.ID, diag.Message),
                                Category = TaskCategory.CodeSense,
                                ErrorCategory =
                                    diag.Level == DiagnosticLevel.Warning
