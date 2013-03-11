@@ -30,6 +30,9 @@ namespace Naggy
 
                 var clangAdapter = GetClangAdapterForBuffer(buffer);
 
+                if (clangAdapter == null)
+                    return;
+
                 clangAdapter.Process(buffer.CurrentSnapshot.GetText());
                 lastProcessedSnapshot = buffer.CurrentSnapshot;
             }
@@ -39,7 +42,8 @@ namespace Naggy
         {
             lock (sync)
             {
-                return GetClangAdapterForBuffer(buffer).GetDiagnostics();
+                var clangAdapter = GetClangAdapterForBuffer(buffer);
+                return clangAdapter != null ? clangAdapter.GetDiagnostics() : Enumerable.Empty<Diagnostic>();
             }
         }
 
@@ -47,7 +51,8 @@ namespace Naggy
         {
             lock (sync)
             {
-                return GetClangAdapterForBuffer(buffer).GetPreprocessor();
+                var clangAdapter = GetClangAdapterForBuffer(buffer);
+                return clangAdapter != null ? clangAdapter.GetPreprocessor() : null;
             }
         }
 
@@ -64,7 +69,8 @@ namespace Naggy
         private static ClangAdapter CreateClangAdapter(ITextBuffer buffer)
         {
             ITextDocument document;
-            buffer.Properties.TryGetProperty(typeof (ITextDocument), out document);
+            if (!buffer.Properties.TryGetProperty(typeof(ITextDocument), out document) || document == null)
+                return null;
 
             var filePath = document.FilePath;
             var includePaths = AVRStudio.GetIncludePaths(filePath, dte);

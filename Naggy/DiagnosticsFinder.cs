@@ -21,7 +21,8 @@ namespace Naggy
         public static IEnumerable<Diagnostic> Find(ITextBuffer buffer)
         {
             ITextDocument document;
-            buffer.Properties.TryGetProperty(typeof(ITextDocument), out document);
+            if (!buffer.Properties.TryGetProperty(typeof(ITextDocument), out document) || document == null)
+                return Enumerable.Empty<Diagnostic>();
 
             ClangServices.Process(buffer);
 

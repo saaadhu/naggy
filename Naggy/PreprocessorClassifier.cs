@@ -51,6 +51,9 @@ namespace Naggy
 
                 ClangServices.Process(buffer);
                 var preprocessor = ClangServices.GetPreprocessorAdapter(buffer);
+                if (preprocessor == null)
+                    return;
+
                 {
                     foreach (var skippedBlock in preprocessor.GetSkippedBlockLineNumbers())
                     {
