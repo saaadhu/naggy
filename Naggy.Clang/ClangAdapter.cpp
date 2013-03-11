@@ -190,6 +190,14 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 		pInvocation->getPreprocessorOpts().addMacroDef(ToCString(symbol));
 	}
 
+	// HACK: Use preprocessor hacking to reduce named address spaces to blanks, so that they won't show up as errors
+	// Really dangerous, but until Clang knows about these, it will keep flagging them as errors.
+	array<String^> ^addressSpaces = { "__flash", "__flash1", "__flash2", "__flash3", "__flash4", "__flash5", "__memx" };
+	for each(String ^addressSpace in addressSpaces)
+	{
+		pInvocation->getPreprocessorOpts().addMacroDef(ToCString(addressSpace + "="));
+	}
+
 	//pInvocation->getLangOpts().C99 = 1;
 	pInvocation->getLangOpts()->GNUMode = 1;
 	pInvocation->getLangOpts()->GNUKeywords = 1;
