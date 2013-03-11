@@ -3,7 +3,7 @@
   <Identifier Id="Naggy..abcdb6b7-a59d-45d6-83da-b448eb0e8945">
     <Name>Naggy</Name>
     <Author>Senthil Kumar Selvaraj</Author>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <Description xml:space="preserve">Compiler diagnostics and preprocessor lowlighting in Atmel Studio for C projects.</Description>
     <Locale>1033</Locale>
     <MoreInfoUrl>https://github.com/saaadhu/naggy</MoreInfoUrl>
