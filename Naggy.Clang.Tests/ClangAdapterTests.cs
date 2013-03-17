@@ -147,6 +147,17 @@ int fun() {
         }
 
         [TestMethod]
+        public void GetDiagnostics_C99StyleSyntaxUsedWithC99TurnedOn_NoDiagnosticsReturned()
+        {
+            File.WriteAllText(sourceFilePath, @"int main() { for (int i = 0; i < 10; i++){} for (int i = 0; i < 10; i++){} return 0;}");
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), true);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count);
+        }
+
+        [TestMethod]
         [Ignore]
         public void GetDiagnostics_MisspelledMemberName_DiagnosticIncludesSuggestedMember()
         {
@@ -158,16 +169,6 @@ int fun() {
             StringAssert.Contains(diags.First().Message, "did you mean 'Foo'?");
         }
 
-        [TestMethod]
-        public void GetDiagnostics_AVRGCCSpecificBuiltin_NoDiagnosticsReported()
-        {
-            File.WriteAllText(sourceFilePath, @"void fun() { __builtin_csrf(1); }");
-            var adapter = new ClangAdapter(sourceFilePath);
-            adapter.Process(null);
-            var diags = adapter.GetDiagnostics();
-
-            Assert.AreEqual(0, diags.Count());
-        }
         [TestMethod]
         public void GetDiagnostics_InlineKeyword_NoDiagnosticsReported()
         {

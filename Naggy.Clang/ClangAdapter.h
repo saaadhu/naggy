@@ -35,19 +35,21 @@ namespace NaggyClang {
 		int EndColumn;
 		DiagnosticLevel Level;
 	};
+
 	public ref class ClangAdapter
 	{
 	public:
 		ClangAdapter(String^ fileName);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols);
+		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled);
 
 		List<Diagnostic^> ^GetDiagnostics();
 		PreprocessorAdapter^ GetPreprocessor();
 
 		void Process(String ^contents);
 	private:
-		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols);
+		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols, bool isC99Enabled);
 
 		void InitializeInvocation(clang::CompilerInvocation *pInvocation);
 		void CreateClangCompiler();
@@ -60,5 +62,6 @@ namespace NaggyClang {
 		List<String^> ^includePaths;
 		List<String^> ^predefinedSymbols;
 		PreprocessorAdapter ^m_preprocessorAdapter;
+		bool isC99Enabled;
 	};
 }

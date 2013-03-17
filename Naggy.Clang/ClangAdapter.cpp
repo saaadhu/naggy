@@ -79,17 +79,22 @@ static NaggyClang::Diagnostic^ ToDiagnostic(clang::StoredDiagnostic& diag)
 
 ClangAdapter::ClangAdapter(String^ fileName)
 {
-	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>());
+	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>(), false);
 }
 
 ClangAdapter::ClangAdapter(String ^fileName, List<String^> ^includePaths)
-{ 
-	Initialize(fileName, includePaths, gcnew List<String^>()); 
+{
+	Initialize(fileName, includePaths, gcnew List<String^>(), false);
 }
 
 ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols)
-{ 
-	Initialize(fileName, includePaths, symbols); 
+{
+	Initialize(fileName, includePaths, symbols, false);
+}
+
+ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled)
+{
+	Initialize(fileName, includePaths, symbols, isC99Enabled);
 }
 
 class PreprocessorBlockCaptureAction : public clang::SyntaxOnlyAction
@@ -144,10 +149,11 @@ List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
 	return diagnostics;
 }
 
-void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols)
+void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols, bool isC99Enabled)
 {
 	this->includePaths = includePaths;
 	this->predefinedSymbols = predefinedSymbols;
+	this->isC99Enabled = isC99Enabled;
 
 	m_filePath = (char *) ToCString(filePath);
 	m_pInstance = NULL;
@@ -198,7 +204,7 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 		pInvocation->getPreprocessorOpts().addMacroDef(ToCString(addressSpace + "="));
 	}
 
-	//pInvocation->getLangOpts().C99 = 1;
+	pInvocation->getLangOpts()->C99 = isC99Enabled ? 1 : 0;
 	pInvocation->getLangOpts()->GNUMode = 1;
 	pInvocation->getLangOpts()->GNUKeywords = 1;
 	pInvocation->getLangOpts()->Bool = 1;

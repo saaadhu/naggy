@@ -30,6 +30,18 @@ namespace Naggy
             return predefinedSymbols;
         }
 
+        public static bool IsC99Enabled(string fileName, DTE dte)
+        {
+            var project = GetProject(dte, fileName);
+
+            if (project == null)
+                return false;
+
+            dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
+            var commandLine = (string) toolchainOptions.CCompiler.CommandLine;
+            return commandLine != null && (commandLine.Contains("-std=gnu99") || commandLine.Contains("-std=c99"));
+        }
+
         public static IEnumerable<string> GetIncludePaths(string fileName, DTE dte)
         {
             var project = GetProject(dte, fileName);
