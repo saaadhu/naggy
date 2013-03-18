@@ -15,7 +15,9 @@ namespace Naggy
             var project = GetProject(dte, fileName);
 
             if (project == null)
+            {
                 return Enumerable.Empty<string>();
+            }
 
             string deviceName = (string)project.Properties.Item("DeviceName").Value;
             var implicitSymbol = DeviceNameToPredefinedSymbolMapper.GetSymbol(deviceName);
@@ -46,6 +48,8 @@ namespace Naggy
         {
             var project = GetProject(dte, fileName);
 
+            // Before giving up, see if it is a file inside the toolchain dirs, if so, find 
+            // a project with the same toolchain dir and returns the DefaultIncludePaths
             if (project == null)
                 return Enumerable.Empty<string>();
 
@@ -82,21 +86,34 @@ namespace Naggy
             if (projectItem != null && projectItem.ContainingProject != null && projectItem.ContainingProject.Properties != null)
                 return projectItem.ContainingProject;
 
-            Array arr = (Array)dte.ActiveSolutionProjects;
-            if (arr.Length == 0)
-                return null;
+            // The file was not a project item. See if we can find it any project's toolchain header paths.
+            var project = GetPossibleProjectBasedOnToolchainHeaderPath(fileName, dte);
+            if (project != null)
+                return project;
 
-            return (Project)arr.GetValue(0);
+            // Otherwise we're out of options, just return the first project we find.
+            var projects = GetProjectsInSolution(dte);
+            return projects.FirstOrDefault();
         }
 
-        private static string GetPropertyValue(dynamic toolchainData, string propertyId)
+        static IEnumerable<Project> GetProjectsInSolution(DTE dte)
         {
-            try
+            var projects = dte.Solution.Projects;
+            for (int i = 1; i <= projects.Count; ++i)
+                yield return projects.Item(i);
+        }
+
+        private static Project GetPossibleProjectBasedOnToolchainHeaderPath(string fileName, DTE dte)
+        {
+            foreach (var project in GetProjectsInSolution(dte))
             {
-                return toolchainData.GetPropertyValue(propertyId);
+                dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
+                IEnumerable<string> defaultIncludePaths = toolchainOptions.CCompiler.DefaultIncludePaths;
+                if (defaultIncludePaths.Any(fileName.Contains))
+                    return project;
             }
-            catch (Exception) { }
-            return string.Empty;
+
+            return null;
         }
     }
 }
