@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Timers;
+using Timer = System.Timers.Timer;
 
 namespace Naggy
 {
@@ -24,6 +26,15 @@ namespace Naggy
             {
                 idRequestMap[id] = request;
                 RestartTimer();
+            }
+        }
+
+        public void AddAndRunImmediately(T id, Action request)
+        {
+            lock (idRequestMapLock)
+            {
+                idRequestMap[id] = request;
+                ThreadPool.QueueUserWorkItem(s => ExecutePendingRequests());
             }
         }
 

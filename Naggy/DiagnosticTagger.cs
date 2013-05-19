@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.Text;
@@ -15,6 +16,7 @@ namespace Naggy
     {
         private readonly ITextBuffer buffer;
         private readonly DTE dte;
+        private DocumentEvents documentEvents;
 
         readonly List<Tuple<SnapshotSpan, Diagnostic>> spansAndDiagnostics = new List<Tuple<SnapshotSpan, Diagnostic>>();
         DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1200);
@@ -22,9 +24,31 @@ namespace Naggy
         public DiagnosticTagger(DTE dte, ITextBuffer buffer)
         {
             this.dte = dte;
+            this.documentEvents = dte.Events.DocumentEvents;
             this.buffer = buffer;
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
+            this.documentEvents.DocumentSaved += DocumentEventsOnDocumentSaved;
+            this.documentEvents.DocumentClosing += DocumentEventsOnDocumentClosing;
             debouncer.Add(0, FindDiagnostics);
+        }
+
+        private void DocumentEventsOnDocumentClosing(Document document)
+        {
+            ITextDocument thisDocument;
+            if (!buffer.Properties.TryGetProperty(typeof(ITextDocument), out thisDocument) || thisDocument == null)
+                return;
+
+            if (document.FullName == thisDocument.FilePath)
+            {
+                this.documentEvents.DocumentSaved -= DocumentEventsOnDocumentSaved;
+                this.documentEvents.DocumentClosing -= DocumentEventsOnDocumentClosing;
+                this.documentEvents = null;
+            }
+        }
+
+        private void DocumentEventsOnDocumentSaved(Document document)
+        {
+            debouncer.AddAndRunImmediately(0, FindDiagnostics);
         }
 
         private void buffer_Changed(object sender, TextContentChangedEventArgs e)

@@ -25,7 +25,6 @@ namespace Naggy
                 return Enumerable.Empty<Diagnostic>();
 
             ClangServices.Process(buffer);
-
             ErrorList.ClearDiagnosticsFromFile(document.FilePath);
 
             var diags = (from diag in ClangServices.GetDiagnostics(buffer)
