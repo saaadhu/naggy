@@ -24,6 +24,10 @@ namespace Naggy
             if (!buffer.Properties.TryGetProperty(typeof(ITextDocument), out document) || document == null)
                 return Enumerable.Empty<Diagnostic>();
 
+            var extension = Path.GetExtension(document.FilePath);
+            if (extension != null && extension.StartsWith(".h"))
+                return Enumerable.Empty<Diagnostic>();
+
             ClangServices.Process(buffer);
             ErrorList.ClearDiagnosticsFromFile(document.FilePath);
 
