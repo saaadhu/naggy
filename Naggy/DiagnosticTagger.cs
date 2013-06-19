@@ -27,9 +27,26 @@ namespace Naggy
             this.documentEvents = dte.Events.DocumentEvents;
             this.buffer = buffer;
             this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
+            DiagnosticsFinder.Toggled += new EventHandler<EventArgs>(DiagnosticsFinder_Toggled);
             this.documentEvents.DocumentSaved += DocumentEventsOnDocumentSaved;
             this.documentEvents.DocumentClosing += DocumentEventsOnDocumentClosing;
             debouncer.Add(0, FindDiagnostics);
+        }
+
+        void DiagnosticsFinder_Toggled(object sender, EventArgs e)
+        {
+            if (DiagnosticsFinder.Enabled)
+            {
+                debouncer.Add(0, FindDiagnostics);
+            }
+            else
+            {
+                spansAndDiagnostics.Clear();
+                if (TagsChanged != null)
+                    TagsChanged(this,
+                                new SnapshotSpanEventArgs(new SnapshotSpan(buffer.CurrentSnapshot, 0,
+                                                                           buffer.CurrentSnapshot.Length)));
+            }
         }
 
         private void DocumentEventsOnDocumentClosing(Document document)
@@ -43,6 +60,7 @@ namespace Naggy
                 this.documentEvents.DocumentSaved -= DocumentEventsOnDocumentSaved;
                 this.documentEvents.DocumentClosing -= DocumentEventsOnDocumentClosing;
                 this.documentEvents = null;
+                DiagnosticsFinder.Toggled -= new EventHandler<EventArgs>(DiagnosticsFinder_Toggled);
             }
         }
 

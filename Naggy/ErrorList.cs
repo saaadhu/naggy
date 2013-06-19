@@ -47,6 +47,11 @@ namespace Naggy
                 errorListProvider.Tasks.Remove(task);
         }
 
+        public static void Clear()
+        {
+            errorListProvider.Tasks.Clear();
+        }
+
         public static void Show(IEnumerable<Diagnostic> diags)
         {
             foreach (var diag in diags)

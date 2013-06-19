@@ -19,6 +19,7 @@
   <References />
   <Content>
     <MefComponent>|%CurrentProject%|</MefComponent>
+    <VsPackage>|%CurrentProject%;PkgdefProjectOutputGroup|</VsPackage>
     <CustomExtension Type="BinaryFile">libclang.dll</CustomExtension>
     <CustomExtension Type="LLVM License">LLVM LICENSE.TXT</CustomExtension>
     <CustomExtension Type="DiagnosticsBlacklist">BlacklistedDiagnostics.txt</CustomExtension>
