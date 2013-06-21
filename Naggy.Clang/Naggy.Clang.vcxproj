@@ -45,6 +45,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -73,6 +74,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib;clangAST.lib;libclang.lib;clangLex.lib;clangBasic.lib;clangParse.lib;clangFrontend.lib;clangCodeGen.lib;clangAnalysis.lib;clangSema.lib;clangSerialization.lib;clangDriver.lib;clangEdit.lib;LLVMCore.lib;LLVMMC.lib;LLVMSupport.lib;LLVMMCParser.lib;LLVMBitReader.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <KeyFile>$(ProjectDir)..\Naggy\Key.snk</KeyFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
