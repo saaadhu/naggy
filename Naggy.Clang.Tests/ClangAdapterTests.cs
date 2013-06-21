@@ -235,6 +235,20 @@ int fun() {
         }
 
         [TestMethod]
+        public void GetDiagnostics_SingleLineCommentWithAsterisk_NoDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"
+//*
+int main() { return 0; }
+");
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
         public void ExpandMacro_MacroDefinitionIncludesAnotherMacro_ExpansionExpandsInnerMacro()
         {
             File.WriteAllText(sourceFilePath, @"
@@ -249,6 +263,7 @@ int fun() {
             }
         }
 
+        
         [TestInitialize]
         public void Setup()
         {
