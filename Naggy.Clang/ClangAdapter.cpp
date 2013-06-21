@@ -169,7 +169,7 @@ void ClangAdapter::CreateClangCompiler()
 {
 	m_pInstance = new clang::CompilerInstance();
 	m_pDiagnosticClient = new StoredDiagnosticClient();
-	m_pInstance->createDiagnostics(m_pDiagnosticClient, true, false);
+	m_pInstance->createDiagnostics(m_pDiagnosticClient, true);
 }
 
 void ClangAdapter::DestroyClangCompiler()
@@ -208,4 +208,5 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 	pInvocation->getLangOpts()->GNUMode = 1;
 	pInvocation->getLangOpts()->GNUKeywords = 1;
 	pInvocation->getLangOpts()->Bool = 1;
+	pInvocation->getLangOpts()->LineComment = 1;
 }
