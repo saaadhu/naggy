@@ -26,7 +26,9 @@
 #define LLVM_IR_USE_H
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/CBindingWrapping.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm-c/Core.h"
 #include <cstddef>
 #include <iterator>
 
@@ -66,7 +68,6 @@ public:
   typedef PointerIntPair<User*, 1, unsigned> UserRef;
 
 private:
-  /// Copy ctor - do not implement
   Use(const Use &U) LLVM_DELETED_FUNCTION;
 
   /// Destructor - Only for zap()
@@ -150,14 +151,14 @@ private:
 // casting operators.
 template<> struct simplify_type<Use> {
   typedef Value* SimpleType;
-  static SimpleType getSimplifiedValue(const Use &Val) {
-    return static_cast<SimpleType>(Val.get());
+  static SimpleType getSimplifiedValue(Use &Val) {
+    return Val.get();
   }
 };
 template<> struct simplify_type<const Use> {
-  typedef Value* SimpleType;
+  typedef /*const*/ Value* SimpleType;
   static SimpleType getSimplifiedValue(const Use &Val) {
-    return static_cast<SimpleType>(Val.get());
+    return Val.get();
   }
 };
 
@@ -214,6 +215,9 @@ public:
   ///
   unsigned getOperandNo() const;
 };
+
+// Create wrappers for C Binding types (see CBindingWrapping.h).
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(Use, LLVMUseRef)
 
 } // End llvm namespace
 

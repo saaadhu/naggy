@@ -135,6 +135,11 @@ public:
                               const TargetLoweringObjectFile *TLOF);
   virtual ~TargetLoweringBase();
 
+protected:
+  /// \brief Initialize all of the actions to default values.
+  void initActions();
+
+public:
   const TargetMachine &getTargetMachine() const { return TM; }
   const DataLayout *getDataLayout() const { return TD; }
   const TargetLoweringObjectFile &getObjFileLowering() const { return TLOF; }
@@ -145,7 +150,9 @@ public:
   // the pointer type from the data layout.
   // FIXME: The default needs to be removed once all the code is updated.
   virtual MVT getPointerTy(uint32_t AS = 0) const { return PointerTy; }
-  virtual MVT getShiftAmountTy(EVT LHSTy) const;
+  virtual MVT getScalarShiftAmountTy(EVT LHSTy) const;
+
+  EVT getShiftAmountTy(EVT LHSTy) const;
 
   /// isSelectExpensive - Return true if the select operation is expensive for
   /// this target.
@@ -183,7 +190,7 @@ public:
   /// isPredictableSelectExpensive - Return true if selects are only cheaper
   /// than branches if the branch is unlikely to be predicted right.
   bool isPredictableSelectExpensive() const {
-    return predictableSelectIsExpensive;
+    return PredictableSelectIsExpensive;
   }
 
   /// getSetCCResultType - Return the ValueType of the result of SETCC
@@ -659,7 +666,7 @@ public:
   /// return the limit for functions that have OptSize attribute.
   /// @brief Get maximum # of store operations permitted for llvm.memset
   unsigned getMaxStoresPerMemset(bool OptSize) const {
-    return OptSize ? maxStoresPerMemsetOptSize : maxStoresPerMemset;
+    return OptSize ? MaxStoresPerMemsetOptSize : MaxStoresPerMemset;
   }
 
   /// This function returns the maximum number of store operations permitted
@@ -668,7 +675,7 @@ public:
   /// return the limit for functions that have OptSize attribute.
   /// @brief Get maximum # of store operations permitted for llvm.memcpy
   unsigned getMaxStoresPerMemcpy(bool OptSize) const {
-    return OptSize ? maxStoresPerMemcpyOptSize : maxStoresPerMemcpy;
+    return OptSize ? MaxStoresPerMemcpyOptSize : MaxStoresPerMemcpy;
   }
 
   /// This function returns the maximum number of store operations permitted
@@ -677,7 +684,7 @@ public:
   /// return the limit for functions that have OptSize attribute.
   /// @brief Get maximum # of store operations permitted for llvm.memmove
   unsigned getMaxStoresPerMemmove(bool OptSize) const {
-    return OptSize ? maxStoresPerMemmoveOptSize : maxStoresPerMemmove;
+    return OptSize ? MaxStoresPerMemmoveOptSize : MaxStoresPerMemmove;
   }
 
   /// This function returns true if the target allows unaligned memory accesses.
@@ -690,13 +697,6 @@ public:
   /// @brief Determine if the target supports unaligned memory accesses.
   virtual bool allowsUnalignedMemoryAccesses(EVT, bool *Fast = 0) const {
     return false;
-  }
-
-  /// This function returns true if the target would benefit from code placement
-  /// optimization.
-  /// @brief Determine if the target should perform code placement optimization.
-  bool shouldOptimizeCodePlacement() const {
-    return benefitFromCodePlacementOpt;
   }
 
   /// getOptimalMemOpType - Returns the target specific optimal type for load
@@ -810,13 +810,6 @@ public:
     return PrefLoopAlignment;
   }
 
-  /// getShouldFoldAtomicFences - return whether the combiner should fold
-  /// fence MEMBARRIER instructions into the atomic intrinsic instructions.
-  ///
-  bool getShouldFoldAtomicFences() const {
-    return ShouldFoldAtomicFences;
-  }
-
   /// getInsertFencesFor - return whether the DAG builder should automatically
   /// insert fences and reduce ordering for atomics.
   ///
@@ -855,6 +848,9 @@ public:
   // TargetLowering Configuration Methods - These methods should be invoked by
   // the derived class constructor to configure this object for the target.
   //
+
+  /// \brief Reset the operation actions based on target options.
+  virtual void resetOperationActions() {}
 
 protected:
   /// setBooleanContents - Specify how the target extends the result of a
@@ -954,6 +950,17 @@ protected:
     assert((unsigned)VT.SimpleTy < array_lengthof(RegClassForVT));
     AvailableRegClasses.push_back(std::make_pair(VT, RC));
     RegClassForVT[VT.SimpleTy] = RC;
+  }
+
+  /// clearRegisterClasses - Remove all register classes.
+  void clearRegisterClasses() {
+    memset(RegClassForVT, 0,MVT::LAST_VALUETYPE * sizeof(TargetRegisterClass*));
+
+    AvailableRegClasses.clear();
+  }
+
+  /// \brief Remove all operation actions.
+  void clearOperationActions() {
   }
 
   /// findRepresentativeClass - Return the largest legal super-reg register class
@@ -1085,12 +1092,6 @@ protected:
   /// argument (in log2(bytes)).
   void setMinStackArgumentAlignment(unsigned Align) {
     MinStackArgumentAlignment = Align;
-  }
-
-  /// setShouldFoldAtomicFences - Set if the target's implementation of the
-  /// atomic operation intrinsics includes locking. Default is false.
-  void setShouldFoldAtomicFences(bool fold) {
-    ShouldFoldAtomicFences = fold;
   }
 
   /// setInsertFencesForAtomic - Set if the DAG builder should
@@ -1350,11 +1351,6 @@ private:
   ///
   unsigned PrefLoopAlignment;
 
-  /// ShouldFoldAtomicFences - Whether fencing MEMBARRIER instructions should
-  /// be folded into the enclosed atomic intrinsic instruction by the
-  /// combiner.
-  bool ShouldFoldAtomicFences;
-
   /// InsertFencesForAtomic - Whether the DAG builder should automatically
   /// insert fences and reduce ordering for atomics.  (This will be set for
   /// for most architectures with weak memory ordering.)
@@ -1509,6 +1505,7 @@ public:
       // or until the element integer type is too big. If a legal type was not
       // found, fallback to the usual mechanism of widening/splitting the
       // vector.
+      EVT OldEltVT = EltVT;
       while (1) {
         // Increase the bitwidth of the element to the next pow-of-two
         // (which is greater than 8 bits).
@@ -1527,6 +1524,10 @@ public:
           return LegalizeKind(TypePromoteInteger,
                               EVT::getVectorVT(Context, EltVT, NumElts));
       }
+
+      // Reset the type to the unexpanded type if we did not find a legal vector
+      // type with a promoted vector element type.
+      EltVT = OldEltVT;
     }
 
     // Try to widen the vector until a legal type is found.
@@ -1598,11 +1599,11 @@ protected:
   /// with 16-bit alignment would result in four 2-byte stores and one 1-byte
   /// store.  This only applies to setting a constant array of a constant size.
   /// @brief Specify maximum number of store instructions per memset call.
-  unsigned maxStoresPerMemset;
+  unsigned MaxStoresPerMemset;
 
   /// Maximum number of stores operations that may be substituted for the call
   /// to memset, used for functions with OptSize attribute.
-  unsigned maxStoresPerMemsetOptSize;
+  unsigned MaxStoresPerMemsetOptSize;
 
   /// When lowering \@llvm.memcpy this field specifies the maximum number of
   /// store operations that may be substituted for a call to memcpy. Targets
@@ -1614,11 +1615,11 @@ protected:
   /// and one 1-byte store. This only applies to copying a constant array of
   /// constant size.
   /// @brief Specify maximum bytes of store instructions per memcpy call.
-  unsigned maxStoresPerMemcpy;
+  unsigned MaxStoresPerMemcpy;
 
   /// Maximum number of store operations that may be substituted for a call
   /// to memcpy, used for functions with OptSize attribute.
-  unsigned maxStoresPerMemcpyOptSize;
+  unsigned MaxStoresPerMemcpyOptSize;
 
   /// When lowering \@llvm.memmove this field specifies the maximum number of
   /// store instructions that may be substituted for a call to memmove. Targets
@@ -1629,19 +1630,15 @@ protected:
   /// with 8-bit alignment would result in nine 1-byte stores.  This only
   /// applies to copying a constant array of constant size.
   /// @brief Specify maximum bytes of store instructions per memmove call.
-  unsigned maxStoresPerMemmove;
+  unsigned MaxStoresPerMemmove;
 
   /// Maximum number of store instructions that may be substituted for a call
   /// to memmove, used for functions with OpSize attribute.
-  unsigned maxStoresPerMemmoveOptSize;
+  unsigned MaxStoresPerMemmoveOptSize;
 
-  /// This field specifies whether the target can benefit from code placement
-  /// optimization.
-  bool benefitFromCodePlacementOpt;
-
-  /// predictableSelectIsExpensive - Tells the code generator that select is
+  /// PredictableSelectIsExpensive - Tells the code generator that select is
   /// more expensive than a branch if the branch is usually predicted right.
-  bool predictableSelectIsExpensive;
+  bool PredictableSelectIsExpensive;
 
 protected:
   /// isLegalRC - Return true if the value types that can be represented by the
@@ -1895,16 +1892,18 @@ public:
   struct ArgListEntry {
     SDValue Node;
     Type* Ty;
-    bool isSExt  : 1;
-    bool isZExt  : 1;
-    bool isInReg : 1;
-    bool isSRet  : 1;
-    bool isNest  : 1;
-    bool isByVal : 1;
+    bool isSExt     : 1;
+    bool isZExt     : 1;
+    bool isInReg    : 1;
+    bool isSRet     : 1;
+    bool isNest     : 1;
+    bool isByVal    : 1;
+    bool isReturned : 1;
     uint16_t Alignment;
 
     ArgListEntry() : isSExt(false), isZExt(false), isInReg(false),
-      isSRet(false), isNest(false), isByVal(false), Alignment(0) { }
+      isSRet(false), isNest(false), isByVal(false), isReturned(false),
+      Alignment(0) { }
   };
   typedef std::vector<ArgListEntry> ArgListTy;
 

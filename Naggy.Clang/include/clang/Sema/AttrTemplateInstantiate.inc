@@ -188,6 +188,10 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
       const DestructorAttr *A = cast<DestructorAttr>(At);
       return A->clone(C);
     }
+    case attr::Endian: {
+      const EndianAttr *A = cast<EndianAttr>(At);
+      return A->clone(C);
+    }
     case attr::ExclusiveLockFunction: {
       const ExclusiveLockFunctionAttr *A = cast<ExclusiveLockFunctionAttr>(At);
       Expr * *tempInstArgs = new (C, 16) Expr *[A->args_size()];
@@ -366,6 +370,10 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
       const Mips16Attr *A = cast<Mips16Attr>(At);
       return A->clone(C);
     }
+    case attr::MsProperty: {
+      const MsPropertyAttr *A = cast<MsPropertyAttr>(At);
+      return A->clone(C);
+    }
     case attr::MsStruct: {
       const MsStructAttr *A = cast<MsStructAttr>(At);
       return A->clone(C);
@@ -402,10 +410,6 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
       const NakedAttr *A = cast<NakedAttr>(At);
       return A->clone(C);
     }
-    case attr::NoAddressSafetyAnalysis: {
-      const NoAddressSafetyAnalysisAttr *A = cast<NoAddressSafetyAnalysisAttr>(At);
-      return A->clone(C);
-    }
     case attr::NoCommon: {
       const NoCommonAttr *A = cast<NoCommonAttr>(At);
       return A->clone(C);
@@ -428,6 +432,18 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
     }
     case attr::NoReturn: {
       const NoReturnAttr *A = cast<NoReturnAttr>(At);
+      return A->clone(C);
+    }
+    case attr::NoSanitizeAddress: {
+      const NoSanitizeAddressAttr *A = cast<NoSanitizeAddressAttr>(At);
+      return A->clone(C);
+    }
+    case attr::NoSanitizeMemory: {
+      const NoSanitizeMemoryAttr *A = cast<NoSanitizeMemoryAttr>(At);
+      return A->clone(C);
+    }
+    case attr::NoSanitizeThread: {
+      const NoSanitizeThreadAttr *A = cast<NoSanitizeThreadAttr>(At);
       return A->clone(C);
     }
     case attr::NoThreadSafetyAnalysis: {
@@ -472,6 +488,10 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
     }
     case attr::ObjCRootClass: {
       const ObjCRootClassAttr *A = cast<ObjCRootClassAttr>(At);
+      return A->clone(C);
+    }
+    case attr::OpenCLImageAccess: {
+      const OpenCLImageAccessAttr *A = cast<OpenCLImageAccessAttr>(At);
       return A->clone(C);
     }
     case attr::OpenCLKernel: {
@@ -631,6 +651,9 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
       const TypeTagForDatatypeAttr *A = cast<TypeTagForDatatypeAttr>(At);
       return A->clone(C);
     }
+    case attr::TypeVisibility: {
+      return NULL;
+    }
     case attr::Unavailable: {
       const UnavailableAttr *A = cast<UnavailableAttr>(At);
       return A->clone(C);
@@ -650,6 +673,10 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
       }
       return new (C) UnlockFunctionAttr(A->getLocation(), C, tempInstArgs, A->args_size());
     }
+    case attr::UnspecifiedInheritance: {
+      const UnspecifiedInheritanceAttr *A = cast<UnspecifiedInheritanceAttr>(At);
+      return A->clone(C);
+    }
     case attr::Unused: {
       const UnusedAttr *A = cast<UnusedAttr>(At);
       return A->clone(C);
@@ -664,6 +691,10 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
     }
     case attr::VecReturn: {
       const VecReturnAttr *A = cast<VecReturnAttr>(At);
+      return A->clone(C);
+    }
+    case attr::VecTypeHint: {
+      const VecTypeHintAttr *A = cast<VecTypeHintAttr>(At);
       return A->clone(C);
     }
     case attr::VirtualInheritance: {

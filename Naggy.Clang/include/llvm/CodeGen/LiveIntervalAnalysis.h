@@ -20,9 +20,7 @@
 #ifndef LLVM_CODEGEN_LIVEINTERVAL_ANALYSIS_H
 #define LLVM_CODEGEN_LIVEINTERVAL_ANALYSIS_H
 
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/IndexedMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/LiveInterval.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -36,6 +34,7 @@
 namespace llvm {
 
   class AliasAnalysis;
+  class BitVector;
   class LiveRangeCalc;
   class LiveVariables;
   class MachineDominatorTree;
@@ -214,6 +213,13 @@ namespace llvm {
       return Indexes->getMBBFromIndex(index);
     }
 
+    void insertMBBInMaps(MachineBasicBlock *MBB) {
+      Indexes->insertMBBInMaps(MBB);
+      assert(unsigned(MBB->getNumber()) == RegMaskBlocks.size() &&
+             "Blocks must be added in order.");
+      RegMaskBlocks.push_back(std::make_pair(RegMaskSlots.size(), 0));
+    }
+
     SlotIndex InsertMachineInstrInMaps(MachineInstr *MI) {
       return Indexes->insertMachineInstrInMaps(MI);
     }
@@ -273,6 +279,21 @@ namespace llvm {
     /// instruction in the Bundle.
     void handleMoveIntoBundle(MachineInstr* MI, MachineInstr* BundleStart,
                               bool UpdateFlags = false);
+
+    /// repairIntervalsInRange - Update live intervals for instructions in a
+    /// range of iterators. It is intended for use after target hooks that may
+    /// insert or remove instructions, and is only efficient for a small number
+    /// of instructions.
+    ///
+    /// OrigRegs is a vector of registers that were originally used by the
+    /// instructions in the range between the two iterators.
+    ///
+    /// Currently, the only only changes that are supported are simple removal
+    /// and addition of uses.
+    void repairIntervalsInRange(MachineBasicBlock *MBB,
+                                MachineBasicBlock::iterator Begin,
+                                MachineBasicBlock::iterator End,
+                                ArrayRef<unsigned> OrigRegs);
 
     // Register mask functions.
     //

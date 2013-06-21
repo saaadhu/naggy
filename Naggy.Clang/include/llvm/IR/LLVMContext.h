@@ -15,7 +15,9 @@
 #ifndef LLVM_IR_LLVMCONTEXT_H
 #define LLVM_IR_LLVMCONTEXT_H
 
+#include "llvm/Support/CBindingWrapping.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm-c/Core.h"
 
 namespace llvm {
 
@@ -46,7 +48,8 @@ public:
     MD_prof = 2,  // "prof"
     MD_fpmath = 3,  // "fpmath"
     MD_range = 4, // "range"
-    MD_tbaa_struct = 5 // "tbaa.struct"
+    MD_tbaa_struct = 5, // "tbaa.struct"
+    MD_invariant_load = 6 // "invariant.load"
   };
   
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.
@@ -58,39 +61,27 @@ public:
   void getMDKindNames(SmallVectorImpl<StringRef> &Result) const;
   
   
-  typedef void (*DiagHandlerTy)(const SMDiagnostic&, void *Context,
-                                unsigned LocCookie);
+  typedef void (*InlineAsmDiagHandlerTy)(const SMDiagnostic&, void *Context,
+                                         unsigned LocCookie);
   
-  /// setDiagnosticHandler - This method sets a handler that is invoked
-  /// when problems are detected by the backend.  The first argument is a
-  /// function pointer and the second is a context pointer that gets passed
-  /// into the DiagHandler.
+  /// setInlineAsmDiagnosticHandler - This method sets a handler that is invoked
+  /// when problems with inline asm are detected by the backend.  The first
+  /// argument is a function pointer and the second is a context pointer that
+  /// gets passed into the DiagHandler.
   ///
   /// LLVMContext doesn't take ownership or interpret either of these
   /// pointers.
-  void setDiagnosticHandler(DiagHandlerTy DiagHandler, void *DiagContext = 0);
-
-  /// getDiagnosticHandler - Return the diagnostic handler set by
-  /// setDiagnosticHandler.
-  DiagHandlerTy getDiagnosticHandler() const;
-
-  /// getDiagnosticContext - Return the diagnostic context set by
-  /// setDiagnosticHandler.
-  void *getDiagnosticContext() const;
-  
-  /// FIXME: Temporary copies of the old names; to be removed as soon as
-  /// clang switches to the new ones.
-  typedef DiagHandlerTy InlineAsmDiagHandlerTy;
   void setInlineAsmDiagnosticHandler(InlineAsmDiagHandlerTy DiagHandler,
-                                     void *DiagContext = 0) {
-    setDiagnosticHandler(DiagHandler, DiagContext);
-  }
-  InlineAsmDiagHandlerTy getInlineAsmDiagnosticHandler() const {
-    return getDiagnosticHandler();
-  }
-  void *getInlineAsmDiagnosticContext() const {
-    return getDiagnosticContext();
-  }
+                                     void *DiagContext = 0);
+
+  /// getInlineAsmDiagnosticHandler - Return the diagnostic handler set by
+  /// setInlineAsmDiagnosticHandler.
+  InlineAsmDiagHandlerTy getInlineAsmDiagnosticHandler() const;
+
+  /// getInlineAsmDiagnosticContext - Return the diagnostic context set by
+  /// setInlineAsmDiagnosticHandler.
+  void *getInlineAsmDiagnosticContext() const;
+  
   
   /// emitError - Emit an error message to the currently installed error handler
   /// with optional location information.  This function returns, so code should
@@ -119,6 +110,19 @@ private:
 /// getGlobalContext - Returns a global context.  This is for LLVM clients that
 /// only care about operating on a single thread.
 extern LLVMContext &getGlobalContext();
+
+// Create wrappers for C Binding types (see CBindingWrapping.h).
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(LLVMContext, LLVMContextRef)
+
+/* Specialized opaque context conversions.
+ */
+inline LLVMContext **unwrap(LLVMContextRef* Tys) {
+  return reinterpret_cast<LLVMContext**>(Tys);
+}
+
+inline LLVMContextRef *wrap(const LLVMContext **Tys) {
+  return reinterpret_cast<LLVMContextRef*>(const_cast<LLVMContext**>(Tys));
+}
 
 }
 

@@ -740,6 +740,22 @@ void DestructorAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) 
 }
 }
 
+EndianAttr *EndianAttr::clone(ASTContext &C) const {
+  return new (C) EndianAttr(getLocation(), C, platform, getSpellingListIndex());
+}
+
+void EndianAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __attribute__((endian(" << getPlatform()->getName() << ")))";
+    break;
+  }
+}
+}
+
 ExclusiveLockFunctionAttr *ExclusiveLockFunctionAttr::clone(ASTContext &C) const {
   return new (C) ExclusiveLockFunctionAttr(getLocation(), C, args, argsSize, getSpellingListIndex());
 }
@@ -1227,6 +1243,22 @@ void Mips16Attr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) cons
 }
 }
 
+MsPropertyAttr *MsPropertyAttr::clone(ASTContext &C) const {
+  return new (C) MsPropertyAttr(getLocation(), C, getSpellingListIndex());
+}
+
+void MsPropertyAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __declspec(property)";
+    break;
+  }
+}
+}
+
 MsStructAttr *MsStructAttr::clone(ASTContext &C) const {
   return new (C) MsStructAttr(getLocation(), C, getSpellingListIndex());
 }
@@ -1375,22 +1407,6 @@ void NakedAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const
 }
 }
 
-NoAddressSafetyAnalysisAttr *NoAddressSafetyAnalysisAttr::clone(ASTContext &C) const {
-  return new (C) NoAddressSafetyAnalysisAttr(getLocation(), C, getSpellingListIndex());
-}
-
-void NoAddressSafetyAnalysisAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
-  switch (SpellingListIndex) {
-  default:
-    llvm_unreachable("Unknown attribute spelling!");
-    break;
-  case 0 : {
-    OS << " __attribute__((no_address_safety_analysis))";
-    break;
-  }
-}
-}
-
 NoCommonAttr *NoCommonAttr::clone(ASTContext &C) const {
   return new (C) NoCommonAttr(getLocation(), C, getSpellingListIndex());
 }
@@ -1502,6 +1518,58 @@ void NoReturnAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) co
   }
   case 1 : {
     OS << " [[gnu::noreturn]]";
+    break;
+  }
+}
+}
+
+NoSanitizeAddressAttr *NoSanitizeAddressAttr::clone(ASTContext &C) const {
+  return new (C) NoSanitizeAddressAttr(getLocation(), C, getSpellingListIndex());
+}
+
+void NoSanitizeAddressAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __attribute__((no_address_safety_analysis))";
+    break;
+  }
+  case 1 : {
+    OS << " __attribute__((no_sanitize_address))";
+    break;
+  }
+}
+}
+
+NoSanitizeMemoryAttr *NoSanitizeMemoryAttr::clone(ASTContext &C) const {
+  return new (C) NoSanitizeMemoryAttr(getLocation(), C, getSpellingListIndex());
+}
+
+void NoSanitizeMemoryAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __attribute__((no_sanitize_memory))";
+    break;
+  }
+}
+}
+
+NoSanitizeThreadAttr *NoSanitizeThreadAttr::clone(ASTContext &C) const {
+  return new (C) NoSanitizeThreadAttr(getLocation(), C, getSpellingListIndex());
+}
+
+void NoSanitizeThreadAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __attribute__((no_sanitize_thread))";
     break;
   }
 }
@@ -1700,6 +1768,22 @@ void ObjCRootClassAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Polic
     break;
   case 0 : {
     OS << " __attribute__((objc_root_class))";
+    break;
+  }
+}
+}
+
+OpenCLImageAccessAttr *OpenCLImageAccessAttr::clone(ASTContext &C) const {
+  return new (C) OpenCLImageAccessAttr(getLocation(), C, access, getSpellingListIndex());
+}
+
+void OpenCLImageAccessAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __attribute__((opencl_image_access(" << getAccess() << ")))";
     break;
   }
 }
@@ -2266,6 +2350,26 @@ void TypeTagForDatatypeAttr::printPretty(raw_ostream &OS, const PrintingPolicy &
 }
 }
 
+TypeVisibilityAttr *TypeVisibilityAttr::clone(ASTContext &C) const {
+  return new (C) TypeVisibilityAttr(getLocation(), C, visibility, getSpellingListIndex());
+}
+
+void TypeVisibilityAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __attribute__((type_visibility(" << getVisibility() << ")))";
+    break;
+  }
+  case 1 : {
+    OS << " [[clang::type_visibility(" << getVisibility() << ")]]";
+    break;
+  }
+}
+}
+
 UnavailableAttr *UnavailableAttr::clone(ASTContext &C) const {
   return new (C) UnavailableAttr(getLocation(), C, getMessage(), getSpellingListIndex());
 }
@@ -2303,6 +2407,13 @@ void UnlockFunctionAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Poli
     break;
   }
 }
+}
+
+UnspecifiedInheritanceAttr *UnspecifiedInheritanceAttr::clone(ASTContext &C) const {
+  return new (C) UnspecifiedInheritanceAttr(getLocation(), C, getSpellingListIndex());
+}
+
+void UnspecifiedInheritanceAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
 }
 
 UnusedAttr *UnusedAttr::clone(ASTContext &C) const {
@@ -2372,6 +2483,22 @@ void VecReturnAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) c
     break;
   case 0 : {
     OS << " __attribute__((vecreturn))";
+    break;
+  }
+}
+}
+
+VecTypeHintAttr *VecTypeHintAttr::clone(ASTContext &C) const {
+  return new (C) VecTypeHintAttr(getLocation(), C, typeHint, typeLoc, getSpellingListIndex());
+}
+
+void VecTypeHintAttr::printPretty(raw_ostream &OS, const PrintingPolicy &Policy) const {
+  switch (SpellingListIndex) {
+  default:
+    llvm_unreachable("Unknown attribute spelling!");
+    break;
+  case 0 : {
+    OS << " __attribute__((vec_type_hint(" << getTypeHint().getAsString() << ", " << getTypeLoc().getRawEncoding() << ")))";
     break;
   }
 }

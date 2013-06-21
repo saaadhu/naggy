@@ -466,6 +466,7 @@ enum {
 
 // ELF Relocation types for PPC64
 enum {
+  R_PPC64_NONE                = 0,
   R_PPC64_ADDR32              = 1,
   R_PPC64_ADDR16_LO           = 4,
   R_PPC64_ADDR16_HI           = 5,
@@ -480,9 +481,13 @@ enum {
   R_PPC64_TOC16_LO            = 48,
   R_PPC64_TOC16_HA            = 50,
   R_PPC64_TOC                 = 51,
+  R_PPC64_ADDR16_DS           = 56,
+  R_PPC64_ADDR16_LO_DS        = 57,
   R_PPC64_TOC16_DS            = 63,
   R_PPC64_TOC16_LO_DS         = 64,
   R_PPC64_TLS                 = 67,
+  R_PPC64_TPREL16_LO          = 70,
+  R_PPC64_TPREL16_HA          = 72,
   R_PPC64_DTPREL16_LO         = 75,
   R_PPC64_DTPREL16_HA         = 77,
   R_PPC64_GOT_TLSGD16_LO      = 80,
@@ -587,6 +592,8 @@ enum {
 
 // ARM Specific e_flags
 enum {
+  EF_ARM_SOFT_FLOAT =     0x00000200U,
+  EF_ARM_VFP_FLOAT =      0x00000400U,
   EF_ARM_EABI_UNKNOWN =   0x00000000U,
   EF_ARM_EABI_VER1 =      0x01000000U,
   EF_ARM_EABI_VER2 =      0x02000000U,
@@ -738,6 +745,13 @@ enum {
   EF_MIPS_NOREORDER = 0x00000001, // Don't reorder instructions
   EF_MIPS_PIC       = 0x00000002, // Position independent code
   EF_MIPS_CPIC      = 0x00000004, // Call object with Position independent code
+  EF_MIPS_ABI_O32   = 0x00001000, // This file follows the first MIPS 32 bit ABI
+
+  //ARCH_ASE
+  EF_MIPS_MICROMIPS = 0x02000000, // microMIPS
+  EF_MIPS_ARCH_ASE_M16 =
+                      0x04000000, // Has Mips-16 ISA extensions
+  //ARCH
   EF_MIPS_ARCH_1    = 0x00000000, // MIPS1 instruction set
   EF_MIPS_ARCH_2    = 0x10000000, // MIPS2 instruction set
   EF_MIPS_ARCH_3    = 0x20000000, // MIPS3 instruction set
@@ -747,8 +761,7 @@ enum {
   EF_MIPS_ARCH_64   = 0x60000000, // MIPS64 instruction set per linux not elf.h
   EF_MIPS_ARCH_32R2 = 0x70000000, // mips32r2
   EF_MIPS_ARCH_64R2 = 0x80000000, // mips64r2
-  EF_MIPS_ARCH      = 0xf0000000, // Mask for applying EF_MIPS_ARCH_ variant
-  EF_MIPS_MICROMIPS = 0x02000000  // microMIPS
+  EF_MIPS_ARCH      = 0xf0000000  // Mask for applying EF_MIPS_ARCH_ variant
 };
 
 // ELF Relocation types for Mips
@@ -809,6 +822,11 @@ enum {
   R_MIPS_NUM               = 218
 };
 
+// Special values for the st_other field in the symbol table entry for MIPS.
+enum {
+  STO_MIPS_MICROMIPS       = 0x80 // MIPS Specific ISA for MicroMips
+};
+
 // Hexagon Specific e_flags
 // Release 5 ABI
 enum {
@@ -828,14 +846,14 @@ enum {
 };
 
 // Hexagon specific Section indexes for common small data
-// Release 5 ABI 
+// Release 5 ABI
 enum {
   SHN_HEXAGON_SCOMMON     = 0xff00,       // Other access sizes
   SHN_HEXAGON_SCOMMON_1   = 0xff01,       // Byte-sized access
   SHN_HEXAGON_SCOMMON_2   = 0xff02,       // Half-word-sized access
   SHN_HEXAGON_SCOMMON_4   = 0xff03,       // Word-sized access
   SHN_HEXAGON_SCOMMON_8   = 0xff04        // Double-word-size access
-};   
+};
 
 // ELF Relocation types for Hexagon
 // Release 5 ABI
@@ -928,6 +946,72 @@ enum {
   R_HEX_TPREL_11_X        =  85
 };
 
+// ELF Relocation types for S390/zSeries
+enum {
+  R_390_NONE        =  0,
+  R_390_8           =  1,
+  R_390_12          =  2,
+  R_390_16          =  3,
+  R_390_32          =  4,
+  R_390_PC32        =  5,
+  R_390_GOT12       =  6,
+  R_390_GOT32       =  7,
+  R_390_PLT32       =  8,
+  R_390_COPY        =  9,
+  R_390_GLOB_DAT    = 10,
+  R_390_JMP_SLOT    = 11,
+  R_390_RELATIVE    = 12,
+  R_390_GOTOFF      = 13,
+  R_390_GOTPC       = 14,
+  R_390_GOT16       = 15,
+  R_390_PC16        = 16,
+  R_390_PC16DBL     = 17,
+  R_390_PLT16DBL    = 18,
+  R_390_PC32DBL     = 19,
+  R_390_PLT32DBL    = 20,
+  R_390_GOTPCDBL    = 21,
+  R_390_64          = 22,
+  R_390_PC64        = 23,
+  R_390_GOT64       = 24,
+  R_390_PLT64       = 25,
+  R_390_GOTENT      = 26,
+  R_390_GOTOFF16    = 27,
+  R_390_GOTOFF64    = 28,
+  R_390_GOTPLT12    = 29,
+  R_390_GOTPLT16    = 30,
+  R_390_GOTPLT32    = 31,
+  R_390_GOTPLT64    = 32,
+  R_390_GOTPLTENT   = 33,
+  R_390_PLTOFF16    = 34,
+  R_390_PLTOFF32    = 35,
+  R_390_PLTOFF64    = 36,
+  R_390_TLS_LOAD    = 37,
+  R_390_TLS_GDCALL  = 38,
+  R_390_TLS_LDCALL  = 39,
+  R_390_TLS_GD32    = 40,
+  R_390_TLS_GD64    = 41,
+  R_390_TLS_GOTIE12 = 42,
+  R_390_TLS_GOTIE32 = 43,
+  R_390_TLS_GOTIE64 = 44,
+  R_390_TLS_LDM32   = 45,
+  R_390_TLS_LDM64   = 46,
+  R_390_TLS_IE32    = 47,
+  R_390_TLS_IE64    = 48,
+  R_390_TLS_IEENT   = 49,
+  R_390_TLS_LE32    = 50,
+  R_390_TLS_LE64    = 51,
+  R_390_TLS_LDO32   = 52,
+  R_390_TLS_LDO64   = 53,
+  R_390_TLS_DTPMOD  = 54,
+  R_390_TLS_DTPOFF  = 55,
+  R_390_TLS_TPOFF   = 56,
+  R_390_20          = 57,
+  R_390_GOT20       = 58,
+  R_390_GOTPLT20    = 59,
+  R_390_TLS_GOTIE20 = 60,
+  R_390_IRELATIVE   = 61
+};
+
 // Section header.
 struct Elf32_Shdr {
   Elf32_Word sh_name;      // Section name (index into string table)
@@ -996,7 +1080,7 @@ enum {
   SHT_GNU_verneed   = 0x6ffffffe, // GNU version references.
   SHT_GNU_versym    = 0x6fffffff, // GNU symbol versions table.
   SHT_HIOS          = 0x6fffffff, // Highest operating system-specific type.
-  SHT_LOPROC        = 0x70000000, // Lowest processor architecture-specific type.
+  SHT_LOPROC        = 0x70000000, // Lowest processor arch-specific type.
   // Fixme: All this is duplicated in MCSectionELF. Why??
   // Exception Index table
   SHT_ARM_EXIDX           = 0x70000001U,
@@ -1006,14 +1090,14 @@ enum {
   SHT_ARM_ATTRIBUTES      = 0x70000003U,
   SHT_ARM_DEBUGOVERLAY    = 0x70000004U,
   SHT_ARM_OVERLAYSECTION  = 0x70000005U,
-  SHT_HEX_ORDERED         = 0x70000000, // Link editor is to sort the entries in 
+  SHT_HEX_ORDERED         = 0x70000000, // Link editor is to sort the entries in
                                         // this section based on their sizes
   SHT_X86_64_UNWIND       = 0x70000001, // Unwind information
 
   SHT_MIPS_REGINFO        = 0x70000006, // Register usage information
   SHT_MIPS_OPTIONS        = 0x7000000d, // General options
 
-  SHT_HIPROC        = 0x7fffffff, // Highest processor architecture-specific type.
+  SHT_HIPROC        = 0x7fffffff, // Highest processor arch-specific type.
   SHT_LOUSER        = 0x80000000, // Lowest type reserved for applications.
   SHT_HIUSER        = 0xffffffff  // Highest type reserved for applications.
 };
@@ -1077,7 +1161,7 @@ enum {
   // section that does not set this flag.
   SHF_X86_64_LARGE = 0x10000000,
 
-  // All sections with the GPREL flag are grouped into a global data area 
+  // All sections with the GPREL flag are grouped into a global data area
   // for faster accesses
   SHF_HEX_GPREL = 0x10000000,
 
@@ -1117,7 +1201,7 @@ struct Elf64_Sym {
   Elf64_Word      st_name;  // Symbol name (index into string table)
   unsigned char   st_info;  // Symbol's type and binding attributes
   unsigned char   st_other; // Must be zero; reserved
-  Elf64_Half      st_shndx; // Which section (header table index) it's defined in
+  Elf64_Half      st_shndx; // Which section (header tbl index) it's defined in
   Elf64_Addr      st_value; // Value or address associated with the symbol
   Elf64_Xword     st_size;  // Size of the symbol
 
@@ -1170,6 +1254,11 @@ enum {
   STV_INTERNAL  = 1,  // Defined by processor supplements
   STV_HIDDEN    = 2,  // Not visible to other components
   STV_PROTECTED = 3   // Visible in other components but not preemptable
+};
+
+// Symbol number.
+enum {
+  STN_UNDEF = 0
 };
 
 // Relocation entry, without explicit addend.
@@ -1260,7 +1349,7 @@ struct Elf64_Phdr {
   Elf64_Word   p_flags;  // Segment flags
   Elf64_Off    p_offset; // File offset where segment is located, in bytes
   Elf64_Addr   p_vaddr;  // Virtual address of beginning of segment
-  Elf64_Addr   p_paddr;  // Physical address of beginning of segment (OS-specific)
+  Elf64_Addr   p_paddr;  // Physical addr of beginning of segment (OS-specific)
   Elf64_Xword  p_filesz; // Num. of bytes in file image of segment (may be zero)
   Elf64_Xword  p_memsz;  // Num. of bytes in mem image of segment (may be zero)
   Elf64_Xword  p_align;  // Segment alignment constraint
@@ -1291,7 +1380,7 @@ enum {
   PT_GNU_RELRO  = 0x6474e552, // Read-only after relocation.
 
   // ARM program header types.
-  PT_ARM_ARCHEXT = 0x70000000, // Platform architecture compatibility information
+  PT_ARM_ARCHEXT = 0x70000000, // Platform architecture compatibility info
   // These all contain stack unwind tables.
   PT_ARM_EXIDX   = 0x70000001,
   PT_ARM_UNWIND  = 0x70000001

@@ -101,7 +101,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       return AttributeList::AT_Naked;	 // "naked"
     }
     break;
-  case 6:	 // 13 strings to match.
+  case 6:	 // 14 strings to match.
     switch (Name[0]) {
     default: break;
     case '_':	 // 1 string to match.
@@ -120,6 +120,10 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       if (memcmp(Name.data()+1, "evice", 5))
         break;
       return AttributeList::AT_CUDADevice;	 // "device"
+    case 'e':	 // 1 string to match.
+      if (memcmp(Name.data()+1, "ndian", 5))
+        break;
+      return AttributeList::AT_Endian;	 // "endian"
     case 'f':	 // 1 string to match.
       if (memcmp(Name.data()+1, "ormat", 5))
         break;
@@ -288,7 +292,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       return AttributeList::AT_WeakRef;	 // "weakref"
     }
     break;
-  case 8:	 // 19 strings to match.
+  case 8:	 // 20 strings to match.
     switch (Name[0]) {
     default: break;
     case 'N':	 // 1 string to match.
@@ -390,6 +394,10 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
         return AttributeList::AT_NoReturn;	 // "noreturn"
       }
       break;
+    case 'p':	 // 1 string to match.
+      if (memcmp(Name.data()+1, "roperty", 7))
+        break;
+      return AttributeList::AT_MsProperty;	 // "property"
     case 's':	 // 1 string to match.
       if (memcmp(Name.data()+1, "entinel", 7))
         break;
@@ -833,7 +841,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
     case 'v':	 // 1 string to match.
       if (memcmp(Name.data()+1, "ec_type_hint", 12))
         break;
-      return AttributeList::IgnoredAttribute;	 // "vec_type_hint"
+      return AttributeList::AT_VecTypeHint;	 // "vec_type_hint"
     }
     break;
   case 14:	 // 8 strings to match.
@@ -887,7 +895,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       return AttributeList::AT_PtGuardedVar;	 // "pt_guarded_var"
     }
     break;
-  case 15:	 // 13 strings to match.
+  case 15:	 // 14 strings to match.
     switch (Name[0]) {
     default: break;
     case 'a':	 // 1 string to match.
@@ -964,6 +972,10 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       if (memcmp(Name.data()+1, "coped_lockable", 14))
         break;
       return AttributeList::AT_ScopedLockable;	 // "scoped_lockable"
+    case 't':	 // 1 string to match.
+      if (memcmp(Name.data()+1, "ype_visibility", 14))
+        break;
+      return AttributeList::AT_TypeVisibility;	 // "type_visibility"
     case 'u':	 // 1 string to match.
       if (memcmp(Name.data()+1, "nlock_function", 14))
         break;
@@ -1020,7 +1032,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       return AttributeList::AT_TransparentUnion;	 // "transparent_union"
     }
     break;
-  case 18:	 // 7 strings to match.
+  case 18:	 // 9 strings to match.
     switch (Name[0]) {
     default: break;
     case 'c':	 // 2 strings to match.
@@ -1055,6 +1067,21 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       if (memcmp(Name.data()+1, "boutletcollection", 17))
         break;
       return AttributeList::AT_IBOutletCollection;	 // "iboutletcollection"
+    case 'n':	 // 2 strings to match.
+      if (memcmp(Name.data()+1, "o_sanitize_", 11))
+        break;
+      switch (Name[12]) {
+      default: break;
+      case 'm':	 // 1 string to match.
+        if (memcmp(Name.data()+13, "emory", 5))
+          break;
+        return AttributeList::AT_NoSanitizeMemory;	 // "no_sanitize_memory"
+      case 't':	 // 1 string to match.
+        if (memcmp(Name.data()+13, "hread", 5))
+          break;
+        return AttributeList::AT_NoSanitizeThread;	 // "no_sanitize_thread"
+      }
+      break;
     case 'o':	 // 1 string to match.
       if (memcmp(Name.data()+1, "bjc_method_family", 17))
         break;
@@ -1065,7 +1092,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       return AttributeList::AT_WarnUnusedResult;	 // "warn_unused_result"
     }
     break;
-  case 19:	 // 6 strings to match.
+  case 19:	 // 7 strings to match.
     switch (Name[0]) {
     default: break;
     case 'c':	 // 3 strings to match.
@@ -1087,10 +1114,19 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
         return AttributeList::AT_CFUnknownTransfer;	 // "cf_unknown_transfer"
       }
       break;
-    case 'n':	 // 1 string to match.
-      if (memcmp(Name.data()+1, "s_returns_retained", 18))
-        break;
-      return AttributeList::AT_NSReturnsRetained;	 // "ns_returns_retained"
+    case 'n':	 // 2 strings to match.
+      switch (Name[1]) {
+      default: break;
+      case 'o':	 // 1 string to match.
+        if (memcmp(Name.data()+2, "_sanitize_address", 17))
+          break;
+        return AttributeList::AT_NoSanitizeAddress;	 // "no_sanitize_address"
+      case 's':	 // 1 string to match.
+        if (memcmp(Name.data()+2, "_returns_retained", 17))
+          break;
+        return AttributeList::AT_NSReturnsRetained;	 // "ns_returns_retained"
+      }
+      break;
     case 'o':	 // 2 strings to match.
       switch (Name[1]) {
       default: break;
@@ -1160,7 +1196,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       return AttributeList::AT_TypeTagForDatatype;	 // "type_tag_for_datatype"
     }
     break;
-  case 22:	 // 4 strings to match.
+  case 22:	 // 5 strings to match.
     switch (Name[0]) {
     default: break;
     case '_':	 // 1 string to match.
@@ -1171,6 +1207,10 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
       if (memcmp(Name.data()+1, "rgument_with_type_tag", 21))
         break;
       return AttributeList::AT_ArgumentWithTypeTag;	 // "argument_with_type_tag"
+    case 'c':	 // 1 string to match.
+      if (memcmp(Name.data()+1, "lang::type_visibility", 21))
+        break;
+      return AttributeList::AT_TypeVisibility;	 // "clang::type_visibility"
     case 'g':	 // 1 string to match.
       if (memcmp(Name.data()+1, "nu::transparent_union", 21))
         break;
@@ -1253,7 +1293,7 @@ static AttributeList::Kind getAttrKind(StringRef Name) {
     case 'n':	 // 1 string to match.
       if (memcmp(Name.data()+1, "o_address_safety_analysis", 25))
         break;
-      return AttributeList::AT_NoAddressSafetyAnalysis;	 // "no_address_safety_analysis"
+      return AttributeList::AT_NoSanitizeAddress;	 // "no_address_safety_analysis"
     case 'o':	 // 1 string to match.
       if (memcmp(Name.data()+1, "bjc_returns_inner_pointer", 25))
         break;

@@ -234,17 +234,17 @@ public:
   pointer getNodePtrUnchecked() const { return NodePtr; }
 };
 
-// do not implement. this is to catch errors when people try to use
-// them as random access iterators
+// These are to catch errors when people try to use them as random access
+// iterators.
 template<typename T>
-void operator-(int, ilist_iterator<T>);
+void operator-(int, ilist_iterator<T>) LLVM_DELETED_FUNCTION;
 template<typename T>
-void operator-(ilist_iterator<T>,int);
+void operator-(ilist_iterator<T>,int) LLVM_DELETED_FUNCTION;
 
 template<typename T>
-void operator+(int, ilist_iterator<T>);
+void operator+(int, ilist_iterator<T>) LLVM_DELETED_FUNCTION;
 template<typename T>
-void operator+(ilist_iterator<T>,int);
+void operator+(ilist_iterator<T>,int) LLVM_DELETED_FUNCTION;
 
 // operator!=/operator== - Allow mixed comparisons without dereferencing
 // the iterator, which could very likely be pointing to end().
@@ -274,12 +274,12 @@ template<typename From> struct simplify_type;
 template<typename NodeTy> struct simplify_type<ilist_iterator<NodeTy> > {
   typedef NodeTy* SimpleType;
 
-  static SimpleType getSimplifiedValue(const ilist_iterator<NodeTy> &Node) {
+  static SimpleType getSimplifiedValue(ilist_iterator<NodeTy> &Node) {
     return &*Node;
   }
 };
 template<typename NodeTy> struct simplify_type<const ilist_iterator<NodeTy> > {
-  typedef NodeTy* SimpleType;
+  typedef /*const*/ NodeTy* SimpleType;
 
   static SimpleType getSimplifiedValue(const ilist_iterator<NodeTy> &Node) {
     return &*Node;

@@ -71,6 +71,16 @@
 #define LLVM_HAS_CXX11_STDLIB 0
 #endif
 
+/// \macro LLVM_HAS_VARIADIC_TEMPLATES
+/// \brief Does this compiler support variadic templates.
+///
+/// Implies LLVM_HAS_RVALUE_REFERENCES and the existence of std::forward.
+#if __has_feature(cxx_variadic_templates)
+# define LLVM_HAS_VARIADIC_TEMPLATES 1
+#else
+# define LLVM_HAS_VARIADIC_TEMPLATES 0
+#endif
+
 /// llvm_move - Expands to ::std::move if the compiler supports
 /// r-value references; otherwise, expands to the argument.
 #if LLVM_HAS_RVALUE_REFERENCES
@@ -295,7 +305,7 @@
 # define LLVM_FUNCTION_NAME __func__
 #endif
 
-#if defined(LLVM_HAVE_MSAN_ANNOTATIONS)
+#if defined(HAVE_SANITIZER_MSAN_INTERFACE_H)
 # include <sanitizer/msan_interface.h>
 #else
 # define __msan_allocated_memory(p, size)
@@ -329,6 +339,26 @@
 # define LLVM_IS_UNALIGNED_ACCESS_FAST 1
 #else
 # define LLVM_IS_UNALIGNED_ACCESS_FAST 0
+#endif
+
+/// \macro LLVM_EXPLICIT
+/// \brief Expands to explicit on compilers which support explicit conversion
+/// operators. Otherwise expands to nothing.
+#if (__has_feature(cxx_explicit_conversions) \
+     || defined(__GXX_EXPERIMENTAL_CXX0X__))
+#define LLVM_EXPLICIT explicit
+#else
+#define LLVM_EXPLICIT
+#endif
+
+/// \macro LLVM_STATIC_ASSERT
+/// \brief Expands to C/C++'s static_assert on compilers which support it.
+#if __has_feature(cxx_static_assert)
+# define LLVM_STATIC_ASSERT(expr, msg) static_assert(expr, msg)
+#elif __has_feature(c_static_assert)
+# define LLVM_STATIC_ASSERT(expr, msg) _Static_assert(expr, msg)
+#else
+# define LLVM_STATIC_ASSERT(expr, msg)
 #endif
 
 #endif

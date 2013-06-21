@@ -4,7 +4,7 @@
 #define CONFIG_H
 
 /* Bug report URL. */
-#define BUG_REPORT_URL ""
+#define BUG_REPORT_URL "http://llvm.org/bugs/"
 
 /* Define if we have libxml2 */
 /* #undef CLANG_HAVE_LIBXML */
@@ -69,6 +69,9 @@
 /* Define to 1 if you have the `closedir' function. */
 /* #undef HAVE_CLOSEDIR */
 
+/* Define to 1 if you have the <cxxabi.h> header file. */
+/* #undef HAVE_CXXABI_H */
+
 /* Define to 1 if you have the <CrashReporterClient.h> header file. */
 #undef HAVE_CRASHREPORTERCLIENT_H
 
@@ -114,7 +117,7 @@
 #undef HAVE_DYLD
 
 /* Define to 1 if you have the <errno.h> header file. */
-#define HAVE_ERRNO_H 1
+#define HAVE_ERRNO_H TRUE
 
 /* Define to 1 if the system has the type `error_t'. */
 /* #undef HAVE_ERROR_T */
@@ -229,6 +232,9 @@
 
 /* Define to 1 if you have the `udis86' library (-ludis86). */
 #undef HAVE_LIBUDIS86
+
+/* Define to 1 if you have the 'z' library (-lz). */
+/* #undef HAVE_LIBZ */
 
 /* Define to 1 if you have the <limits.h> header file. */
 #define HAVE_LIMITS_H 1
@@ -498,6 +504,9 @@
 /* Define if the xdot.py program is available */
 /* #undef HAVE_XDOT_PY */
 
+/* Define to 1 if you have the <zlib.h> header file. */
+/* #undef HAVE_ZLIB_H */
+
 /* Have host's _alloca */
 /* #undef HAVE__ALLOCA */
 
@@ -570,6 +579,9 @@
 /* Define if threads enabled */
 #define LLVM_ENABLE_THREADS 1
 
+/* Define if zlib compression is available */
+#define LLVM_ENABLE_ZLIB 0
+
 /* Installation directory for config files */
 /* #undef LLVM_ETCDIR */
 
@@ -577,7 +589,7 @@
 #define LLVM_HAS_ATOMICS 1
 
 /* Host triple LLVM will be executed on */
-#define LLVM_HOSTTRIPLE "i686-pc-win32"
+#define LLVM_HOST_TRIPLE "i686-pc-win32"
 
 /* Installation directory for include files */
 /* #undef LLVM_INCLUDEDIR */
@@ -646,10 +658,10 @@
 /* #undef LLVM_PATH_XDOT_PY */
 
 /* Installation prefix directory */
-#define LLVM_PREFIX "C:/Program Files (x86)/LLVM"
+#define LLVM_PREFIX "llvminstall"
 
 /* Define if we have the Intel JIT API runtime support library */
-/* #undef LLVM_USE_INTEL_JITEVENTS */
+#define LLVM_USE_INTEL_JITEVENTS 1
 
 /* Define if we have the oprofile JIT-support library */
 /* #undef LLVM_USE_OPROFILE */

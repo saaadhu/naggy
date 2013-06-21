@@ -131,6 +131,9 @@ class MachineFunction {
   /// about the control flow of such functions.
   bool ExposesReturnsTwice;
 
+  /// True if the function includes MS-style inline assembly.
+  bool HasMSInlineAsm;
+
   MachineFunction(const MachineFunction &) LLVM_DELETED_FUNCTION;
   void operator=(const MachineFunction&) LLVM_DELETED_FUNCTION;
 public:
@@ -213,6 +216,17 @@ public:
   /// a "returns twice" function.
   void setExposesReturnsTwice(bool B) {
     ExposesReturnsTwice = B;
+  }
+
+  /// Returns true if the function contains any MS-style inline assembly.
+  bool hasMSInlineAsm() const {
+    return HasMSInlineAsm;
+  }
+
+  /// Set a flag that indicates that the function contains MS-style inline
+  /// assembly.
+  void setHasMSInlineAsm(bool B) {
+    HasMSInlineAsm = B;
   }
   
   /// getInfo - Keep track of various per-function pieces of information for
@@ -338,8 +352,8 @@ public:
   // Internal functions used to automatically number MachineBasicBlocks
   //
 
-  /// getNextMBBNumber - Returns the next unique number to be assigned
-  /// to a MachineBasicBlock in this MachineFunction.
+  /// \brief Adds the MBB to the internal numbering. Returns the unique number
+  /// assigned to the MBB.
   ///
   unsigned addToMBBNumbering(MachineBasicBlock *MBB) {
     MBBNumbering.push_back(MBB);

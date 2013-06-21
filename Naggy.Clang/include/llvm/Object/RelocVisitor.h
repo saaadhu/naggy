@@ -92,6 +92,26 @@ public:
         HasError = true;
         return RelocToApply();
       }
+    } else if (FileFormat == "ELF64-aarch64") {
+      switch (RelocType) {
+      case llvm::ELF::R_AARCH64_ABS32:
+        return visitELF_AARCH64_ABS32(R, Value);
+      case llvm::ELF::R_AARCH64_ABS64:
+        return visitELF_AARCH64_ABS64(R, Value);
+      default:
+        HasError = true;
+        return RelocToApply();
+      }
+    } else if (FileFormat == "ELF64-s390") {
+      switch (RelocType) {
+      case llvm::ELF::R_390_32:
+        return visitELF_390_32(R, Value);
+      case llvm::ELF::R_390_64:
+        return visitELF_390_64(R, Value);
+      default:
+        HasError = true;
+        return RelocToApply();
+      }
     }
     HasError = true;
     return RelocToApply();
@@ -123,7 +143,7 @@ private:
     int64_t Addend;
     R.getAdditionalInfo(Addend);
     uint64_t Address;
-    R.getAddress(Address);
+    R.getOffset(Address);
     return RelocToApply(Value + Addend - Address, 4);
   }
 
@@ -141,7 +161,7 @@ private:
     int64_t Addend;
     R.getAdditionalInfo(Addend);
     uint64_t Address;
-    R.getAddress(Address);
+    R.getOffset(Address);
     return RelocToApply(Value + Addend - Address, 4);
   }
   RelocToApply visitELF_X86_64_32(RelocationRef R, uint64_t Value) {
@@ -171,6 +191,44 @@ private:
     R.getAdditionalInfo(Addend);
     uint32_t Res = (Value + Addend) & 0xFFFFFFFF;
     return RelocToApply(Res, 4);
+  }
+
+  // AArch64 ELF
+  RelocToApply visitELF_AARCH64_ABS32(RelocationRef R, uint64_t Value) {
+    int64_t Addend;
+    R.getAdditionalInfo(Addend);
+    int64_t Res =  Value + Addend;
+
+    // Overflow check allows for both signed and unsigned interpretation.
+    if (Res < INT32_MIN || Res > UINT32_MAX)
+      HasError = true;
+
+    return RelocToApply(static_cast<uint32_t>(Res), 4);
+  }
+
+  RelocToApply visitELF_AARCH64_ABS64(RelocationRef R, uint64_t Value) {
+    int64_t Addend;
+    R.getAdditionalInfo(Addend);
+    return RelocToApply(Value + Addend, 8);
+  }
+
+  // SystemZ ELF
+  RelocToApply visitELF_390_32(RelocationRef R, uint64_t Value) {
+    int64_t Addend;
+    R.getAdditionalInfo(Addend);
+    int64_t Res = Value + Addend;
+
+    // Overflow check allows for both signed and unsigned interpretation.
+    if (Res < INT32_MIN || Res > UINT32_MAX)
+      HasError = true;
+
+    return RelocToApply(static_cast<uint32_t>(Res), 4);
+  }
+
+  RelocToApply visitELF_390_64(RelocationRef R, uint64_t Value) {
+    int64_t Addend;
+    R.getAdditionalInfo(Addend);
+    return RelocToApply(Value + Addend, 8);
   }
 };
 

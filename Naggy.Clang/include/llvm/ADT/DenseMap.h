@@ -493,7 +493,6 @@ private:
       if (KeyInfoT::isEqual(ThisBucket->first, EmptyKey)) {
         // If we've already seen a tombstone while probing, fill it in instead
         // of the empty bucket we eventually probed to.
-        if (FoundTombstone) ThisBucket = FoundTombstone;
         FoundBucket = FoundTombstone ? FoundTombstone : ThisBucket;
         return false;
       }
@@ -619,7 +618,7 @@ public:
     unsigned OldNumBuckets = NumBuckets;
     BucketT *OldBuckets = Buckets;
 
-    allocateBuckets(std::max<unsigned>(64, NextPowerOf2(AtLeast-1)));
+    allocateBuckets(std::max<unsigned>(64, static_cast<unsigned>(NextPowerOf2(AtLeast-1))));
     assert(Buckets);
     if (!OldBuckets) {
       this->BaseT::initEmpty();

@@ -537,23 +537,29 @@ public:
   }
 
   // Get the local instance/class method declared in this interface.
-  ObjCMethodDecl *getMethod(Selector Sel, bool isInstance) const;
-  ObjCMethodDecl *getInstanceMethod(Selector Sel) const {
-    return getMethod(Sel, true/*isInstance*/);
+  ObjCMethodDecl *getMethod(Selector Sel, bool isInstance,
+                            bool AllowHidden = false) const;
+  ObjCMethodDecl *getInstanceMethod(Selector Sel,
+                                    bool AllowHidden = false) const {
+    return getMethod(Sel, true/*isInstance*/, AllowHidden);
   }
-  ObjCMethodDecl *getClassMethod(Selector Sel) const {
-    return getMethod(Sel, false/*isInstance*/);
+  ObjCMethodDecl *getClassMethod(Selector Sel, bool AllowHidden = false) const {
+    return getMethod(Sel, false/*isInstance*/, AllowHidden);
   }
+  bool HasUserDeclaredSetterMethod(const ObjCPropertyDecl *P) const;
   ObjCIvarDecl *getIvarDecl(IdentifierInfo *Id) const;
 
   ObjCPropertyDecl *FindPropertyDeclaration(IdentifierInfo *PropertyId) const;
 
   typedef llvm::DenseMap<IdentifierInfo*, ObjCPropertyDecl*> PropertyMap;
-
+  
+  typedef llvm::SmallVector<ObjCPropertyDecl*, 8> PropertyDeclOrder;
+  
   /// This routine collects list of properties to be implemented in the class.
   /// This includes, class's and its conforming protocols' properties.
   /// Note, the superclass's properties are not included in the list.
-  virtual void collectPropertiesToImplement(PropertyMap &PM) const {}
+  virtual void collectPropertiesToImplement(PropertyMap &PM,
+                                            PropertyDeclOrder &PO) const {}
 
   SourceLocation getAtStartLoc() const { return AtStart; }
   void setAtStartLoc(SourceLocation Loc) { AtStart = Loc; }
@@ -648,6 +654,10 @@ class ObjCInterfaceDecl : public ObjCContainerDecl
     /// completed by the external AST source when required.
     mutable bool ExternallyCompleted : 1;
 
+    /// \brief Indicates that the ivar cache does not yet include ivars
+    /// declared in the implementation.
+    mutable bool IvarListMissingImplementation : 1;
+
     /// \brief The location of the superclass, if any.
     SourceLocation SuperClassLoc;
     
@@ -657,7 +667,8 @@ class ObjCInterfaceDecl : public ObjCContainerDecl
     SourceLocation EndLoc; 
 
     DefinitionData() : Definition(), SuperClass(), CategoryList(), IvarList(), 
-                       ExternallyCompleted() { }
+                       ExternallyCompleted(),
+                       IvarListMissingImplementation(true) { }
   };
 
   ObjCInterfaceDecl(DeclContext *DC, SourceLocation atLoc, IdentifierInfo *Id,
@@ -1090,7 +1101,8 @@ public:
   ObjCPropertyDecl
     *FindPropertyVisibleInPrimaryClass(IdentifierInfo *PropertyId) const;
 
-  virtual void collectPropertiesToImplement(PropertyMap &PM) const;
+  virtual void collectPropertiesToImplement(PropertyMap &PM,
+                                            PropertyDeclOrder &PO) const;
 
   /// isSuperClassOf - Return true if this class is the specified class or is a
   /// super class of the specified interface class.
@@ -1124,7 +1136,8 @@ public:
   // Lookup a method. First, we search locally. If a method isn't
   // found, we search referenced protocols and class categories.
   ObjCMethodDecl *lookupMethod(Selector Sel, bool isInstance,
-                               bool shallowCategoryLookup= false) const;
+                               bool shallowCategoryLookup= false,
+                               const ObjCCategoryDecl *C= 0) const;
   ObjCMethodDecl *lookupInstanceMethod(Selector Sel,
                             bool shallowCategoryLookup = false) const {
     return lookupMethod(Sel, true/*isInstance*/, shallowCategoryLookup);
@@ -1143,6 +1156,15 @@ public:
     return lookupPrivateMethod(Sel, false);
   }
 
+  /// \brief Lookup a setter or getter in the class hierarchy,
+  /// including in all categories except for category passed
+  /// as argument.
+  ObjCMethodDecl *lookupPropertyAccessor(const Selector Sel,
+                                         const ObjCCategoryDecl *Cat) const {
+    return lookupMethod(Sel, true/*isInstance*/,
+                        false/*shallowCategoryLookup*/, Cat);
+  }
+                          
   SourceLocation getEndOfDefinitionLoc() const { 
     if (!hasDefinition())
       return getLocation();
@@ -1489,7 +1511,8 @@ public:
     return getFirstDeclaration();
   }
 
-  virtual void collectPropertiesToImplement(PropertyMap &PM) const;
+  virtual void collectPropertiesToImplement(PropertyMap &PM,
+                                            PropertyDeclOrder &PO) const;
 
   static bool classof(const Decl *D) { return classofKind(D->getKind()); }
   static bool classofKind(Kind K) { return K == ObjCProtocol; }
@@ -1775,6 +1798,8 @@ class ObjCImplementationDecl : public ObjCImplDecl {
   virtual void anchor();
   /// Implementation Class's super class.
   ObjCInterfaceDecl *SuperClass;
+  SourceLocation SuperLoc;
+
   /// \@implementation may have private ivars.
   SourceLocation IvarLBraceLoc;
   SourceLocation IvarRBraceLoc;
@@ -1795,10 +1820,11 @@ class ObjCImplementationDecl : public ObjCImplDecl {
                          ObjCInterfaceDecl *classInterface,
                          ObjCInterfaceDecl *superDecl,
                          SourceLocation nameLoc, SourceLocation atStartLoc,
+                         SourceLocation superLoc = SourceLocation(),
                          SourceLocation IvarLBraceLoc=SourceLocation(), 
                          SourceLocation IvarRBraceLoc=SourceLocation())
     : ObjCImplDecl(ObjCImplementation, DC, classInterface, nameLoc, atStartLoc),
-       SuperClass(superDecl), IvarLBraceLoc(IvarLBraceLoc), 
+       SuperClass(superDecl), SuperLoc(superLoc), IvarLBraceLoc(IvarLBraceLoc),
        IvarRBraceLoc(IvarRBraceLoc),
        IvarInitializers(0), NumIvarInitializers(0),
        HasNonZeroConstructors(false), HasDestructors(false) {}
@@ -1808,6 +1834,7 @@ public:
                                         ObjCInterfaceDecl *superDecl,
                                         SourceLocation nameLoc,
                                         SourceLocation atStartLoc,
+                                     SourceLocation superLoc = SourceLocation(),
                                         SourceLocation IvarLBraceLoc=SourceLocation(), 
                                         SourceLocation IvarRBraceLoc=SourceLocation());
 
@@ -1880,6 +1907,7 @@ public:
 
   const ObjCInterfaceDecl *getSuperClass() const { return SuperClass; }
   ObjCInterfaceDecl *getSuperClass() { return SuperClass; }
+  SourceLocation getSuperClassLoc() const { return SuperLoc; }
 
   void setSuperClass(ObjCInterfaceDecl * superCls) { SuperClass = superCls; }
 

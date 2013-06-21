@@ -235,6 +235,11 @@
         return 1;
     break;
   }
+  case AT_Endian : {
+    if (Name == "endian" && SyntaxUsed == 0 && Scope == "")
+        return 0;
+    break;
+  }
   case AT_ExclusiveLockFunction : {
     if (Name == "exclusive_lock_function" && SyntaxUsed == 0 && Scope == "")
         return 0;
@@ -387,6 +392,11 @@
         return 1;
     break;
   }
+  case AT_MsProperty : {
+    if (Name == "property" && SyntaxUsed == 2 && Scope == "")
+        return 0;
+    break;
+  }
   case AT_MsStruct : {
     if (Name == "ms_struct" && SyntaxUsed == 2 && Scope == "")
         return 0;
@@ -444,11 +454,6 @@
         return 0;
     break;
   }
-  case AT_NoAddressSafetyAnalysis : {
-    if (Name == "no_address_safety_analysis" && SyntaxUsed == 0 && Scope == "")
-        return 0;
-    break;
-  }
   case AT_NoCommon : {
     if (Name == "nocommon" && SyntaxUsed == 0 && Scope == "")
         return 0;
@@ -487,6 +492,23 @@
         return 0;
     if (Name == "noreturn" && SyntaxUsed == 1 && Scope == "gnu")
         return 1;
+    break;
+  }
+  case AT_NoSanitizeAddress : {
+    if (Name == "no_address_safety_analysis" && SyntaxUsed == 0 && Scope == "")
+        return 0;
+    if (Name == "no_sanitize_address" && SyntaxUsed == 0 && Scope == "")
+        return 1;
+    break;
+  }
+  case AT_NoSanitizeMemory : {
+    if (Name == "no_sanitize_memory" && SyntaxUsed == 0 && Scope == "")
+        return 0;
+    break;
+  }
+  case AT_NoSanitizeThread : {
+    if (Name == "no_sanitize_thread" && SyntaxUsed == 0 && Scope == "")
+        return 0;
     break;
   }
   case AT_NoThreadSafetyAnalysis : {
@@ -738,6 +760,13 @@
         return 0;
     break;
   }
+  case AT_TypeVisibility : {
+    if (Name == "type_visibility" && SyntaxUsed == 0 && Scope == "")
+        return 0;
+    if (Name == "type_visibility" && SyntaxUsed == 1 && Scope == "clang")
+        return 1;
+    break;
+  }
   case AT_Unavailable : {
     if (Name == "unavailable" && SyntaxUsed == 0 && Scope == "")
         return 0;
@@ -746,6 +775,9 @@
   case AT_UnlockFunction : {
     if (Name == "unlock_function" && SyntaxUsed == 0 && Scope == "")
         return 0;
+    break;
+  }
+  case AT_UnspecifiedInheritance : {
     break;
   }
   case AT_Unused : {
@@ -769,6 +801,11 @@
   }
   case AT_VecReturn : {
     if (Name == "vecreturn" && SyntaxUsed == 0 && Scope == "")
+        return 0;
+    break;
+  }
+  case AT_VecTypeHint : {
+    if (Name == "vec_type_hint" && SyntaxUsed == 0 && Scope == "")
         return 0;
     break;
   }

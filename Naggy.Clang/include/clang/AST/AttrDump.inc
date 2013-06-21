@@ -274,6 +274,16 @@
     setMoreChildren(OldMoreChildren);
     break;
   }
+  case attr::Endian: {
+    const EndianAttr *SA = cast<EndianAttr>(A);
+    OS << " " << SA->getPlatform()->getName();
+    bool OldMoreChildren = hasMoreChildren();
+    bool MoreChildren = OldMoreChildren;
+    MoreChildren = OldMoreChildren;
+    setMoreChildren(MoreChildren);
+    setMoreChildren(OldMoreChildren);
+    break;
+  }
   case attr::ExclusiveLockFunction: {
     const ExclusiveLockFunctionAttr *SA = cast<ExclusiveLockFunctionAttr>(A);
     bool OldMoreChildren = hasMoreChildren();
@@ -477,6 +487,9 @@
   case attr::Mips16: {
     break;
   }
+  case attr::MsProperty: {
+    break;
+  }
   case attr::MsStruct: {
     break;
   }
@@ -511,9 +524,6 @@
   case attr::Naked: {
     break;
   }
-  case attr::NoAddressSafetyAnalysis: {
-    break;
-  }
   case attr::NoCommon: {
     break;
   }
@@ -530,6 +540,15 @@
     break;
   }
   case attr::NoReturn: {
+    break;
+  }
+  case attr::NoSanitizeAddress: {
+    break;
+  }
+  case attr::NoSanitizeMemory: {
+    break;
+  }
+  case attr::NoSanitizeThread: {
     break;
   }
   case attr::NoThreadSafetyAnalysis: {
@@ -597,6 +616,16 @@
     break;
   }
   case attr::ObjCRootClass: {
+    break;
+  }
+  case attr::OpenCLImageAccess: {
+    const OpenCLImageAccessAttr *SA = cast<OpenCLImageAccessAttr>(A);
+    OS << " " << SA->getAccess();
+    bool OldMoreChildren = hasMoreChildren();
+    bool MoreChildren = OldMoreChildren;
+    MoreChildren = OldMoreChildren;
+    setMoreChildren(MoreChildren);
+    setMoreChildren(OldMoreChildren);
     break;
   }
   case attr::OpenCLKernel: {
@@ -826,6 +855,26 @@
     setMoreChildren(OldMoreChildren);
     break;
   }
+  case attr::TypeVisibility: {
+    const TypeVisibilityAttr *SA = cast<TypeVisibilityAttr>(A);
+    switch(SA->getVisibility()) {
+    case TypeVisibilityAttr::Default:
+      OS << " Default";
+      break;
+    case TypeVisibilityAttr::Hidden:
+      OS << " Hidden";
+      break;
+    case TypeVisibilityAttr::Protected:
+      OS << " Protected";
+      break;
+    }
+    bool OldMoreChildren = hasMoreChildren();
+    bool MoreChildren = OldMoreChildren;
+    MoreChildren = OldMoreChildren;
+    setMoreChildren(MoreChildren);
+    setMoreChildren(OldMoreChildren);
+    break;
+  }
   case attr::Unavailable: {
     const UnavailableAttr *SA = cast<UnavailableAttr>(A);
     OS << " \"" << SA->getMessage() << "\"";
@@ -850,6 +899,9 @@
     setMoreChildren(OldMoreChildren);
     break;
   }
+  case attr::UnspecifiedInheritance: {
+    break;
+  }
   case attr::Unused: {
     break;
   }
@@ -867,6 +919,20 @@
     break;
   }
   case attr::VecReturn: {
+    break;
+  }
+  case attr::VecTypeHint: {
+    const VecTypeHintAttr *SA = cast<VecTypeHintAttr>(A);
+    OS << " " << SA->getTypeHint().getAsString();
+    OS << " ";
+    SA->getTypeLoc().print(OS, *SM);
+    bool OldMoreChildren = hasMoreChildren();
+    bool MoreChildren = OldMoreChildren;
+    MoreChildren = OldMoreChildren || false;
+    setMoreChildren(MoreChildren);
+    MoreChildren = OldMoreChildren;
+    setMoreChildren(MoreChildren);
+    setMoreChildren(OldMoreChildren);
     break;
   }
   case attr::VirtualInheritance: {

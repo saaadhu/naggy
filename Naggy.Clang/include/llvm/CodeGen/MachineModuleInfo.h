@@ -35,7 +35,6 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MachineLocation.h"
@@ -296,7 +295,7 @@ public:
   /// isUsedFunction - Return true if the functions in the llvm.used list.  This
   /// does not return true for things in llvm.compiler.used unless they are also
   /// in llvm.used.
-  bool isUsedFunction(const Function *F) {
+  bool isUsedFunction(const Function *F) const {
     return UsedFunctions.count(F);
   }
 

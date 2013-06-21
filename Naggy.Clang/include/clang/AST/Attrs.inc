@@ -1064,6 +1064,34 @@ int priority;
   virtual bool isLateParsed() const { return 0; }
 };
 
+class EndianAttr : public InheritableAttr {
+IdentifierInfo * platform;
+
+
+ public:
+  EndianAttr(SourceRange R, ASTContext &Ctx
+              , IdentifierInfo * Platform
+              , unsigned SI = 0
+             )
+    : InheritableAttr(attr::Endian, R, SI)
+              , platform(Platform)
+  {
+
+  }
+
+  virtual EndianAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+  IdentifierInfo * getPlatform() const {
+    return platform;
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::Endian; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
 class ExclusiveLockFunctionAttr : public InheritableAttr {
   unsigned argsSize;
   Expr * *args;
@@ -1804,6 +1832,25 @@ class Mips16Attr : public InheritableAttr {
   virtual bool isLateParsed() const { return 0; }
 };
 
+class MsPropertyAttr : public Attr {
+
+ public:
+  MsPropertyAttr(SourceRange R, ASTContext &Ctx
+              , unsigned SI = 0
+             )
+    : Attr(attr::MsProperty, R, SI)
+  {
+  }
+
+  virtual MsPropertyAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::MsProperty; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
 class MsStructAttr : public InheritableAttr {
 
  public:
@@ -1823,13 +1870,13 @@ class MsStructAttr : public InheritableAttr {
   virtual bool isLateParsed() const { return 0; }
 };
 
-class MultipleInheritanceAttr : public InheritableAttr {
+class MultipleInheritanceAttr : public MSInheritanceAttr {
 
  public:
   MultipleInheritanceAttr(SourceRange R, ASTContext &Ctx
               , unsigned SI = 0
              )
-    : InheritableAttr(attr::MultipleInheritance, R, SI)
+    : MSInheritanceAttr(attr::MultipleInheritance, R, SI)
   {
   }
 
@@ -1984,25 +2031,6 @@ class NakedAttr : public InheritableAttr {
   virtual bool isLateParsed() const { return 0; }
 };
 
-class NoAddressSafetyAnalysisAttr : public InheritableAttr {
-
- public:
-  NoAddressSafetyAnalysisAttr(SourceRange R, ASTContext &Ctx
-              , unsigned SI = 0
-             )
-    : InheritableAttr(attr::NoAddressSafetyAnalysis, R, SI)
-  {
-  }
-
-  virtual NoAddressSafetyAnalysisAttr *clone (ASTContext &C) const;
-  virtual void printPretty(raw_ostream &OS,
-                           const PrintingPolicy &Policy) const;
-
-
-  static bool classof(const Attr *A) { return A->getKind() == attr::NoAddressSafetyAnalysis; }
-  virtual bool isLateParsed() const { return 0; }
-};
-
 class NoCommonAttr : public InheritableAttr {
 
  public:
@@ -2114,6 +2142,63 @@ class NoReturnAttr : public InheritableAttr {
 
 
   static bool classof(const Attr *A) { return A->getKind() == attr::NoReturn; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
+class NoSanitizeAddressAttr : public InheritableAttr {
+
+ public:
+  NoSanitizeAddressAttr(SourceRange R, ASTContext &Ctx
+              , unsigned SI = 0
+             )
+    : InheritableAttr(attr::NoSanitizeAddress, R, SI)
+  {
+  }
+
+  virtual NoSanitizeAddressAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::NoSanitizeAddress; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
+class NoSanitizeMemoryAttr : public InheritableAttr {
+
+ public:
+  NoSanitizeMemoryAttr(SourceRange R, ASTContext &Ctx
+              , unsigned SI = 0
+             )
+    : InheritableAttr(attr::NoSanitizeMemory, R, SI)
+  {
+  }
+
+  virtual NoSanitizeMemoryAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::NoSanitizeMemory; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
+class NoSanitizeThreadAttr : public InheritableAttr {
+
+ public:
+  NoSanitizeThreadAttr(SourceRange R, ASTContext &Ctx
+              , unsigned SI = 0
+             )
+    : InheritableAttr(attr::NoSanitizeThread, R, SI)
+  {
+  }
+
+  virtual NoSanitizeThreadAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::NoSanitizeThread; }
   virtual bool isLateParsed() const { return 0; }
 };
 
@@ -2366,6 +2451,34 @@ class ObjCRootClassAttr : public Attr {
 
 
   static bool classof(const Attr *A) { return A->getKind() == attr::ObjCRootClass; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
+class OpenCLImageAccessAttr : public Attr {
+int access;
+
+
+ public:
+  OpenCLImageAccessAttr(SourceRange R, ASTContext &Ctx
+              , int Access
+              , unsigned SI = 0
+             )
+    : Attr(attr::OpenCLImageAccess, R, SI)
+              , access(Access)
+  {
+
+  }
+
+  virtual OpenCLImageAccessAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+  int getAccess() const {
+    return access;
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::OpenCLImageAccess; }
   virtual bool isLateParsed() const { return 0; }
 };
 
@@ -2998,13 +3111,13 @@ Expr * successValue;
   virtual bool isLateParsed() const { return 1; }
 };
 
-class SingleInheritanceAttr : public InheritableAttr {
+class SingleInheritanceAttr : public MSInheritanceAttr {
 
  public:
   SingleInheritanceAttr(SourceRange R, ASTContext &Ctx
               , unsigned SI = 0
              )
-    : InheritableAttr(attr::SingleInheritance, R, SI)
+    : MSInheritanceAttr(attr::SingleInheritance, R, SI)
   {
   }
 
@@ -3166,6 +3279,41 @@ bool mustBeNull;
   virtual bool isLateParsed() const { return 0; }
 };
 
+class TypeVisibilityAttr : public InheritableAttr {
+public:
+  enum VisibilityType {
+    Default,
+    Hidden,
+    Protected
+  };
+private:
+  VisibilityType visibility;
+
+
+ public:
+  TypeVisibilityAttr(SourceRange R, ASTContext &Ctx
+              , VisibilityType Visibility
+              , unsigned SI = 0
+             )
+    : InheritableAttr(attr::TypeVisibility, R, SI)
+              , visibility(Visibility)
+  {
+
+  }
+
+  virtual TypeVisibilityAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+  VisibilityType getVisibility() const {
+    return visibility;
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::TypeVisibility; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
 class UnavailableAttr : public InheritableAttr {
 unsigned messageLength;
 char *message;
@@ -3238,6 +3386,25 @@ class UnlockFunctionAttr : public InheritableAttr {
 
   static bool classof(const Attr *A) { return A->getKind() == attr::UnlockFunction; }
   virtual bool isLateParsed() const { return 1; }
+};
+
+class UnspecifiedInheritanceAttr : public MSInheritanceAttr {
+
+ public:
+  UnspecifiedInheritanceAttr(SourceRange R, ASTContext &Ctx
+              , unsigned SI = 0
+             )
+    : MSInheritanceAttr(attr::UnspecifiedInheritance, R, SI)
+  {
+  }
+
+  virtual UnspecifiedInheritanceAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::UnspecifiedInheritance; }
+  virtual bool isLateParsed() const { return 0; }
 };
 
 class UnusedAttr : public InheritableAttr {
@@ -3334,13 +3501,50 @@ class VecReturnAttr : public InheritableAttr {
   virtual bool isLateParsed() const { return 0; }
 };
 
-class VirtualInheritanceAttr : public InheritableAttr {
+class VecTypeHintAttr : public InheritableAttr {
+QualType typeHint;
+
+SourceLocation typeLoc;
+
+
+ public:
+  VecTypeHintAttr(SourceRange R, ASTContext &Ctx
+              , QualType TypeHint
+              , SourceLocation TypeLoc
+              , unsigned SI = 0
+             )
+    : InheritableAttr(attr::VecTypeHint, R, SI)
+              , typeHint(TypeHint)
+              , typeLoc(TypeLoc)
+  {
+
+
+  }
+
+  virtual VecTypeHintAttr *clone (ASTContext &C) const;
+  virtual void printPretty(raw_ostream &OS,
+                           const PrintingPolicy &Policy) const;
+  QualType getTypeHint() const {
+    return typeHint;
+  }
+
+  SourceLocation getTypeLoc() const {
+    return typeLoc;
+  }
+
+
+
+  static bool classof(const Attr *A) { return A->getKind() == attr::VecTypeHint; }
+  virtual bool isLateParsed() const { return 0; }
+};
+
+class VirtualInheritanceAttr : public MSInheritanceAttr {
 
  public:
   VirtualInheritanceAttr(SourceRange R, ASTContext &Ctx
               , unsigned SI = 0
              )
-    : InheritableAttr(attr::VirtualInheritance, R, SI)
+    : MSInheritanceAttr(attr::VirtualInheritance, R, SI)
   {
   }
 

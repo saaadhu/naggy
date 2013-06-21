@@ -120,6 +120,10 @@ public:
   /// by adding a check even before the "normal" function prologue.
   virtual void adjustForSegmentedStacks(MachineFunction &MF) const { }
 
+  /// Adjust the prologue to add Erlang Run-Time System (ERTS) specific code in
+  /// the assembly prologue to explicitly handle the stack.
+  virtual void adjustForHiPEPrologue(MachineFunction &MF) const { }
+
   /// spillCalleeSavedRegisters - Issues instruction(s) to spill all callee
   /// saved registers and returns true if it isn't possible / profitable to do
   /// so by issuing a series of store instructions via
@@ -190,7 +194,23 @@ public:
   /// finalized.  Once the frame is finalized, MO_FrameIndex operands are
   /// replaced with direct constants.  This method is optional.
   ///
-  virtual void processFunctionBeforeFrameFinalized(MachineFunction &MF) const {
+  virtual void processFunctionBeforeFrameFinalized(MachineFunction &MF,
+                                               RegScavenger *RS = NULL) const {
+  }
+
+  /// eliminateCallFramePseudoInstr - This method is called during prolog/epilog
+  /// code insertion to eliminate call frame setup and destroy pseudo
+  /// instructions (but only if the Target is using them).  It is responsible
+  /// for eliminating these instructions, replacing them with concrete
+  /// instructions.  This method need only be implemented if using call frame
+  /// setup/destroy pseudo instructions.
+  ///
+  virtual void
+  eliminateCallFramePseudoInstr(MachineFunction &MF,
+                                MachineBasicBlock &MBB,
+                                MachineBasicBlock::iterator MI) const {
+    llvm_unreachable("Call Frame Pseudo Instructions do not exist on this "
+                     "target!");
   }
 };
 
