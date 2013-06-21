@@ -1,5 +1,12 @@
 Naggy is an Atmel Studio extension that uses the Clang frontend from the LLVM project to show errors/warnings on the fly, and to lowlight code excluded by preprocessor directives.
 
+0.3.3
+------
+
+* Diagnostics parsing is disabled for header files.
+* A new menu option (Tools -> Disable Naggy) can be used to turn Naggy on/off with immediate effect.
+* Upgraded LLVM/Clang version used to 3.3
+
 0.3.2
 ------
 
