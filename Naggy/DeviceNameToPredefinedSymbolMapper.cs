@@ -205,6 +205,7 @@ namespace Naggy
 { "atmxt224",            "__AVR_ATMXT224__" },
 { "atmxt224e",           "__AVR_ATMXT224E__" },
 { "atmxt336s",           "__AVR_ATMXT336S__" },
+{ "atmxts200",           "__AVR_ATMXTS200__" },
 { "atxmega16a4",         "__AVR_ATxmega16A4__" },
 { "atxmega16a4u",        "__AVR_ATxmega16A4U__" },
 { "atxmega16c4",         "__AVR_ATxmega16C4__" },
@@ -335,8 +336,8 @@ namespace Naggy
 { "mxt540e",             "__AVR32_MXT540E__" },
 { "mxt768e",             "__AVR32_MXT768E__" },
 { "mxt1664s",            "__AVR32_MXT1664S__" },
-{ "mxt1664eng",          "__AVR32_MXT1664ENG__" },
-                                                            } ;
+{ "mxt1664eng",          "__AVR32_MXT1664ENG__" }
+                                                            };
         public static IEnumerable<string> GetSymbol(string deviceName)
         {
             string text;
