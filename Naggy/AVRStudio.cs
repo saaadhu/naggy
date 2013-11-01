@@ -32,14 +32,23 @@ namespace Naggy
             return predefinedSymbols;
         }
 
-        public static bool IsCPP(string filename, DTE dte)
+        public static NaggyClang.Language GetLanguage(string filePath, DTE dte)
         {
-            var project = GetProject(dte, filename);
+            var project = GetProject(dte, filePath);
 
             if (project == null)
-                return false;
+                return NaggyClang.Language.C;
 
-            return IsCPP(filename, project);
+            if (IsCPP(filePath, project))
+            {
+                if (IsCPP11Enabled(project))
+                    return NaggyClang.Language.Cpp11;
+                return NaggyClang.Language.Cpp;
+            }
+
+            if (IsC99Enabled(project))
+                return NaggyClang.Language.C99;
+            return NaggyClang.Language.C;
         }
 
         private static bool IsCPP(string filename, dynamic project)
@@ -47,16 +56,18 @@ namespace Naggy
             return Path.GetExtension(filename) != ".c" && project.Object.GetProjectProperty("Language") == "CPP";
         }
 
-        public static bool IsC99Enabled(string fileName, DTE dte)
+        public static bool IsC99Enabled(Project project)
         {
-            var project = GetProject(dte, fileName);
-
-            if (project == null)
-                return false;
-
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
             var commandLine = (string) toolchainOptions.CCompiler.CommandLine;
             return commandLine != null && (commandLine.Contains("-std=gnu99") || commandLine.Contains("-std=c99"));
+        }
+
+        public static bool IsCPP11Enabled(Project project)
+        {
+            dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
+            var commandLine = (string) toolchainOptions.CppCompiler.CommandLine;
+            return commandLine != null && (commandLine.Contains("-std=gnu++11") || commandLine.Contains("-std=c++11"));
         }
 
         public static IEnumerable<string> GetIncludePaths(string fileName, DTE dte)
@@ -132,5 +143,6 @@ namespace Naggy
 
             return null;
         }
+
     }
 }

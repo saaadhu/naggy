@@ -23,6 +23,14 @@ namespace NaggyClang {
 		Warning
 	};
 
+	public enum class Language
+	{
+		C,
+		C99,
+		Cpp,
+		Cpp11
+	};
+
 	public ref class Diagnostic
 	{
 	public:
@@ -42,15 +50,14 @@ namespace NaggyClang {
 		ClangAdapter(String^ fileName);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols);
-		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled);
-		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled, bool isCPP);
+		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, Language language);
 
 		List<Diagnostic^> ^GetDiagnostics();
 		PreprocessorAdapter^ GetPreprocessor();
 
 		void Process(String ^contents);
 	private:
-		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols, bool isC99Enabled, bool isCPP);
+		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols, Language language);
 
 		void InitializeInvocation(clang::CompilerInvocation *pInvocation);
 		void CreateClangCompiler();
@@ -65,5 +72,6 @@ namespace NaggyClang {
 		PreprocessorAdapter ^m_preprocessorAdapter;
 		bool isC99Enabled;
 		bool isCPP;
+		bool isCPP11;
 	};
 }

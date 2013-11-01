@@ -79,27 +79,22 @@ static NaggyClang::Diagnostic^ ToDiagnostic(clang::StoredDiagnostic& diag)
 
 ClangAdapter::ClangAdapter(String^ fileName)
 {
-	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>(), false, false);
+	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>(), Language::C);
 }
 
 ClangAdapter::ClangAdapter(String ^fileName, List<String^> ^includePaths)
 {
-	Initialize(fileName, includePaths, gcnew List<String^>(), false, false);
+	Initialize(fileName, includePaths, gcnew List<String^>(), Language::C);
 }
 
 ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols)
 {
-	Initialize(fileName, includePaths, symbols, false, false);
+	Initialize(fileName, includePaths, symbols, Language::C);
 }
 
-ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled)
+ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, Language language)
 {
-	Initialize(fileName, includePaths, symbols, isC99Enabled, false);
-}
-
-ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled, bool isCPP)
-{
-	Initialize(fileName, includePaths, symbols, isC99Enabled, isCPP);
+	Initialize(fileName, includePaths, symbols, language);
 }
 
 class PreprocessorBlockCaptureAction : public clang::SyntaxOnlyAction
@@ -154,12 +149,13 @@ List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
 	return diagnostics;
 }
 
-void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols, bool isC99Enabled, bool isCPP)
+void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols, Language language)
 {
 	this->includePaths = includePaths;
 	this->predefinedSymbols = predefinedSymbols;
-	this->isC99Enabled = isC99Enabled;
-	this->isCPP = isCPP;
+	this->isC99Enabled = language == Language::C99;
+	this->isCPP = language == Language::Cpp;
+	this->isCPP11 = language == Language::Cpp11;
 
 	m_filePath = (char *) ToCString(filePath);
 	m_pInstance = NULL;
@@ -216,4 +212,6 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 	pInvocation->getLangOpts()->Bool = 1;
 	pInvocation->getLangOpts()->LineComment = 1;
 	pInvocation->getLangOpts()->CPlusPlus = isCPP ? 1 : 0;
+	pInvocation->getLangOpts()->CPlusPlus11 = isCPP11 ? 1 : 0;
+	pInvocation->getLangOpts()->CXXExceptions = 1;
 }

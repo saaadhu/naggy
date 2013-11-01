@@ -28,7 +28,7 @@ namespace Naggy.Clang.Tests
         public void GetDiagnostics_EmptyCppFile_NoDiagnosticsReturned()
         {
             File.WriteAllText(cppSourceFilePath, "");
-            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), false, true);
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), Language.Cpp);
             var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(0, diags.Count);
@@ -49,11 +49,11 @@ namespace Naggy.Clang.Tests
         }
 
         [TestMethod]
-        public void GetDiagnostics_CPPFileInDiskWithOneWarning_OneDiagnosticsReturned()
+        public void GetDiagnostics_CppFileInDiskWithOneWarning_OneDiagnosticsReturned()
         {
             var sourceText =  "int func(){}";
             File.WriteAllText(cppSourceFilePath, sourceText);
-            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), false, true);
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), Language.Cpp);
 
             adapter.Process(null);
             
@@ -161,12 +161,12 @@ int fun() {
         }
 
         [TestMethod]
-        public void GetDiagnostics_ClassDeclarationInCPP_NoDiagnosticsReturned()
+        public void GetDiagnostics_ClassDeclarationInCpp_NoDiagnosticsReturned()
         {
             File.WriteAllText(cppSourceFilePath, @"
 class C{};
 ");
-            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), false, true);
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), Language.Cpp);
             adapter.Process(null);
             Assert.AreEqual(0, adapter.GetDiagnostics().Count());
         }
@@ -186,7 +186,19 @@ class C{};
         public void GetDiagnostics_C99StyleSyntaxUsedWithC99TurnedOn_NoDiagnosticsReturned()
         {
             File.WriteAllText(sourceFilePath, @"int main() { for (int i = 0; i < 10; i++){} for (int i = 0; i < 10; i++){} return 0;}");
-            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), true);
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), Language.C99);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count);
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_Cpp11StyleSyntaxUsedWithCpp11TurnedOn_NoDiagnosticsReturned()
+        {
+            File.WriteAllText(cppSourceFilePath,
+                              @"auto it = 4;");
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), Language.Cpp11);
             adapter.Process(null);
             var diags = adapter.GetDiagnostics();
 
@@ -234,7 +246,7 @@ class C{};
         {
             File.WriteAllText(sourceFilePath, @"func() { return 0; }");
 
-            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), true);
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), Language.C99);
             adapter.Process(null);
             var diags = adapter.GetDiagnostics().ToList();
 
