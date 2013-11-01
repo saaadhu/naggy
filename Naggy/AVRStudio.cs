@@ -98,7 +98,9 @@ namespace Naggy
 
         private static string[] GetPredefinedSymbols(dynamic compiler)
         {
-            return compiler.SymbolDefines.ToArray();
+            var commandLine = (string) compiler.CommandLine;
+            var options = commandLine.Split(new char[] {' '});
+            return options.Where(p => p.StartsWith("-D")).Select(p => p.Substring("-D".Length)).ToArray();
         }
 
         internal static ProjectItem GetProjectItem(DTE dte, string fileName)
