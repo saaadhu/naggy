@@ -87,8 +87,10 @@ namespace Naggy
                 .Select(p => p.Replace("bin\\", string.Empty));
             
             IEnumerable<string> projectSpecificIncludePaths = compiler.IncludePaths;
+            var expandedProjectSpecificIncludePaths = projectSpecificIncludePaths
+                .Select(p => p.Replace("$(ToolchainDir)", (string)((dynamic)project).Object.GetProjectProperty("ToolchainDir")));
             string outputFolder = ((dynamic)project.Object).GetProjectProperty("OutputDirectory");
-            var absoluteProjectSpecificFolderPaths = projectSpecificIncludePaths
+            var absoluteProjectSpecificFolderPaths = expandedProjectSpecificIncludePaths
                 .Select(p => Path.IsPathRooted(p) ? p : Path.Combine(outputFolder, p));
             
             return adjustedDefaultIncludePaths.Concat(absoluteProjectSpecificFolderPaths);
