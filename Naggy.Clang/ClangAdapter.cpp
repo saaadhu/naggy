@@ -79,22 +79,27 @@ static NaggyClang::Diagnostic^ ToDiagnostic(clang::StoredDiagnostic& diag)
 
 ClangAdapter::ClangAdapter(String^ fileName)
 {
-	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>(), false);
+	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>(), false, false);
 }
 
 ClangAdapter::ClangAdapter(String ^fileName, List<String^> ^includePaths)
 {
-	Initialize(fileName, includePaths, gcnew List<String^>(), false);
+	Initialize(fileName, includePaths, gcnew List<String^>(), false, false);
 }
 
 ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols)
 {
-	Initialize(fileName, includePaths, symbols, false);
+	Initialize(fileName, includePaths, symbols, false, false);
 }
 
 ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled)
 {
-	Initialize(fileName, includePaths, symbols, isC99Enabled);
+	Initialize(fileName, includePaths, symbols, isC99Enabled, false);
+}
+
+ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled, bool isCPP)
+{
+	Initialize(fileName, includePaths, symbols, isC99Enabled, isCPP);
 }
 
 class PreprocessorBlockCaptureAction : public clang::SyntaxOnlyAction
@@ -149,11 +154,12 @@ List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
 	return diagnostics;
 }
 
-void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols, bool isC99Enabled)
+void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols, bool isC99Enabled, bool isCPP)
 {
 	this->includePaths = includePaths;
 	this->predefinedSymbols = predefinedSymbols;
 	this->isC99Enabled = isC99Enabled;
+	this->isCPP = isCPP;
 
 	m_filePath = (char *) ToCString(filePath);
 	m_pInstance = NULL;
@@ -209,4 +215,5 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 	pInvocation->getLangOpts()->GNUKeywords = 1;
 	pInvocation->getLangOpts()->Bool = 1;
 	pInvocation->getLangOpts()->LineComment = 1;
+	pInvocation->getLangOpts()->CPlusPlus = isCPP ? 1 : 0;
 }

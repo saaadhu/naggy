@@ -43,13 +43,14 @@ namespace NaggyClang {
 		ClangAdapter(String ^fileName, List<String^> ^includePaths);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled);
+		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, bool isC99Enabled, bool isCPP);
 
 		List<Diagnostic^> ^GetDiagnostics();
 		PreprocessorAdapter^ GetPreprocessor();
 
 		void Process(String ^contents);
 	private:
-		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols, bool isC99Enabled);
+		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols, bool isC99Enabled, bool isCPP);
 
 		void InitializeInvocation(clang::CompilerInvocation *pInvocation);
 		void CreateClangCompiler();
@@ -63,5 +64,6 @@ namespace NaggyClang {
 		List<String^> ^predefinedSymbols;
 		PreprocessorAdapter ^m_preprocessorAdapter;
 		bool isC99Enabled;
+		bool isCPP;
 	};
 }

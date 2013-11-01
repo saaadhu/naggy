@@ -12,6 +12,7 @@ namespace Naggy.Clang.Tests
     public class ClangAdapterTests
     {
         string sourceFilePath;
+        string cppSourceFilePath;
 
         [TestMethod]
         public void GetDiagnostics_EmptyCFile_NoDiagnosticsReturned()
@@ -24,11 +25,35 @@ namespace Naggy.Clang.Tests
         }
 
         [TestMethod]
+        public void GetDiagnostics_EmptyCppFile_NoDiagnosticsReturned()
+        {
+            File.WriteAllText(cppSourceFilePath, "");
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), false, true);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count);
+        }
+
+        [TestMethod]
         public void GetDiagnostics_CFileInDiskWithOneWarning_OneDiagnosticsReturned()
         {
             var sourceText =  "int func(){}";
             File.WriteAllText(sourceFilePath, sourceText);
             var adapter = new ClangAdapter(sourceFilePath);
+
+            adapter.Process(null);
+            
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(1, diags.Count);
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_CPPFileInDiskWithOneWarning_OneDiagnosticsReturned()
+        {
+            var sourceText =  "int func(){}";
+            File.WriteAllText(cppSourceFilePath, sourceText);
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), false, true);
 
             adapter.Process(null);
             
@@ -136,6 +161,17 @@ int fun() {
         }
 
         [TestMethod]
+        public void GetDiagnostics_ClassDeclarationInCPP_NoDiagnosticsReturned()
+        {
+            File.WriteAllText(cppSourceFilePath, @"
+class C{};
+");
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), false, true);
+            adapter.Process(null);
+            Assert.AreEqual(0, adapter.GetDiagnostics().Count());
+        }
+
+        [TestMethod]
         public void GetDiagnostics_SymbolInSourceCodeProvidedInPredefinedSymbolList_NoDiagnosticsReturned()
         {
             File.WriteAllText(sourceFilePath, @"int main() { return FOO; }");
@@ -198,7 +234,7 @@ int fun() {
         {
             File.WriteAllText(sourceFilePath, @"func() { return 0; }");
 
-            var adapter = new ClangAdapter(sourceFilePath);
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), true);
             adapter.Process(null);
             var diags = adapter.GetDiagnostics().ToList();
 
@@ -268,12 +304,14 @@ int main() { return 0; }
         public void Setup()
         {
             sourceFilePath = Path.ChangeExtension(Path.GetTempFileName(), ".c");
+            cppSourceFilePath = Path.ChangeExtension(Path.GetTempFileName(), ".cpp");
         }
 
         [TestCleanup]
         public void Cleanup()
         {
             File.Delete(sourceFilePath);
+            File.Delete(cppSourceFilePath);
         }
     }
 }

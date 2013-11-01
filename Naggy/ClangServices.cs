@@ -76,7 +76,8 @@ namespace Naggy
             var includePaths = AVRStudio.GetIncludePaths(filePath, dte);
             var symbols = AVRStudio.GetPredefinedSymbols(filePath, dte);
             var isc99 = AVRStudio.IsC99Enabled(filePath, dte);
-            return new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols), isc99);
+            var isCPP = AVRStudio.IsCPP(filePath, dte);
+            return new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols), isc99, isCPP);
         }
     }
 }

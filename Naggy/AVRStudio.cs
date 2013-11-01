@@ -23,13 +23,28 @@ namespace Naggy
             var implicitSymbol = DeviceNameToPredefinedSymbolMapper.GetSymbol(deviceName);
 
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
-            var symbolsInProject = GetPredefinedSymbols(toolchainOptions);
+            var symbolsInProject = GetPredefinedSymbols(IsCPP(fileName, project) ? toolchainOptions.CppCompiler: toolchainOptions.CCompiler);
 
             var predefinedSymbols = new List<string>();
             predefinedSymbols.AddRange(implicitSymbol);
 
             predefinedSymbols.AddRange(symbolsInProject);
             return predefinedSymbols;
+        }
+
+        public static bool IsCPP(string filename, DTE dte)
+        {
+            var project = GetProject(dte, filename);
+
+            if (project == null)
+                return false;
+
+            return IsCPP(filename, project);
+        }
+
+        private static bool IsCPP(string filename, dynamic project)
+        {
+            return Path.GetExtension(filename) != ".c" && project.Object.GetProjectProperty("Language") == "CPP";
         }
 
         public static bool IsC99Enabled(string fileName, DTE dte)
@@ -54,12 +69,13 @@ namespace Naggy
                 return Enumerable.Empty<string>();
 
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
-            IEnumerable<string> defaultIncludePaths = toolchainOptions.CCompiler.DefaultIncludePaths;
+            var compiler = IsCPP(fileName, project) ? toolchainOptions.CppCompiler : toolchainOptions.CCompiler;
+            IEnumerable<string> defaultIncludePaths = compiler.DefaultIncludePaths;
 
             var adjustedDefaultIncludePaths = defaultIncludePaths
                 .Select(p => p.Replace("bin\\", string.Empty));
             
-            IEnumerable<string> projectSpecificIncludePaths = toolchainOptions.CCompiler.IncludePaths;
+            IEnumerable<string> projectSpecificIncludePaths = compiler.IncludePaths;
             string outputFolder = ((dynamic)project.Object).GetProjectProperty("OutputDirectory");
             var absoluteProjectSpecificFolderPaths = projectSpecificIncludePaths
                 .Select(p => Path.IsPathRooted(p) ? p : Path.Combine(outputFolder, p));
@@ -67,9 +83,9 @@ namespace Naggy
             return adjustedDefaultIncludePaths.Concat(absoluteProjectSpecificFolderPaths);
         }
 
-        private static string[] GetPredefinedSymbols(dynamic toolchainOptions)
+        private static string[] GetPredefinedSymbols(dynamic compiler)
         {
-            return toolchainOptions.CCompiler.SymbolDefines.ToArray();
+            return compiler.SymbolDefines.ToArray();
         }
 
         internal static ProjectItem GetProjectItem(DTE dte, string fileName)
@@ -108,7 +124,8 @@ namespace Naggy
             foreach (var project in GetProjectsInSolution(dte))
             {
                 dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
-                IEnumerable<string> defaultIncludePaths = toolchainOptions.CCompiler.DefaultIncludePaths;
+                var compiler= IsCPP(fileName, project) ? toolchainOptions.CppCompiler: toolchainOptions.CCompiler;
+                IEnumerable<string> defaultIncludePaths = compiler.DefaultIncludePaths;
                 if (defaultIncludePaths.Any(fileName.Contains))
                     return project;
             }
