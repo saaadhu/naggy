@@ -1,5 +1,5 @@
-﻿1632 : invalid asm constraint
-1636 : invalid output constraint
+﻿1636 : invalid asm constraint
+1640 : invalid output constraint
 1639 : unknown register name
-3711 : unknown attribute
+3780 : unknown attribute
 3292 : use of unknown builtin
