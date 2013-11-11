@@ -56,8 +56,6 @@ namespace Naggy
         {
             foreach (var diag in diags)
                 Show(diag);
-
-            errorListProvider.Show();
         }
 
         public static void Show(Diagnostic diag)
