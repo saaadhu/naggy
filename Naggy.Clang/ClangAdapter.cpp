@@ -211,7 +211,10 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 	pInvocation->getLangOpts()->GNUKeywords = 1;
 	pInvocation->getLangOpts()->Bool = 1;
 	pInvocation->getLangOpts()->LineComment = 1;
-	pInvocation->getLangOpts()->CPlusPlus = isCPP ? 1 : 0;
+	pInvocation->getLangOpts()->CPlusPlus = (isCPP || isCPP11) ? 1 : 0;
 	pInvocation->getLangOpts()->CPlusPlus11 = isCPP11 ? 1 : 0;
 	pInvocation->getLangOpts()->CXXExceptions = 1;
+
+	if (isCPP || isCPP11)
+		pInvocation->getLangOpts()->ImplicitInt = 0;
 }
