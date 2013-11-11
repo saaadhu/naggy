@@ -206,6 +206,32 @@ class C{};
         }
 
         [TestMethod]
+        public void GetDiagnostics_DestructorDefinedOutsideClassWithCppTurnedOn_NoDiagnosticsReturned()
+        {
+            File.WriteAllText(cppSourceFilePath,
+                              @"class C { ~C(); };
+                                C::~C() {}");
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), Language.Cpp);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count);
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_DestructorDefinedOutsideClassWithCpp11TurnedOn_NoDiagnosticsReturned()
+        {
+            File.WriteAllText(cppSourceFilePath,
+                              @"class C { ~C(); };
+                                C::~C() {}");
+            var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), Language.Cpp11);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count);
+        }
+
+        [TestMethod]
         [Ignore]
         public void GetDiagnostics_MisspelledMemberName_DiagnosticIncludesSuggestedMember()
         {
