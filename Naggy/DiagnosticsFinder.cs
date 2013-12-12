@@ -14,6 +14,8 @@ namespace Naggy
         public static event EventHandler<EventArgs> Toggled;
 
         private static bool enabled = true;
+        private static bool initialized = false;
+
         public static bool Enabled
         {
             get { return enabled; }
@@ -24,7 +26,7 @@ namespace Naggy
 
                 enabled = value;
 
-                if (!enabled)
+                if (initialized && !enabled)
                     ErrorList.Clear();
 
                 if (Toggled != null)
@@ -36,6 +38,7 @@ namespace Naggy
             ErrorList.Initialize(serviceProvider, dte);
             ClangServices.Initialize(dte);
             DiagnosticsBlacklist.Initialize();
+            initialized = true;
         }
 
         public static IEnumerable<Diagnostic> Find(ITextBuffer buffer)
