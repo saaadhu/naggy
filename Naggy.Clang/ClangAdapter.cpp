@@ -79,22 +79,27 @@ static NaggyClang::Diagnostic^ ToDiagnostic(clang::StoredDiagnostic& diag)
 
 ClangAdapter::ClangAdapter(String^ fileName)
 {
-	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>(), Language::C);
+	Initialize(fileName, gcnew List<String^>(), gcnew List<String^>(), Language::C, Arch::AVR);
 }
 
 ClangAdapter::ClangAdapter(String ^fileName, List<String^> ^includePaths)
 {
-	Initialize(fileName, includePaths, gcnew List<String^>(), Language::C);
+	Initialize(fileName, includePaths, gcnew List<String^>(), Language::C, Arch::AVR);
 }
 
 ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols)
 {
-	Initialize(fileName, includePaths, symbols, Language::C);
+	Initialize(fileName, includePaths, symbols, Language::C, Arch::AVR);
 }
 
 ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, Language language)
 {
-	Initialize(fileName, includePaths, symbols, language);
+	Initialize(fileName, includePaths, symbols, language, Arch::AVR);
+}
+
+ClangAdapter:: ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, Language language, Arch arch)
+{
+	Initialize(fileName, includePaths, symbols, language, arch);
 }
 
 class PreprocessorBlockCaptureAction : public clang::SyntaxOnlyAction
@@ -155,13 +160,14 @@ List<Diagnostic^>^ ClangAdapter::ComputeDiagnostics()
 	return diagnostics;
 }
 
-void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols, Language language)
+void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, List<String ^>^ predefinedSymbols, Language language, Arch arch)
 {
 	this->includePaths = includePaths;
 	this->predefinedSymbols = predefinedSymbols;
 	this->isC99Enabled = language == Language::C99;
 	this->isCPP = language == Language::Cpp;
 	this->isCPP11 = language == Language::Cpp11;
+	this->arch = arch;
 
 	m_filePath = (char *) ToCString(filePath);
 	m_pInstance = NULL;
@@ -195,7 +201,13 @@ void ClangAdapter::InitializeInvocation(clang::CompilerInvocation *pInvocation)
 {
 	pInvocation->getFrontendOpts().Inputs.push_back(clang::FrontendInputFile(m_filePath, clang::IK_CXX));
 	pInvocation->getFrontendOpts().ProgramAction = clang::frontend::ParseSyntaxOnly;
-	pInvocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+	if (arch == Arch::AVR)
+		pInvocation->getTargetOpts().Triple = "avr-unknown-none";
+	else if (arch == Arch::ARM)
+		pInvocation->getTargetOpts().Triple = "arm-unknown-linux-gnu";
+	else
+		pInvocation->getTargetOpts().Triple = "i386-unknown-linux-gnu";
+
 
 	for each(String^ path in includePaths)
 	{

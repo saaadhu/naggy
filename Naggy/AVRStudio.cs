@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.VisualStudio.Shell;
 using EnvDTE;
 using System.IO;
+using NaggyClang;
 
 namespace Naggy
 {
@@ -49,6 +50,29 @@ namespace Naggy
             if (IsC99Enabled(project))
                 return NaggyClang.Language.C99;
             return NaggyClang.Language.C;
+        }
+
+
+        public static NaggyClang.Arch GetArch (string filePath, DTE dte)
+        {
+            var project = GetProject(dte, filePath);
+
+            if (project == null)
+                return NaggyClang.Arch.AVR;
+
+            dynamic toolchainName = project.Properties.Item("ToolchainName").Value;
+            if (toolchainName == null)
+                return NaggyClang.Arch.AVR;
+            return GetArchFromCommandLine(toolchainName);
+        }
+
+        private static NaggyClang.Arch GetArchFromCommandLine (string toolchainName)
+        {
+            if (toolchainName.Contains("AVR"))
+                return NaggyClang.Arch.AVR;
+            if (toolchainName.Contains("ARM"))
+                return NaggyClang.Arch.ARM;
+            return NaggyClang.Arch.AVR32;
         }
 
         private static bool IsCPP(string filename, dynamic project)

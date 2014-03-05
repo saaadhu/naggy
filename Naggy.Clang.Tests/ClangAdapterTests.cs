@@ -312,6 +312,30 @@ class C{};
         }
 
         [TestMethod]
+        public void GetDiagnostics_ShortCastToIntPointerForAVR_NoDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"volatile short x; int main() { return *(int *)x; }");
+
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_ShortCastToIntPointerForARM_OneDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"volatile short x; int main() { return *(int *)x; }");
+
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), Language.C, Arch.ARM);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(1, diags.Count());
+        }
+
+        [TestMethod]
         public void GetDiagnostics_SingleLineCommentWithAsterisk_NoDiagnosticsReported()
         {
             File.WriteAllText(sourceFilePath, @"

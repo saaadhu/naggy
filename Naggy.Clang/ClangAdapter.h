@@ -31,6 +31,13 @@ namespace NaggyClang {
 		Cpp11
 	};
 
+	public enum class Arch
+	{
+		AVR,
+		AVR32,
+		ARM
+	};
+
 	public ref class Diagnostic
 	{
 	public:
@@ -51,13 +58,14 @@ namespace NaggyClang {
 		ClangAdapter(String ^fileName, List<String^> ^includePaths);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols);
 		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, Language language);
+		ClangAdapter(String ^fileName, List<String^> ^includePaths, List<String ^> ^symbols, Language language, Arch arch);
 
 		List<Diagnostic^> ^GetDiagnostics();
 		PreprocessorAdapter^ GetPreprocessor();
 
 		void Process(String ^contents);
 	private:
-		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols, Language language);
+		void Initialize(String ^fileName, List<String^> ^includePaths, List<String^>^ symbols, Language language, Arch arch);
 
 		void InitializeInvocation(clang::CompilerInvocation *pInvocation);
 		void CreateClangCompiler();
@@ -75,5 +83,6 @@ namespace NaggyClang {
 		bool isC99Enabled;
 		bool isCPP;
 		bool isCPP11;
+		Arch arch;
 	};
 }

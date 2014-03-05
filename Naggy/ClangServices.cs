@@ -77,7 +77,8 @@ namespace Naggy
             var symbols = AVRStudio.GetPredefinedSymbols(filePath, dte);
 
             var language = AVRStudio.GetLanguage(filePath, dte);
-            return new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols), language);
+            var arch = AVRStudio.GetArch(filePath, dte);
+            return new ClangAdapter(filePath, new List<string>(includePaths), new List<string>(symbols), language, arch);
         }
     }
 }
