@@ -19,6 +19,7 @@ namespace Naggy.Clang.Tests
         {
             File.WriteAllText(sourceFilePath, "");
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(0, diags.Count);
@@ -29,6 +30,7 @@ namespace Naggy.Clang.Tests
         {
             File.WriteAllText(cppSourceFilePath, "");
             var adapter = new ClangAdapter(cppSourceFilePath, new List<string>(), new List<string>(), Language.Cpp);
+            adapter.Process(null);
             var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(0, diags.Count);
@@ -132,6 +134,7 @@ int main(){}
 
             File.WriteAllText(sourceFilePath, sourceInFile);
             var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
             var diags = adapter.GetDiagnostics();
             Assert.AreEqual(0, diags.Count);
 
