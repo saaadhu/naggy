@@ -62,11 +62,13 @@ namespace NaggyClang {
 		void InitializeInvocation(clang::CompilerInvocation *pInvocation);
 		void CreateClangCompiler();
 		void DestroyClangCompiler();
+		List<Diagnostic^> ^ComputeDiagnostics();
 
 	private:
 		clang::CompilerInstance * m_pInstance;
 		StoredDiagnosticClient *m_pDiagnosticClient;
 		char* m_filePath;
+		List<Diagnostic^> ^diagnostics;
 		List<String^> ^includePaths;
 		List<String^> ^predefinedSymbols;
 		PreprocessorAdapter ^m_preprocessorAdapter;

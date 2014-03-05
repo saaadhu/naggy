@@ -113,12 +113,10 @@ public:
 };
 void ClangAdapter::Process(String ^contents)
 {
-	DestroyClangCompiler();
-
 	const char* pContents = ToCString(contents);
 	CreateClangCompiler();
 
-	m_pDiagnosticClient->clear();	
+	diagnostics = gcnew List<Diagnostic^>();
 	clang::CompilerInvocation *pInvocation = new clang::CompilerInvocation();
 	InitializeInvocation(pInvocation);
 
@@ -131,11 +129,19 @@ void ClangAdapter::Process(String ^contents)
 	m_pInstance->ExecuteAction(action);
 	m_preprocessorAdapter = action.m_preprocessorAdapter;
 
+	diagnostics = ComputeDiagnostics();
+
 	Marshal::FreeHGlobal(IntPtr((void *)pContents));
+	pInvocation->getPreprocessorOpts().clearRemappedFiles();
+	DestroyClangCompiler();
 }
 
-
 List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
+{
+	return diagnostics;
+}
+
+List<Diagnostic^>^ ClangAdapter::ComputeDiagnostics()
 {
 	StoredDiagnosticClient *client = dynamic_cast<StoredDiagnosticClient*>(m_pInstance->getDiagnostics().takeClient());
 	unsigned int numDiagnostics = client->size();
@@ -159,6 +165,7 @@ void ClangAdapter::Initialize(String ^filePath, List<String^> ^includePaths, Lis
 
 	m_filePath = (char *) ToCString(filePath);
 	m_pInstance = NULL;
+	diagnostics = gcnew List<Diagnostic^>();
 	CreateClangCompiler();
 }
 
@@ -177,7 +184,9 @@ void ClangAdapter::CreateClangCompiler()
 void ClangAdapter::DestroyClangCompiler()
 {
 	if (m_pInstance)
+	{
 		delete m_pInstance;
+	}
 
 	m_pInstance = NULL;
 }
