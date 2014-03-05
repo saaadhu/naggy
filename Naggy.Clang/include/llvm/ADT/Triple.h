@@ -51,6 +51,7 @@ public:
     mips64,  // MIPS64: mips64
     mips64el,// MIPS64EL: mips64el
     msp430,  // MSP430: msp430
+	avr,
     ppc,     // PPC: powerpc
     ppc64,   // PPC64: powerpc64, ppu
     r600,    // R600: AMD GPUs HD2XXX - HD6XXX
