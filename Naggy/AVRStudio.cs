@@ -69,11 +69,11 @@ namespace Naggy
 
         private static NaggyClang.Arch GetArchFromCommandLine (string toolchainName)
         {
-            if (toolchainName.Contains("AVR"))
-                return NaggyClang.Arch.AVR;
+            if (toolchainName.Contains("AVRGCC32"))
+                return NaggyClang.Arch.AVR32;
             if (toolchainName.Contains("ARM"))
                 return NaggyClang.Arch.ARM;
-            return NaggyClang.Arch.AVR32;
+            return NaggyClang.Arch.AVR;
         }
 
         private static bool IsCPP(string filename, dynamic project)
