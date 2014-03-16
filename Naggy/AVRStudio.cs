@@ -21,7 +21,8 @@ namespace Naggy
             }
 
             string deviceName = (string)project.Properties.Item("DeviceName").Value;
-            var implicitSymbol = DeviceNameToPredefinedSymbolMapper.GetSymbol(deviceName);
+            var arch = GetArch(fileName, dte);
+            var implicitSymbol = DeviceNameToPredefinedSymbolMapper.GetSymbols(deviceName, arch);
 
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
             var symbolsInProject = GetPredefinedSymbols(IsCPP(fileName, project) ? toolchainOptions.CppCompiler: toolchainOptions.CCompiler);
