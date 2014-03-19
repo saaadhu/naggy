@@ -1,5 +1,11 @@
 Naggy is an Atmel Studio extension that uses the Clang frontend from the LLVM project to show errors/warnings on the fly, and to lowlight code excluded by preprocessor directives.
 
+0.3.6
+-----
+* Make Naggy know about AVR and its type sizes.
+* Make Naggy aware of toolchain type (ARM or AVR) and use the correct target triple.
+* Prefix Naggy's diagnostics with a [N} to make it distinct from build errors.
+
 0.3.5
 ------
 
