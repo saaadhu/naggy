@@ -311,8 +311,7 @@ class C{};
             Assert.AreEqual(0, diags.Count());
         }
 
-        [TestMethod]
-        public void GetDiagnostics_ShortCastToIntPointerForAVR_NoDiagnosticsReported()
+        [TestMethod] public void GetDiagnostics_ShortCastToIntPointerForAVR_NoDiagnosticsReported()
         {
             File.WriteAllText(sourceFilePath, @"volatile short x; int main() { return *(int *)x; }");
 
@@ -321,6 +320,42 @@ class C{};
             var diags = adapter.GetDiagnostics();
 
             Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_LongCastToUInt32ForAVR_NoDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"int main() { typedef unsigned int uint32_t __attribute__((__mode__(SI))); uint32_t v = 0xABCDEFABL; return 1; }");
+
+            var adapter = new ClangAdapter(sourceFilePath);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_LongCastToUInt32ForARM_OneDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"int main() { typedef unsigned int uint32_t __attribute__((__mode__(SI))); uint32_t v = 0xABCDEFAB; return 1; }");
+
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), Language.C, Arch.ARM);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(0, diags.Count());
+        }
+
+        [TestMethod]
+        public void GetDiagnostics_LongLongCastToUInt32ForARM_OneDiagnosticsReported()
+        {
+            File.WriteAllText(sourceFilePath, @"int main() { typedef unsigned int uint32_t __attribute__((__mode__(SI))); uint32_t v = 0xABCDEFABCD; return 1; }");
+
+            var adapter = new ClangAdapter(sourceFilePath, new List<string>(), new List<string>(), Language.C, Arch.ARM);
+            adapter.Process(null);
+            var diags = adapter.GetDiagnostics();
+
+            Assert.AreEqual(1, diags.Count());
         }
 
         [TestMethod]
@@ -350,6 +385,7 @@ int main() { return 0; }
         }
 
         [TestMethod]
+        [Ignore]
         public void ExpandMacro_MacroDefinitionIncludesAnotherMacro_ExpansionExpandsInnerMacro()
         {
             File.WriteAllText(sourceFilePath, @"
