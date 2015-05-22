@@ -16,6 +16,7 @@ namespace Naggy
         private readonly ITextBuffer buffer;
         private IClassificationType excludedCodeClassificationType;
         private SnapshotSpan lastSpan;
+        private readonly DTE dte;
 
         readonly List<SnapshotSpan> excludedSpans = new List<SnapshotSpan>();
         DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(3000);
@@ -28,13 +29,12 @@ namespace Naggy
             excludedCodeClassificationType = this.classificationRegistry.GetClassificationType(Constants.ClassificationName);
 
             this.buffer = buffer;
-            this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
+            this.dte = dte;
 
-            debouncer.Add(1, FindSkippedRegions);
-        }
+            NaggyTriggers.Register(buffer,
+                () => debouncer.Add(1, FindSkippedRegions),
+                () => { });
 
-        private void buffer_Changed(object sender, TextContentChangedEventArgs e)
-        {
             debouncer.Add(1, FindSkippedRegions);
         }
 

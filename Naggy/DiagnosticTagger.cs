@@ -16,7 +16,6 @@ namespace Naggy
     {
         private readonly ITextBuffer buffer;
         private readonly DTE dte;
-        private DocumentEvents documentEvents;
 
         readonly List<Tuple<SnapshotSpan, Diagnostic>> spansAndDiagnostics = new List<Tuple<SnapshotSpan, Diagnostic>>();
         DelayedRequestExecutor<int> debouncer = new DelayedRequestExecutor<int>(1200);
@@ -24,54 +23,22 @@ namespace Naggy
         public DiagnosticTagger(DTE dte, ITextBuffer buffer)
         {
             this.dte = dte;
-            this.documentEvents = dte.Events.DocumentEvents;
             this.buffer = buffer;
-            this.buffer.Changed += new EventHandler<TextContentChangedEventArgs>(buffer_Changed);
-            DiagnosticsFinder.Toggled += new EventHandler<EventArgs>(DiagnosticsFinder_Toggled);
-            this.documentEvents.DocumentSaved += DocumentEventsOnDocumentSaved;
-            this.documentEvents.DocumentClosing += DocumentEventsOnDocumentClosing;
+
+            NaggyTriggers.Register(buffer,
+                () => debouncer.Add(0, FindDiagnostics),
+                ClearDiagnostics);
+
             debouncer.Add(0, FindDiagnostics);
         }
 
-        void DiagnosticsFinder_Toggled(object sender, EventArgs e)
+        void ClearDiagnostics()
         {
-            if (DiagnosticsFinder.Enabled)
-            {
-                debouncer.Add(0, FindDiagnostics);
-            }
-            else
-            {
-                spansAndDiagnostics.Clear();
-                if (TagsChanged != null)
-                    TagsChanged(this,
-                                new SnapshotSpanEventArgs(new SnapshotSpan(buffer.CurrentSnapshot, 0,
-                                                                           buffer.CurrentSnapshot.Length)));
-            }
-        }
-
-        private void DocumentEventsOnDocumentClosing(Document document)
-        {
-            ITextDocument thisDocument;
-            if (!buffer.Properties.TryGetProperty(typeof(ITextDocument), out thisDocument) || thisDocument == null)
-                return;
-
-            if (document.FullName == thisDocument.FilePath)
-            {
-                this.documentEvents.DocumentSaved -= DocumentEventsOnDocumentSaved;
-                this.documentEvents.DocumentClosing -= DocumentEventsOnDocumentClosing;
-                this.documentEvents = null;
-                DiagnosticsFinder.Toggled -= new EventHandler<EventArgs>(DiagnosticsFinder_Toggled);
-            }
-        }
-
-        private void DocumentEventsOnDocumentSaved(Document document)
-        {
-            debouncer.AddAndRunImmediately(0, FindDiagnostics);
-        }
-
-        private void buffer_Changed(object sender, TextContentChangedEventArgs e)
-        {
-            debouncer.Add(0, FindDiagnostics);
+            spansAndDiagnostics.Clear();
+            if (TagsChanged != null)
+                TagsChanged(this,
+                            new SnapshotSpanEventArgs(new SnapshotSpan(buffer.CurrentSnapshot, 0,
+                                                                       buffer.CurrentSnapshot.Length)));
         }
 
         private SnapshotSpan lastTotalDiagnosticsSpan;

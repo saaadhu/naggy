@@ -38,6 +38,16 @@ namespace Naggy
             }
         }
 
+        public static void ClearCache(ITextBuffer buffer)
+        {
+            lock (sync)
+            {
+                buffer.Properties.RemoveProperty("ClangAdapter");
+                if (lastProcessedSnapshot != null && lastProcessedSnapshot.TextBuffer == buffer)
+                    lastProcessedSnapshot = null;
+            }
+        }
+
         public static IEnumerable<Diagnostic> GetDiagnostics(ITextBuffer buffer)
         {
             lock (sync)
@@ -61,7 +71,7 @@ namespace Naggy
             ClangAdapter clangAdapter = null;
             ThreadHelper.Generic.Invoke(new Action(()=>
                                {
-                                   clangAdapter = buffer.Properties.GetOrCreateSingletonProperty <ClangAdapter>( () => CreateClangAdapter(buffer));
+                                   clangAdapter = buffer.Properties.GetOrCreateSingletonProperty <ClangAdapter>("ClangAdapter", () => CreateClangAdapter(buffer));
                                }));
             return clangAdapter;
         }

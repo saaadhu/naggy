@@ -22,6 +22,7 @@ namespace Naggy
         {
             var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
             DiagnosticsFinder.Initialize(ServiceProvider, dte);
+            NaggyTriggers.Initialize(dte);
             Func<ITagger<T>> taggerFunc = () => new DiagnosticTagger(dte, buffer) as ITagger<T>;
             return buffer.Properties.GetOrCreateSingletonProperty<ITagger<T>>(taggerFunc);
         }
@@ -45,6 +46,7 @@ namespace Naggy
         {
             var dte = (DTE)ServiceProvider.GetService(typeof(DTE));
             ClangServices.Initialize(dte);
+            NaggyTriggers.Initialize(dte);
             Func<IClassifier> preprocessorClassifierFunc = () => new PreprocessorClassifier(dte, textBuffer, classificationTypeRegistry) as IClassifier;
             return textBuffer.Properties.GetOrCreateSingletonProperty<IClassifier>(preprocessorClassifierFunc);
         }
