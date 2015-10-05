@@ -11,6 +11,7 @@ namespace Naggy
 {
     static class AVRStudio
     {
+        private const string NaggyMacro = "__NAGGY__";
         public static IEnumerable<string> GetPredefinedSymbols(string fileName, DTE dte)
         {
             var project = GetProject(dte, fileName);
@@ -28,6 +29,7 @@ namespace Naggy
             var symbolsInProject = GetPredefinedSymbols(IsCPP(fileName, project) ? toolchainOptions.CppCompiler: toolchainOptions.CCompiler);
 
             var predefinedSymbols = new List<string>();
+            predefinedSymbols.Add(NaggyMacro);
             predefinedSymbols.AddRange(implicitSymbol);
 
             predefinedSymbols.AddRange(symbolsInProject);
