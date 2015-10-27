@@ -16,7 +16,6 @@
 using namespace System::Runtime::InteropServices;
 using namespace System::Collections::Generic;
 using namespace NaggyClang;
-using namespace std;
 
 class StoredDiagnosticClient : public clang::DiagnosticConsumer
 {

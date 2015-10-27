@@ -1,22 +1,21 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Naggy", "Naggy\Naggy.csproj", "{7E21CD13-762D-4153-993A-56DF985C93ED}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Naggy.Clang", "Naggy.Clang\Naggy.Clang.vcxproj", "{48434C5D-FAED-43A7-92CE-954901E43E3E}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Naggy.Clang.Tests", "Naggy.Clang.Tests\Naggy.Clang.Tests.csproj", "{A47E5199-925E-4648-8C34-3EF4A82E94FB}"
-EndProject
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D2E66618-A77D-4640-AF7B-F06BB35B1EF0}"
 	ProjectSection(SolutionItems) = preProject
 		Naggy.vsmdi = Naggy.vsmdi
 		TestSettings1.testsettings = TestSettings1.testsettings
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Naggy", "Naggy\Naggy.csproj", "{7E21CD13-762D-4153-993A-56DF985C93ED}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Naggy.Clang", "Naggy.Clang\Naggy.Clang.vcxproj", "{48434C5D-FAED-43A7-92CE-954901E43E3E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Naggy.Clang.Tests", "Naggy.Clang.Tests\Naggy.Clang.Tests.csproj", "{A47E5199-925E-4648-8C34-3EF4A82E94FB}"
+EndProject
 Global
-	GlobalSection(TestCaseManagementSettings) = postSolution
-		CategoryFile = Naggy.vsmdi
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -59,5 +58,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = Naggy.vsmdi
 	EndGlobalSection
 EndGlobal
