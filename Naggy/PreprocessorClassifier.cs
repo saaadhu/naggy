@@ -7,7 +7,7 @@ using Microsoft.VisualStudio.Text.Tagging;
 using NaggyClang;
 using EnvDTE;
 using Microsoft.VisualStudio.Text.Classification;
-using Microsoft.VisualStudio.Language.StandardClassification;
+
 
 namespace Naggy
 {

@@ -13,7 +13,7 @@ using namespace NaggyClang;
 
 ClangPreprocessor::ClangPreprocessor(clang::Preprocessor &preprocessor) : m_pPreprocessor(&preprocessor), m_pCallback(new Callback(&preprocessor, m_skippedBlocks))
 {
-	preprocessor.addPPCallbacks(m_pCallback);
+	preprocessor.addPPCallbacks(std::unique_ptr<clang::PPCallbacks>(m_pCallback));
 }
 
 bool ClangPreprocessor::Expand(const char* macroName, std::string &expansion)

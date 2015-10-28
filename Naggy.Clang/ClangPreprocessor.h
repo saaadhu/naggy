@@ -61,7 +61,7 @@ namespace NaggyClang
 			clang::SourceLocation end = sourceRange.getEnd();
 
 			clang::SourceManager &sm = m_pPreprocessor->getSourceManager();
-			if (!sm.isFromMainFile(start))
+			if (!sm.isWrittenInMainFile(start))
 				return;
 
 			m_skippedBlocks.push_back(LineRange(GetLine(start), GetLine(end)));
