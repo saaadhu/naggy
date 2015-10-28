@@ -11,6 +11,7 @@ class DDecl<Decl base, bit abstract = 0> : Decl<abstract> {
 class DeclContext { }
 
 def TranslationUnit : Decl, DeclContext;
+def ExternCContext : Decl, DeclContext;
 def Named : Decl<1>;
   def Namespace : DDecl<Named>, DeclContext;
   def UsingDirective : DDecl<Named>;
@@ -20,6 +21,7 @@ def Named : Decl<1>;
     def TypedefName : DDecl<Type, 1>;
       def Typedef : DDecl<TypedefName>;
       def TypeAlias : DDecl<TypedefName>;
+      def ObjCTypeParam : DDecl<TypedefName>;
     def UnresolvedUsingTypename : DDecl<Type>;
     def Tag : DDecl<Type, 1>, DeclContext;
       def Enum : DDecl<Tag>;
@@ -44,6 +46,9 @@ def Named : Decl<1>;
           def CXXDestructor : DDecl<CXXMethod>;
           def CXXConversion : DDecl<CXXMethod>;
       def Var : DDecl<Declarator>;
+        def VarTemplateSpecialization : DDecl<Var>;
+          def VarTemplatePartialSpecialization
+            : DDecl<VarTemplateSpecialization>;
         def ImplicitParam : DDecl<Var>;
         def ParmVar : DDecl<Var>;
       def NonTypeTemplateParm : DDecl<Declarator>;
@@ -51,6 +56,7 @@ def Named : Decl<1>;
     def RedeclarableTemplate : DDecl<Template, 1>;
       def FunctionTemplate : DDecl<RedeclarableTemplate>;
       def ClassTemplate : DDecl<RedeclarableTemplate>;
+      def VarTemplate : DDecl<RedeclarableTemplate>;
       def TypeAliasTemplate : DDecl<RedeclarableTemplate>;
     def TemplateTemplateParm : DDecl<Template>;
   def Using : DDecl<Named>;

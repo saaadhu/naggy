@@ -42,7 +42,12 @@ namespace bitc {
 
     TYPE_BLOCK_ID_NEW,
 
-    USELIST_BLOCK_ID
+    USELIST_BLOCK_ID,
+
+    MODULE_STRTAB_BLOCK_ID,
+    FUNCTION_SUMMARY_BLOCK_ID,
+
+    OPERAND_BUNDLE_TAGS_BLOCK_ID
   };
 
 
@@ -66,12 +71,18 @@ namespace bitc {
     MODULE_CODE_FUNCTION    = 8,
 
     // ALIAS: [alias type, aliasee val#, linkage, visibility]
-    MODULE_CODE_ALIAS       = 9,
+    MODULE_CODE_ALIAS_OLD   = 9,
 
     // MODULE_CODE_PURGEVALS: [numvals]
     MODULE_CODE_PURGEVALS   = 10,
 
-    MODULE_CODE_GCNAME      = 11   // GCNAME: [strchr x N]
+    MODULE_CODE_GCNAME      = 11,  // GCNAME: [strchr x N]
+    MODULE_CODE_COMDAT      = 12,  // COMDAT: [selection_kind, name]
+
+    MODULE_CODE_VSTOFFSET   = 13,  // VSTOFFSET: [offset]
+
+    // ALIAS: [alias value type, addrspace, aliasee val#, linkage, visibility]
+    MODULE_CODE_ALIAS       = 14,
   };
 
   /// PARAMATTR blocks have code for defining a parameter attribute set.
@@ -120,7 +131,13 @@ namespace bitc {
     TYPE_CODE_STRUCT_NAME = 19, // STRUCT_NAME: [strchr x N]
     TYPE_CODE_STRUCT_NAMED = 20,// STRUCT_NAMED: [ispacked, eltty x N]
 
-    TYPE_CODE_FUNCTION = 21     // FUNCTION: [vararg, retty, paramty x N]
+    TYPE_CODE_FUNCTION = 21,    // FUNCTION: [vararg, retty, paramty x N]
+
+    TYPE_CODE_TOKEN = 22        // TOKEN
+  };
+
+  enum OperandBundleTagCode {
+    OPERAND_BUNDLE_TAG = 1,     // TAG: [strchr x N]
   };
 
   // The type symbol table only has one code (TST_ENTRY_CODE).
@@ -128,24 +145,60 @@ namespace bitc {
     TST_CODE_ENTRY = 1     // TST_ENTRY: [typeid, namechar x N]
   };
 
-  // The value symbol table only has one code (VST_ENTRY_CODE).
+  // Value symbol table codes.
   enum ValueSymtabCodes {
-    VST_CODE_ENTRY   = 1,  // VST_ENTRY: [valid, namechar x N]
-    VST_CODE_BBENTRY = 2   // VST_BBENTRY: [bbid, namechar x N]
+    VST_CODE_ENTRY   = 1,   // VST_ENTRY: [valueid, namechar x N]
+    VST_CODE_BBENTRY = 2,   // VST_BBENTRY: [bbid, namechar x N]
+    VST_CODE_FNENTRY = 3,   // VST_FNENTRY: [valueid, offset, namechar x N]
+    // VST_COMBINED_FNENTRY: [offset, namechar x N]
+    VST_CODE_COMBINED_FNENTRY = 4
+  };
+
+  // The module path symbol table only has one code (MST_CODE_ENTRY).
+  enum ModulePathSymtabCodes {
+    MST_CODE_ENTRY   = 1,  // MST_ENTRY: [modid, namechar x N]
+  };
+
+  // The function summary section uses different codes in the per-module
+  // and combined index cases.
+  enum FunctionSummarySymtabCodes {
+    FS_CODE_PERMODULE_ENTRY = 1,  // FS_ENTRY: [valueid, islocal, instcount]
+    FS_CODE_COMBINED_ENTRY  = 2,  // FS_ENTRY: [modid, instcount]
   };
 
   enum MetadataCodes {
     METADATA_STRING        = 1,   // MDSTRING:      [values]
-    // 2 is unused.
-    // 3 is unused.
+    METADATA_VALUE         = 2,   // VALUE:         [type num, value num]
+    METADATA_NODE          = 3,   // NODE:          [n x md num]
     METADATA_NAME          = 4,   // STRING:        [values]
-    // 5 is unused.
+    METADATA_DISTINCT_NODE = 5,   // DISTINCT_NODE: [n x md num]
     METADATA_KIND          = 6,   // [n x [id, name]]
-    // 7 is unused.
-    METADATA_NODE          = 8,   // NODE:          [n x (type num, value num)]
-    METADATA_FN_NODE       = 9,   // FN_NODE:       [n x (type num, value num)]
+    METADATA_LOCATION      = 7,   // [distinct, line, col, scope, inlined-at?]
+    METADATA_OLD_NODE      = 8,   // OLD_NODE:      [n x (type num, value num)]
+    METADATA_OLD_FN_NODE   = 9,   // OLD_FN_NODE:   [n x (type num, value num)]
     METADATA_NAMED_NODE    = 10,  // NAMED_NODE:    [n x mdnodes]
-    METADATA_ATTACHMENT    = 11   // [m x [value, [n x [id, mdnode]]]
+    METADATA_ATTACHMENT    = 11,  // [m x [value, [n x [id, mdnode]]]
+    METADATA_GENERIC_DEBUG = 12,  // [distinct, tag, vers, header, n x md num]
+    METADATA_SUBRANGE      = 13,  // [distinct, count, lo]
+    METADATA_ENUMERATOR    = 14,  // [distinct, value, name]
+    METADATA_BASIC_TYPE    = 15,  // [distinct, tag, name, size, align, enc]
+    METADATA_FILE          = 16,  // [distinct, filename, directory]
+    METADATA_DERIVED_TYPE  = 17,  // [distinct, ...]
+    METADATA_COMPOSITE_TYPE= 18,  // [distinct, ...]
+    METADATA_SUBROUTINE_TYPE=19,  // [distinct, flags, types]
+    METADATA_COMPILE_UNIT  = 20,  // [distinct, ...]
+    METADATA_SUBPROGRAM    = 21,  // [distinct, ...]
+    METADATA_LEXICAL_BLOCK = 22,  // [distinct, scope, file, line, column]
+    METADATA_LEXICAL_BLOCK_FILE=23,//[distinct, scope, file, discriminator]
+    METADATA_NAMESPACE     = 24,  // [distinct, scope, file, name, line]
+    METADATA_TEMPLATE_TYPE = 25,  // [distinct, scope, name, type, ...]
+    METADATA_TEMPLATE_VALUE= 26,  // [distinct, scope, name, type, value, ...]
+    METADATA_GLOBAL_VAR    = 27,  // [distinct, ...]
+    METADATA_LOCAL_VAR     = 28,  // [distinct, ...]
+    METADATA_EXPRESSION    = 29,  // [distinct, n x element]
+    METADATA_OBJC_PROPERTY = 30,  // [distinct, name, file, line, ...]
+    METADATA_IMPORTED_ENTITY=31,  // [distinct, tag, scope, entity, line, name]
+    METADATA_MODULE=32,           // [distinct, scope, name, ...]
   };
 
   // The constants block (CONSTANTS_BLOCK_ID) describes emission for each
@@ -194,7 +247,8 @@ namespace bitc {
     CAST_FPEXT    =  8,
     CAST_PTRTOINT =  9,
     CAST_INTTOPTR = 10,
-    CAST_BITCAST  = 11
+    CAST_BITCAST  = 11,
+    CAST_ADDRSPACECAST = 12
   };
 
   /// BinaryOpcodes - These are values used in the bitcode files to encode which
@@ -271,7 +325,7 @@ namespace bitc {
 
     FUNC_CODE_INST_BINOP       =  2, // BINOP:      [opcode, ty, opval, opval]
     FUNC_CODE_INST_CAST        =  3, // CAST:       [opcode, ty, opty, opval]
-    FUNC_CODE_INST_GEP         =  4, // GEP:        [n x operands]
+    FUNC_CODE_INST_GEP_OLD     =  4, // GEP:        [n x operands]
     FUNC_CODE_INST_SELECT      =  5, // SELECT:     [ty, opval, opval, opval]
     FUNC_CODE_INST_EXTRACTELT  =  6, // EXTRACTELT: [opty, opval, opval]
     FUNC_CODE_INST_INSERTELT   =  7, // INSERTELT:  [ty, opval, opval, opval]
@@ -288,7 +342,7 @@ namespace bitc {
     FUNC_CODE_INST_PHI         = 16, // PHI:        [ty, val0,bb0, ...]
     // 17 is unused.
     // 18 is unused.
-    FUNC_CODE_INST_ALLOCA      = 19, // ALLOCA:     [instty, op, align]
+    FUNC_CODE_INST_ALLOCA      = 19, // ALLOCA:     [instty, opty, op, align]
     FUNC_CODE_INST_LOAD        = 20, // LOAD:       [opty, op, align, vol]
     // 21 is unused.
     // 22 is unused.
@@ -296,7 +350,7 @@ namespace bitc {
     // This store code encodes the pointer type, rather than the value type
     // this is so information only available in the pointer type (e.g. address
     // spaces) is retained.
-    FUNC_CODE_INST_STORE       = 24, // STORE:      [ptrty,ptr,val, align, vol]
+    FUNC_CODE_INST_STORE_OLD   = 24, // STORE:      [ptrty,ptr,val, align, vol]
     // 25 is unused.
     FUNC_CODE_INST_EXTRACTVAL  = 26, // EXTRACTVAL: [n x operands]
     FUNC_CODE_INST_INSERTVAL   = 27, // INSERTVAL:  [n x operands]
@@ -305,31 +359,107 @@ namespace bitc {
     FUNC_CODE_INST_CMP2        = 28, // CMP2:       [opty, opval, opval, pred]
     // new select on i1 or [N x i1]
     FUNC_CODE_INST_VSELECT     = 29, // VSELECT:    [ty,opval,opval,predty,pred]
-    FUNC_CODE_INST_INBOUNDS_GEP= 30, // INBOUNDS_GEP: [n x operands]
+    FUNC_CODE_INST_INBOUNDS_GEP_OLD = 30, // INBOUNDS_GEP: [n x operands]
     FUNC_CODE_INST_INDIRECTBR  = 31, // INDIRECTBR: [opty, op0, op1, ...]
     // 32 is unused.
     FUNC_CODE_DEBUG_LOC_AGAIN  = 33, // DEBUG_LOC_AGAIN
 
-    FUNC_CODE_INST_CALL        = 34, // CALL:       [attr, fnty, fnid, args...]
+    FUNC_CODE_INST_CALL        = 34, // CALL:    [attr, cc, fnty, fnid, args...]
 
     FUNC_CODE_DEBUG_LOC        = 35, // DEBUG_LOC:  [Line,Col,ScopeVal, IAVal]
     FUNC_CODE_INST_FENCE       = 36, // FENCE: [ordering, synchscope]
-    FUNC_CODE_INST_CMPXCHG     = 37, // CMPXCHG: [ptrty,ptr,cmp,new, align, vol,
+    FUNC_CODE_INST_CMPXCHG_OLD = 37, // CMPXCHG: [ptrty,ptr,cmp,new, align, vol,
                                      //           ordering, synchscope]
     FUNC_CODE_INST_ATOMICRMW   = 38, // ATOMICRMW: [ptrty,ptr,val, operation,
                                      //             align, vol,
                                      //             ordering, synchscope]
     FUNC_CODE_INST_RESUME      = 39, // RESUME:     [opval]
-    FUNC_CODE_INST_LANDINGPAD  = 40, // LANDINGPAD: [ty,val,val,num,id0,val0...]
+    FUNC_CODE_INST_LANDINGPAD_OLD  = 40, // LANDINGPAD: [ty,val,val,num,id0,val0...]
     FUNC_CODE_INST_LOADATOMIC  = 41, // LOAD: [opty, op, align, vol,
                                      //        ordering, synchscope]
-    FUNC_CODE_INST_STOREATOMIC = 42  // STORE: [ptrty,ptr,val, align, vol
+    FUNC_CODE_INST_STOREATOMIC_OLD = 42, // STORE: [ptrty,ptr,val, align, vol
                                      //         ordering, synchscope]
+    FUNC_CODE_INST_GEP         = 43, // GEP:  [inbounds, n x operands]
+    FUNC_CODE_INST_STORE       = 44, // STORE: [ptrty,ptr,valty,val, align, vol]
+    FUNC_CODE_INST_STOREATOMIC = 45, // STORE: [ptrty,ptr,val, align, vol
+    FUNC_CODE_INST_CMPXCHG     = 46, // CMPXCHG: [ptrty,ptr,valty,cmp,new, align,
+                                     //           vol,ordering,synchscope]
+    FUNC_CODE_INST_LANDINGPAD  = 47, // LANDINGPAD: [ty,val,num,id0,val0...]
+    FUNC_CODE_INST_CLEANUPRET  = 48, // CLEANUPRET: [val] or [val,bb#]
+    FUNC_CODE_INST_CATCHRET    = 49, // CATCHRET: [val,bb#]
+    FUNC_CODE_INST_CATCHPAD  = 50, // CATCHPAD: [bb#,bb#,num,args...]
+    FUNC_CODE_INST_TERMINATEPAD = 51, // TERMINATEPAD: [bb#,num,args...]
+    FUNC_CODE_INST_CLEANUPPAD = 52, // CLEANUPPAD: [num,args...]
+    FUNC_CODE_INST_CATCHENDPAD = 53, // CATCHENDPAD: [] or [bb#]
+    FUNC_CODE_INST_CLEANUPENDPAD = 54, // CLEANUPENDPAD: [val] or [val,bb#]
+
+    FUNC_CODE_OPERAND_BUNDLE = 55, // OPERAND_BUNDLE: [tag#, value...]
   };
 
   enum UseListCodes {
-    USELIST_CODE_ENTRY = 1   // USELIST_CODE_ENTRY: TBD.
+    USELIST_CODE_DEFAULT = 1, // DEFAULT: [index..., value-id]
+    USELIST_CODE_BB      = 2  // BB: [index..., bb-id]
   };
+
+  enum AttributeKindCodes {
+    // = 0 is unused
+    ATTR_KIND_ALIGNMENT = 1,
+    ATTR_KIND_ALWAYS_INLINE = 2,
+    ATTR_KIND_BY_VAL = 3,
+    ATTR_KIND_INLINE_HINT = 4,
+    ATTR_KIND_IN_REG = 5,
+    ATTR_KIND_MIN_SIZE = 6,
+    ATTR_KIND_NAKED = 7,
+    ATTR_KIND_NEST = 8,
+    ATTR_KIND_NO_ALIAS = 9,
+    ATTR_KIND_NO_BUILTIN = 10,
+    ATTR_KIND_NO_CAPTURE = 11,
+    ATTR_KIND_NO_DUPLICATE = 12,
+    ATTR_KIND_NO_IMPLICIT_FLOAT = 13,
+    ATTR_KIND_NO_INLINE = 14,
+    ATTR_KIND_NON_LAZY_BIND = 15,
+    ATTR_KIND_NO_RED_ZONE = 16,
+    ATTR_KIND_NO_RETURN = 17,
+    ATTR_KIND_NO_UNWIND = 18,
+    ATTR_KIND_OPTIMIZE_FOR_SIZE = 19,
+    ATTR_KIND_READ_NONE = 20,
+    ATTR_KIND_READ_ONLY = 21,
+    ATTR_KIND_RETURNED = 22,
+    ATTR_KIND_RETURNS_TWICE = 23,
+    ATTR_KIND_S_EXT = 24,
+    ATTR_KIND_STACK_ALIGNMENT = 25,
+    ATTR_KIND_STACK_PROTECT = 26,
+    ATTR_KIND_STACK_PROTECT_REQ = 27,
+    ATTR_KIND_STACK_PROTECT_STRONG = 28,
+    ATTR_KIND_STRUCT_RET = 29,
+    ATTR_KIND_SANITIZE_ADDRESS = 30,
+    ATTR_KIND_SANITIZE_THREAD = 31,
+    ATTR_KIND_SANITIZE_MEMORY = 32,
+    ATTR_KIND_UW_TABLE = 33,
+    ATTR_KIND_Z_EXT = 34,
+    ATTR_KIND_BUILTIN = 35,
+    ATTR_KIND_COLD = 36,
+    ATTR_KIND_OPTIMIZE_NONE = 37,
+    ATTR_KIND_IN_ALLOCA = 38,
+    ATTR_KIND_NON_NULL = 39,
+    ATTR_KIND_JUMP_TABLE = 40,
+    ATTR_KIND_DEREFERENCEABLE = 41,
+    ATTR_KIND_DEREFERENCEABLE_OR_NULL = 42,
+    ATTR_KIND_CONVERGENT = 43,
+    ATTR_KIND_SAFESTACK = 44,
+    ATTR_KIND_ARGMEMONLY = 45,
+    ATTR_KIND_SWIFT_SELF = 46,
+    ATTR_KIND_SWIFT_ERROR = 47
+  };
+
+  enum ComdatSelectionKindCodes {
+    COMDAT_SELECTION_KIND_ANY = 1,
+    COMDAT_SELECTION_KIND_EXACT_MATCH = 2,
+    COMDAT_SELECTION_KIND_LARGEST = 3,
+    COMDAT_SELECTION_KIND_NO_DUPLICATES = 4,
+    COMDAT_SELECTION_KIND_SAME_SIZE = 5,
+  };
+
 } // End bitc namespace
 } // End llvm namespace
 

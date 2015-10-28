@@ -12,8 +12,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_OBJCRUNTIME_H
-#define LLVM_CLANG_OBJCRUNTIME_H
+#ifndef LLVM_CLANG_BASIC_OBJCRUNTIME_H
+#define LLVM_CLANG_BASIC_OBJCRUNTIME_H
 
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/Triple.h"
@@ -79,7 +79,7 @@ public:
     case GCC: return false;
     case MacOSX: return true;
     case GNUstep: return true;
-    case ObjFW: return false;
+    case ObjFW: return true;
     case iOS: return true;
     }
     llvm_unreachable("bad kind");
@@ -98,9 +98,13 @@ public:
           Arch == llvm::Triple::x86 ||
           Arch == llvm::Triple::x86_64)
         return false;
-      // Mac runtimes use legacy dispatch everywhere except x86-64
-    } else if (isNeXTFamily() && isNonFragile())
+    }
+    else if ((getKind() ==  MacOSX) && isNonFragile() &&
+             (getVersion() >= VersionTuple(10, 0)) &&
+             (getVersion() < VersionTuple(10, 6)))
         return Arch != llvm::Triple::x86_64;
+    // Except for deployment target of 10.5 or less,
+    // Mac runtimes use legacy dispatch everywhere now.
     return true;
   }
 
@@ -129,7 +133,9 @@ public:
   /// \brief Does this runtime allow ARC at all?
   bool allowsARC() const {
     switch (getKind()) {
-    case FragileMacOSX: return false;
+    case FragileMacOSX:
+      // No stub library for the fragile runtime.
+      return getVersion() >= VersionTuple(10, 7);
     case MacOSX: return true;
     case iOS: return true;
     case GCC: return false;
@@ -146,7 +152,7 @@ public:
   /// library.
   bool hasNativeARC() const {
     switch (getKind()) {
-    case FragileMacOSX: return false;
+    case FragileMacOSX: return getVersion() >= VersionTuple(10, 7);
     case MacOSX: return getVersion() >= VersionTuple(10, 7);
     case iOS: return getVersion() >= VersionTuple(5);
 

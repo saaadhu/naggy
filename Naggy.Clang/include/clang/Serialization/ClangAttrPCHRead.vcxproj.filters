@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\Serialization\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\875f92100d543b2948d52c4072a1291b\AttrPCHRead.inc.tmp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\875f92100d543b2948d52c4072a1291b\AttrPCHRead.inc.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\e25e037a1f5c8bd63b22658c4bfc75d0\ClangAttrPCHRead.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\Serialization\CMakeFiles\ClangAttrPCHRead" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{40F6E61E-06AD-4A12-8D2E-D1032AFAB4EC}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

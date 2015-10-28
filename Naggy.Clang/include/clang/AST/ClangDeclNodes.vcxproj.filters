@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\9ac951b354b7ba446242561509c947af\DeclNodes.inc.tmp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\9ac951b354b7ba446242561509c947af\DeclNodes.inc.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\fdfbeee593a75522ad8d5be8f4bbc8a5\ClangDeclNodes.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\ClangDeclNodes" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{40F6E61E-06AD-4A12-8D2E-D1032AFAB4EC}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

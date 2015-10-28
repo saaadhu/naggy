@@ -14,13 +14,12 @@
 #ifndef LLVM_TABLEGEN_TABLEGENBACKEND_H
 #define LLVM_TABLEGEN_TABLEGENBACKEND_H
 
-#include "llvm/ADT/StringRef.h"
-
 namespace llvm {
 
+class StringRef;
 class raw_ostream;
 
-/// emitSourceFileHeader - Output a LLVM style file header to the specified
+/// emitSourceFileHeader - Output an LLVM style file header to the specified
 /// raw_ostream.
 void emitSourceFileHeader(StringRef Desc, raw_ostream &OS);
 

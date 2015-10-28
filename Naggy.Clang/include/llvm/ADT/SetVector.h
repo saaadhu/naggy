@@ -44,6 +44,8 @@ public:
   typedef Vector vector_type;
   typedef typename vector_type::const_iterator iterator;
   typedef typename vector_type::const_iterator const_iterator;
+  typedef typename vector_type::const_reverse_iterator reverse_iterator;
+  typedef typename vector_type::const_reverse_iterator const_reverse_iterator;
   typedef typename vector_type::size_type size_type;
 
   /// \brief Construct an empty SetVector
@@ -85,6 +87,26 @@ public:
     return vector_.end();
   }
 
+  /// \brief Get an reverse_iterator to the end of the SetVector.
+  reverse_iterator rbegin() {
+    return vector_.rbegin();
+  }
+
+  /// \brief Get a const_reverse_iterator to the end of the SetVector.
+  const_reverse_iterator rbegin() const {
+    return vector_.rbegin();
+  }
+
+  /// \brief Get a reverse_iterator to the beginning of the SetVector.
+  reverse_iterator rend() {
+    return vector_.rend();
+  }
+
+  /// \brief Get a const_reverse_iterator to the beginning of the SetVector.
+  const_reverse_iterator rend() const {
+    return vector_.rend();
+  }
+
   /// \brief Return the last element of the SetVector.
   const T &back() const {
     assert(!empty() && "Cannot call back() on empty SetVector!");
@@ -100,7 +122,7 @@ public:
   /// \brief Insert a new element into the SetVector.
   /// \returns true iff the element was inserted into the SetVector.
   bool insert(const value_type &X) {
-    bool result = set_.insert(X);
+    bool result = set_.insert(X).second;
     if (result)
       vector_.push_back(X);
     return result;
@@ -110,7 +132,7 @@ public:
   template<typename It>
   void insert(It Start, It End) {
     for (; Start != End; ++Start)
-      if (set_.insert(*Start))
+      if (set_.insert(*Start).second)
         vector_.push_back(*Start);
   }
 
@@ -150,7 +172,6 @@ public:
     return true;
   }
 
-
   /// \brief Count the number of elements of a given key in the SetVector.
   /// \returns 0 if the element is not in the SetVector, 1 if it is.
   size_type count(const key_type &key) const {
@@ -169,8 +190,8 @@ public:
     set_.erase(back());
     vector_.pop_back();
   }
-  
-  T pop_back_val() {
+
+  T LLVM_ATTRIBUTE_UNUSED_RESULT pop_back_val() {
     T Ret = back();
     pop_back();
     return Ret;
@@ -195,11 +216,10 @@ private:
     set_type &set_;
 
   public:
-    typedef typename UnaryPredicate::argument_type argument_type;
-
     TestAndEraseFromSet(UnaryPredicate P, set_type &set_) : P(P), set_(set_) {}
 
-    bool operator()(argument_type Arg) {
+    template <typename ArgumentT>
+    bool operator()(const ArgumentT &Arg) {
       if (P(Arg)) {
         set_.erase(Arg);
         return true;

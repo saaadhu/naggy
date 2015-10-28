@@ -18,6 +18,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclarationName.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
 #include <algorithm>
@@ -26,23 +27,27 @@ namespace clang {
 
 class DependentDiagnostic;
 
-/// StoredDeclsList - This is an array of decls optimized a common case of only
-/// containing one entry.
+/// \brief An array of decls optimized for the common case of only containing
+/// one entry.
 struct StoredDeclsList {
 
-  /// DeclsTy - When in vector form, this is what the Data pointer points to.
+  /// \brief When in vector form, this is what the Data pointer points to.
   typedef SmallVector<NamedDecl *, 4> DeclsTy;
 
+  /// \brief A collection of declarations, with a flag to indicate if we have
+  /// further external declarations.
+  typedef llvm::PointerIntPair<DeclsTy *, 1, bool> DeclsAndHasExternalTy;
+
   /// \brief The stored data, which will be either a pointer to a NamedDecl,
-  /// or a pointer to a vector.
-  llvm::PointerUnion<NamedDecl *, DeclsTy *> Data;
+  /// or a pointer to a vector with a flag to indicate if there are further
+  /// external declarations.
+  llvm::PointerUnion<NamedDecl*, DeclsAndHasExternalTy> Data;
 
 public:
   StoredDeclsList() {}
 
-  StoredDeclsList(const StoredDeclsList &RHS) : Data(RHS.Data) {
-    if (DeclsTy *RHSVec = RHS.getAsVector())
-      Data = new DeclsTy(*RHSVec);
+  StoredDeclsList(StoredDeclsList &&RHS) : Data(RHS.Data) {
+    RHS.Data = (NamedDecl *)nullptr;
   }
 
   ~StoredDeclsList() {
@@ -51,12 +56,11 @@ public:
       delete Vector;
   }
 
-  StoredDeclsList &operator=(const StoredDeclsList &RHS) {
+  StoredDeclsList &operator=(StoredDeclsList &&RHS) {
     if (DeclsTy *Vector = getAsVector())
       delete Vector;
     Data = RHS.Data;
-    if (DeclsTy *RHSVec = RHS.getAsVector())
-      Data = new DeclsTy(*RHSVec);
+    RHS.Data = (NamedDecl *)nullptr;
     return *this;
   }
 
@@ -66,8 +70,27 @@ public:
     return Data.dyn_cast<NamedDecl *>();
   }
 
+  DeclsAndHasExternalTy getAsVectorAndHasExternal() const {
+    return Data.dyn_cast<DeclsAndHasExternalTy>();
+  }
+
   DeclsTy *getAsVector() const {
-    return Data.dyn_cast<DeclsTy *>();
+    return getAsVectorAndHasExternal().getPointer();
+  }
+
+  bool hasExternalDecls() const {
+    return getAsVectorAndHasExternal().getInt();
+  }
+
+  void setHasExternalDecls() {
+    if (DeclsTy *Vec = getAsVector())
+      Data = DeclsAndHasExternalTy(Vec, true);
+    else {
+      DeclsTy *VT = new DeclsTy();
+      if (NamedDecl *OldD = getAsDecl())
+        VT->push_back(OldD);
+      Data = DeclsAndHasExternalTy(VT, true);
+    }
   }
 
   void setOnlyValue(NamedDecl *ND) {
@@ -84,7 +107,7 @@ public:
     if (NamedDecl *Singleton = getAsDecl()) {
       assert(Singleton == D && "list is different singleton");
       (void)Singleton;
-      Data = (NamedDecl *)0;
+      Data = (NamedDecl *)nullptr;
       return;
     }
 
@@ -110,6 +133,8 @@ public:
       Vec.erase(std::remove_if(Vec.begin(), Vec.end(),
                                std::mem_fun(&Decl::isFromASTFile)),
                 Vec.end());
+      // Don't have any external decls any more.
+      Data = DeclsAndHasExternalTy(&Vec, false);
     }
   }
 
@@ -117,31 +142,29 @@ public:
   /// represents.
   DeclContext::lookup_result getLookupResult() {
     if (isNull())
-      return DeclContext::lookup_result(DeclContext::lookup_iterator(0),
-                                        DeclContext::lookup_iterator(0));
+      return DeclContext::lookup_result();
 
     // If we have a single NamedDecl, return it.
-    if (getAsDecl()) {
+    if (NamedDecl *ND = getAsDecl()) {
       assert(!isNull() && "Empty list isn't allowed");
 
       // Data is a raw pointer to a NamedDecl*, return it.
-      void *Ptr = &Data;
-      return DeclContext::lookup_result((NamedDecl**)Ptr, (NamedDecl**)Ptr+1);
+      return DeclContext::lookup_result(ND);
     }
 
     assert(getAsVector() && "Must have a vector at this point");
     DeclsTy &Vector = *getAsVector();
 
     // Otherwise, we have a range result.
-    return DeclContext::lookup_result(Vector.begin(), Vector.end());
+    return DeclContext::lookup_result(Vector);
   }
 
   /// HandleRedeclaration - If this is a redeclaration of an existing decl,
   /// replace the old one with D and return true.  Otherwise return false.
-  bool HandleRedeclaration(NamedDecl *D) {
+  bool HandleRedeclaration(NamedDecl *D, bool IsKnownNewer) {
     // Most decls only have one entry in their list, special case it.
     if (NamedDecl *OldD = getAsDecl()) {
-      if (!D->declarationReplaces(OldD))
+      if (!D->declarationReplaces(OldD, IsKnownNewer))
         return false;
       setOnlyValue(D);
       return true;
@@ -152,7 +175,7 @@ public:
     for (DeclsTy::iterator OD = Vec.begin(), ODEnd = Vec.end();
          OD != ODEnd; ++OD) {
       NamedDecl *OldD = *OD;
-      if (D->declarationReplaces(OldD)) {
+      if (D->declarationReplaces(OldD, IsKnownNewer)) {
         *OD = D;
         return true;
       }
@@ -165,12 +188,14 @@ public:
   /// not a redeclaration to merge it into the appropriate place in our list.
   ///
   void AddSubsequentDecl(NamedDecl *D) {
+    assert(!isNull() && "don't AddSubsequentDecl when we have no decls");
+
     // If this is the second decl added to the list, convert this to vector
     // form.
     if (NamedDecl *OldD = getAsDecl()) {
       DeclsTy *VT = new DeclsTy();
       VT->push_back(OldD);
-      Data = VT;
+      Data = DeclsAndHasExternalTy(VT, false);
     }
 
     DeclsTy &Vec = *getAsVector();
@@ -225,7 +250,7 @@ private:
 
 class DependentStoredDeclsMap : public StoredDeclsMap {
 public:
-  DependentStoredDeclsMap() : FirstDiagnostic(0) {}
+  DependentStoredDeclsMap() : FirstDiagnostic(nullptr) {}
 
 private:
   friend class DependentDiagnostic;

@@ -15,10 +15,12 @@
 #ifndef LLVM_TRANSFORMS_UTILS_LOCAL_H
 #define LLVM_TRANSFORMS_UTILS_LOCAL_H
 
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Dominators.h"
+#include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Operator.h"
-#include "llvm/Support/GetElementPtrTypeIterator.h"
 
 namespace llvm {
 
@@ -31,17 +33,18 @@ class DbgDeclareInst;
 class StoreInst;
 class LoadInst;
 class Value;
-class Pass;
 class PHINode;
 class AllocaInst;
+class AssumptionCache;
 class ConstantExpr;
 class DataLayout;
 class TargetLibraryInfo;
 class TargetTransformInfo;
 class DIBuilder;
+class DominatorTree;
 
 template<typename T> class SmallVectorImpl;
-  
+
 //===----------------------------------------------------------------------===//
 //  Local constant propagation.
 //
@@ -54,7 +57,7 @@ template<typename T> class SmallVectorImpl;
 /// conditions and indirectbr addresses this might make dead if
 /// DeleteDeadConditions is true.
 bool ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions = false,
-                            const TargetLibraryInfo *TLI = 0);
+                            const TargetLibraryInfo *TLI = nullptr);
 
 //===----------------------------------------------------------------------===//
 //  Local dead code elimination.
@@ -63,31 +66,32 @@ bool ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions = false,
 /// isInstructionTriviallyDead - Return true if the result produced by the
 /// instruction is not used, and the instruction has no side effects.
 ///
-bool isInstructionTriviallyDead(Instruction *I, const TargetLibraryInfo *TLI=0);
+bool isInstructionTriviallyDead(Instruction *I,
+                                const TargetLibraryInfo *TLI = nullptr);
 
 /// RecursivelyDeleteTriviallyDeadInstructions - If the specified value is a
 /// trivially dead instruction, delete it.  If that makes any of its operands
 /// trivially dead, delete them too, recursively.  Return true if any
 /// instructions were deleted.
 bool RecursivelyDeleteTriviallyDeadInstructions(Value *V,
-                                                const TargetLibraryInfo *TLI=0);
+                                        const TargetLibraryInfo *TLI = nullptr);
 
 /// RecursivelyDeleteDeadPHINode - If the specified value is an effectively
 /// dead PHI node, due to being a def-use chain of single-use nodes that
 /// either forms a cycle or is terminated by a trivially dead instruction,
 /// delete it.  If that makes any of its operands trivially dead, delete them
 /// too, recursively.  Return true if a change was made.
-bool RecursivelyDeleteDeadPHINode(PHINode *PN, const TargetLibraryInfo *TLI=0);
+bool RecursivelyDeleteDeadPHINode(PHINode *PN,
+                                  const TargetLibraryInfo *TLI = nullptr);
 
-  
 /// SimplifyInstructionsInBlock - Scan the specified basic block and try to
 /// simplify any instructions in it and recursively delete dead instructions.
 ///
 /// This returns true if it changed the code, note that it can delete
 /// instructions in other blocks as well in this block.
-bool SimplifyInstructionsInBlock(BasicBlock *BB, const DataLayout *TD = 0,
-                                 const TargetLibraryInfo *TLI = 0);
-    
+bool SimplifyInstructionsInBlock(BasicBlock *BB,
+                                 const TargetLibraryInfo *TLI = nullptr);
+
 //===----------------------------------------------------------------------===//
 //  Control Flow Graph Restructuring.
 //
@@ -103,17 +107,14 @@ bool SimplifyInstructionsInBlock(BasicBlock *BB, const DataLayout *TD = 0,
 ///
 /// .. and delete the predecessor corresponding to the '1', this will attempt to
 /// recursively fold the 'and' to 0.
-void RemovePredecessorAndSimplify(BasicBlock *BB, BasicBlock *Pred,
-                                  DataLayout *TD = 0);
-    
-  
+void RemovePredecessorAndSimplify(BasicBlock *BB, BasicBlock *Pred);
+
 /// MergeBasicBlockIntoOnlyPred - BB is a block with one predecessor and its
 /// predecessor is known to have one successor (BB!).  Eliminate the edge
 /// between them, moving the instructions in the predecessor into BB.  This
 /// deletes the predecessor block.
 ///
-void MergeBasicBlockIntoOnlyPred(BasicBlock *BB, Pass *P = 0);
-    
+void MergeBasicBlockIntoOnlyPred(BasicBlock *BB, DominatorTree *DT = nullptr);
 
 /// TryToSimplifyUncondBranchFromEmptyBlock - BB is known to contain an
 /// unconditional branch, and contains no instructions other than PHI nodes,
@@ -136,13 +137,19 @@ bool EliminateDuplicatePHINodes(BasicBlock *BB);
 /// the basic block that was pointed to.
 ///
 bool SimplifyCFG(BasicBlock *BB, const TargetTransformInfo &TTI,
-                 const DataLayout *TD = 0);
+                 unsigned BonusInstThreshold, AssumptionCache *AC = nullptr);
+
+/// FlatternCFG - This function is used to flatten a CFG.  For
+/// example, it uses parallel-and and parallel-or mode to collapse
+//  if-conditions and merge if-regions with identical statements.
+///
+bool FlattenCFG(BasicBlock *BB, AliasAnalysis *AA = nullptr);
 
 /// FoldBranchToCommonDest - If this basic block is ONLY a setcc and a branch,
 /// and if a predecessor branches to us and one of our successors, fold the
 /// setcc into the predecessor and use logical operations to pick the right
 /// destination.
-bool FoldBranchToCommonDest(BranchInst *BI);
+bool FoldBranchToCommonDest(BranchInst *BI, unsigned BonusInstThreshold = 1);
 
 /// DemoteRegToStack - This function takes a virtual register computed by an
 /// Instruction and replaces it with a slot in the stack frame, allocated via
@@ -152,23 +159,29 @@ bool FoldBranchToCommonDest(BranchInst *BI);
 ///
 AllocaInst *DemoteRegToStack(Instruction &X,
                              bool VolatileLoads = false,
-                             Instruction *AllocaPoint = 0);
+                             Instruction *AllocaPoint = nullptr);
 
 /// DemotePHIToStack - This function takes a virtual register computed by a phi
 /// node and replaces it with a slot in the stack frame, allocated via alloca.
-/// The phi node is deleted and it returns the pointer to the alloca inserted. 
-AllocaInst *DemotePHIToStack(PHINode *P, Instruction *AllocaPoint = 0);
+/// The phi node is deleted and it returns the pointer to the alloca inserted.
+AllocaInst *DemotePHIToStack(PHINode *P, Instruction *AllocaPoint = nullptr);
 
 /// getOrEnforceKnownAlignment - If the specified pointer has an alignment that
 /// we can determine, return it, otherwise return 0.  If PrefAlign is specified,
 /// and it is more than the alignment of the ultimate object, see if we can
 /// increase the alignment of the ultimate object, making this check succeed.
 unsigned getOrEnforceKnownAlignment(Value *V, unsigned PrefAlign,
-                                    const DataLayout *TD = 0);
+                                    const DataLayout &DL,
+                                    const Instruction *CxtI = nullptr,
+                                    AssumptionCache *AC = nullptr,
+                                    const DominatorTree *DT = nullptr);
 
 /// getKnownAlignment - Try to infer an alignment for the specified pointer.
-static inline unsigned getKnownAlignment(Value *V, const DataLayout *TD = 0) {
-  return getOrEnforceKnownAlignment(V, 0, TD);
+static inline unsigned getKnownAlignment(Value *V, const DataLayout &DL,
+                                         const Instruction *CxtI = nullptr,
+                                         AssumptionCache *AC = nullptr,
+                                         const DominatorTree *DT = nullptr) {
+  return getOrEnforceKnownAlignment(V, 0, DL, CxtI, AC, DT);
 }
 
 /// EmitGEPOffset - Given a getelementptr instruction/constantexpr, emit the
@@ -176,31 +189,37 @@ static inline unsigned getKnownAlignment(Value *V, const DataLayout *TD = 0) {
 /// in the base pointer).  Return the result as a signed integer of intptr size.
 /// When NoAssumptions is true, no assumptions about index computation not
 /// overflowing is made.
-template<typename IRBuilderTy>
-Value *EmitGEPOffset(IRBuilderTy *Builder, const DataLayout &TD, User *GEP,
+template <typename IRBuilderTy>
+Value *EmitGEPOffset(IRBuilderTy *Builder, const DataLayout &DL, User *GEP,
                      bool NoAssumptions = false) {
-  gep_type_iterator GTI = gep_type_begin(GEP);
-  Type *IntPtrTy = TD.getIntPtrType(GEP->getContext());
+  GEPOperator *GEPOp = cast<GEPOperator>(GEP);
+  Type *IntPtrTy = DL.getIntPtrType(GEP->getType());
   Value *Result = Constant::getNullValue(IntPtrTy);
 
   // If the GEP is inbounds, we know that none of the addressing operations will
   // overflow in an unsigned sense.
-  bool isInBounds = cast<GEPOperator>(GEP)->isInBounds() && !NoAssumptions;
+  bool isInBounds = GEPOp->isInBounds() && !NoAssumptions;
 
   // Build a mask for high order bits.
-  unsigned IntPtrWidth = TD.getPointerSizeInBits();
-  uint64_t PtrSizeMask = ~0ULL >> (64-IntPtrWidth);
+  unsigned IntPtrWidth = IntPtrTy->getScalarType()->getIntegerBitWidth();
+  uint64_t PtrSizeMask = ~0ULL >> (64 - IntPtrWidth);
 
+  gep_type_iterator GTI = gep_type_begin(GEP);
   for (User::op_iterator i = GEP->op_begin() + 1, e = GEP->op_end(); i != e;
        ++i, ++GTI) {
     Value *Op = *i;
-    uint64_t Size = TD.getTypeAllocSize(GTI.getIndexedType()) & PtrSizeMask;
-    if (ConstantInt *OpC = dyn_cast<ConstantInt>(Op)) {
-      if (OpC->isZero()) continue;
+    uint64_t Size = DL.getTypeAllocSize(GTI.getIndexedType()) & PtrSizeMask;
+    if (Constant *OpC = dyn_cast<Constant>(Op)) {
+      if (OpC->isZeroValue())
+        continue;
 
       // Handle a struct index, which adds its field offset to the pointer.
       if (StructType *STy = dyn_cast<StructType>(*GTI)) {
-        Size = TD.getStructLayout(STy)->getElementOffset(OpC->getZExtValue());
+        if (OpC->getType()->isVectorTy())
+          OpC = OpC->getSplatValue();
+
+        uint64_t OpValue = cast<ConstantInt>(OpC)->getZExtValue();
+        Size = DL.getStructLayout(STy)->getElementOffset(OpValue);
 
         if (Size)
           Result = Builder->CreateAdd(Result, ConstantInt::get(IntPtrTy, Size),
@@ -252,15 +271,50 @@ bool LowerDbgDeclare(Function &F);
 /// an alloca, if any.
 DbgDeclareInst *FindAllocaDbgDeclare(Value *V);
 
-/// replaceDbgDeclareForAlloca - Replaces llvm.dbg.declare instruction when
-/// alloca is replaced with a new value.
+/// \brief Replaces llvm.dbg.declare instruction when an alloca is replaced with
+/// a new value. If Deref is true, an additional DW_OP_deref is prepended to the
+/// expression. If Offset is non-zero, a constant displacement is added to the
+/// expression (after the optional Deref). Offset can be negative.
 bool replaceDbgDeclareForAlloca(AllocaInst *AI, Value *NewAllocaAddress,
-                                DIBuilder &Builder);
+                                DIBuilder &Builder, bool Deref, int Offset = 0);
+
+/// Replace 'BB's terminator with one that does not have an unwind successor
+/// block.  Rewrites `invoke` to `call`, `catchendpad unwind label %foo` to
+/// `catchendpad unwind to caller`, etc.  Updates any PHIs in unwind successor.
+///
+/// \param BB  Block whose terminator will be replaced.  Its terminator must
+///            have an unwind successor.
+void removeUnwindEdge(BasicBlock *BB);
 
 /// \brief Remove all blocks that can not be reached from the function's entry.
 ///
 /// Returns true if any basic block was removed.
 bool removeUnreachableBlocks(Function &F);
+
+/// \brief Combine the metadata of two instructions so that K can replace J
+///
+/// Metadata not listed as known via KnownIDs is removed
+void combineMetadata(Instruction *K, const Instruction *J, ArrayRef<unsigned> KnownIDs);
+
+/// \brief Replace each use of 'From' with 'To' if that use is dominated by 
+/// the given edge.  Returns the number of replacements made.
+unsigned replaceDominatedUsesWith(Value *From, Value *To, DominatorTree &DT,
+                                  const BasicBlockEdge &Edge);
+/// \brief Replace each use of 'From' with 'To' if that use is dominated by
+/// the given BasicBlock. Returns the number of replacements made.
+unsigned replaceDominatedUsesWith(Value *From, Value *To, DominatorTree &DT,
+                                  const BasicBlock *BB);
+
+
+/// \brief Return true if the CallSite CS calls a gc leaf function.
+///
+/// A leaf function is a function that does not safepoint the thread during its
+/// execution.  During a call or invoke to such a function, the callers stack
+/// does not have to be made parseable.
+///
+/// Most passes can and should ignore this information, and it is only used
+/// during lowering by the GC infrastructure.
+bool callsGCLeafFunction(ImmutableCallSite CS);
 
 } // End llvm namespace
 

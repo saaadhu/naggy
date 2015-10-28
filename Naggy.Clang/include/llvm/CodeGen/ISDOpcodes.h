@@ -72,22 +72,23 @@ namespace ISD {
     /// the parent's frame or return address, and so on.
     FRAMEADDR, RETURNADDR,
 
+    /// LOCAL_RECOVER - Represents the llvm.localrecover intrinsic.
+    /// Materializes the offset from the local object pointer of another
+    /// function to a particular local object passed to llvm.localescape. The
+    /// operand is the MCSymbol label used to represent this offset, since
+    /// typically the offset is not known until after code generation of the
+    /// parent.
+    LOCAL_RECOVER,
+
+    /// READ_REGISTER, WRITE_REGISTER - This node represents llvm.register on
+    /// the DAG, which implements the named register global variables extension.
+    READ_REGISTER,
+    WRITE_REGISTER,
+
     /// FRAME_TO_ARGS_OFFSET - This node represents offset from frame pointer to
     /// first (possible) on-stack argument. This is needed for correct stack
     /// adjustment during unwind.
     FRAME_TO_ARGS_OFFSET,
-
-    /// RESULT, OUTCHAIN = EXCEPTIONADDR(INCHAIN) - This node represents the
-    /// address of the exception block on entry to an landing pad block.
-    EXCEPTIONADDR,
-
-    /// RESULT, OUTCHAIN = LSDAADDR(INCHAIN) - This node represents the
-    /// address of the Language Specific Data Area for the enclosing function.
-    LSDAADDR,
-
-    /// RESULT, OUTCHAIN = EHSELECTION(INCHAIN, EXCEPTION) - This node
-    /// represents the selection index of the exception thrown.
-    EHSELECTION,
 
     /// OUTCHAIN = EH_RETURN(INCHAIN, OFFSET, HANDLER) - This node represents
     /// 'eh_return' gcc dwarf builtin, which is used to return from
@@ -107,6 +108,10 @@ namespace ISD {
     /// and returns an outchain.
     EH_SJLJ_LONGJMP,
 
+    /// OUTCHAIN = EH_SJLJ_SETUP_DISPATCH(INCHAIN)
+    /// The target initializes the dispatch table here.
+    EH_SJLJ_SETUP_DISPATCH,
+
     /// TargetConstant* - Like Constant*, but the DAG does not do any folding,
     /// simplification, or lowering of the constant. They are used for constants
     /// which are known to fit in the immediate fields of their users, or for
@@ -125,6 +130,8 @@ namespace ISD {
     TargetConstantPool,
     TargetExternalSymbol,
     TargetBlockAddress,
+
+    MCSymbol,
 
     /// TargetIndex - Like a constant pool entry, but with completely
     /// target-dependent semantics. Holds target flags, a 32-bit index, and a
@@ -231,11 +238,18 @@ namespace ISD {
     SMULO, UMULO,
 
     /// Simple binary floating point operators.
-    FADD, FSUB, FMUL, FMA, FDIV, FREM,
+    FADD, FSUB, FMUL, FDIV, FREM,
+
+    /// FMA - Perform a * b + c with no intermediate rounding step.
+    FMA,
+
+    /// FMAD - Perform a * b + c, while getting the same result as the
+    /// separately rounded operations.
+    FMAD,
 
     /// FCOPYSIGN(X, Y) - Return the value of X with the sign of Y.  NOTE: This
-    /// DAG node does not require that X and Y have the same type, just that the
-    /// are both floating point.  X and the result must have the same type.
+    /// DAG node does not require that X and Y have the same type, just that
+    /// they are both floating point.  X and the result must have the same type.
     /// FCOPYSIGN(f32, f64) is allowed.
     FCOPYSIGN,
 
@@ -303,6 +317,10 @@ namespace ISD {
     /// part.
     MULHU, MULHS,
 
+    /// [US]{MIN/MAX} - Binary minimum or maximum or signed or unsigned
+    /// integers.
+    SMIN, SMAX, UMIN, UMAX,
+
     /// Bitwise operators - logical and, logical or, logical xor.
     AND, OR, XOR,
 
@@ -319,6 +337,10 @@ namespace ISD {
 
     /// Byte Swap and Counting operators.
     BSWAP, CTTZ, CTLZ, CTPOP,
+
+    /// [SU]ABSDIFF - Signed/Unsigned absolute difference of two input integer
+    /// vector. These nodes are generated from llvm.*absdiff* intrinsics.
+    SABSDIFF, UABSDIFF,
 
     /// Bit counting operators with an undefined result for zero inputs.
     CTTZ_ZERO_UNDEF, CTLZ_ZERO_UNDEF,
@@ -386,6 +408,37 @@ namespace ISD {
     /// operand, a ValueType node.
     SIGN_EXTEND_INREG,
 
+    /// ANY_EXTEND_VECTOR_INREG(Vector) - This operator represents an
+    /// in-register any-extension of the low lanes of an integer vector. The
+    /// result type must have fewer elements than the operand type, and those
+    /// elements must be larger integer types such that the total size of the
+    /// operand type and the result type match. Each of the low operand
+    /// elements is any-extended into the corresponding, wider result
+    /// elements with the high bits becoming undef.
+    ANY_EXTEND_VECTOR_INREG,
+
+    /// SIGN_EXTEND_VECTOR_INREG(Vector) - This operator represents an
+    /// in-register sign-extension of the low lanes of an integer vector. The
+    /// result type must have fewer elements than the operand type, and those
+    /// elements must be larger integer types such that the total size of the
+    /// operand type and the result type match. Each of the low operand
+    /// elements is sign-extended into the corresponding, wider result
+    /// elements.
+    // FIXME: The SIGN_EXTEND_INREG node isn't specifically limited to
+    // scalars, but it also doesn't handle vectors well. Either it should be
+    // restricted to scalars or this node (and its handling) should be merged
+    // into it.
+    SIGN_EXTEND_VECTOR_INREG,
+
+    /// ZERO_EXTEND_VECTOR_INREG(Vector) - This operator represents an
+    /// in-register zero-extension of the low lanes of an integer vector. The
+    /// result type must have fewer elements than the operand type, and those
+    /// elements must be larger integer types such that the total size of the
+    /// operand type and the result type match. Each of the low operand
+    /// elements is zero-extended into the corresponding, wider result
+    /// elements.
+    ZERO_EXTEND_VECTOR_INREG,
+
     /// FP_TO_[US]INT - Convert a floating point value to a signed or unsigned
     /// integer.
     FP_TO_SINT,
@@ -431,6 +484,10 @@ namespace ISD {
     /// getNode().
     BITCAST,
 
+    /// ADDRSPACECAST - This operator converts between pointers of different
+    /// address spaces.
+    ADDRSPACECAST,
+
     /// CONVERT_RNDSAT - This operator is used to support various conversions
     /// between various types (float, signed, unsigned and vectors of those
     /// types) with rounding and saturation. NOTE: Avoid using this operator as
@@ -444,20 +501,29 @@ namespace ISD {
     ///   5) ISD::CvtCode indicating the type of conversion to do
     CONVERT_RNDSAT,
 
-    /// FP16_TO_FP32, FP32_TO_FP16 - These operators are used to perform
-    /// promotions and truncation for half-precision (16 bit) floating
-    /// numbers. We need special nodes since FP16 is a storage-only type with
-    /// special semantics of operations.
-    FP16_TO_FP32, FP32_TO_FP16,
+    /// FP16_TO_FP, FP_TO_FP16 - These operators are used to perform promotions
+    /// and truncation for half-precision (16 bit) floating numbers. These nodes
+    /// form a semi-softened interface for dealing with f16 (as an i16), which
+    /// is often a storage-only type but has native conversions.
+    FP16_TO_FP, FP_TO_FP16,
 
     /// FNEG, FABS, FSQRT, FSIN, FCOS, FPOWI, FPOW,
     /// FLOG, FLOG2, FLOG10, FEXP, FEXP2,
-    /// FCEIL, FTRUNC, FRINT, FNEARBYINT, FFLOOR - Perform various unary
+    /// FCEIL, FTRUNC, FRINT, FNEARBYINT, FROUND, FFLOOR - Perform various unary
     /// floating point operations. These are inspired by libm.
     FNEG, FABS, FSQRT, FSIN, FCOS, FPOWI, FPOW,
     FLOG, FLOG2, FLOG10, FEXP, FEXP2,
-    FCEIL, FTRUNC, FRINT, FNEARBYINT, FFLOOR,
-    
+    FCEIL, FTRUNC, FRINT, FNEARBYINT, FROUND, FFLOOR,
+    /// FMINNUM/FMAXNUM - Perform floating-point minimum or maximum on two
+    /// values.
+    /// In the case where a single input is NaN, the non-NaN input is returned.
+    ///
+    /// The return value of (FMINNUM 0.0, -0.0) could be either 0.0 or -0.0.
+    FMINNUM, FMAXNUM,
+    /// FMINNAN/FMAXNAN - Behave identically to FMINNUM/FMAXNUM, except that
+    /// when a single input is NaN, NaN is returned.
+    FMINNAN, FMAXNAN,
+
     /// FSINCOS - Compute both fsin and fcos as a single operation.
     FSINCOS,
 
@@ -525,6 +591,15 @@ namespace ISD {
     /// take a chain as input and return a chain.
     EH_LABEL,
 
+    /// CATCHRET - Represents a return from a catch block funclet. Used for
+    /// MSVC compatible exception handling. Takes a chain operand and a
+    /// destination basic block operand.
+    CATCHRET,
+
+    /// CLEANUPRET - Represents a return from a cleanup block funclet.  Used for
+    /// MSVC compatible exception handling. Takes only a chain operand.
+    CLEANUPRET,
+
     /// STACKSAVE - STACKSAVE has one operand, an input chain.  It produces a
     /// value, the same type as the pointer type for the system, and an output
     /// chain.
@@ -568,9 +643,11 @@ namespace ISD {
     PCMARKER,
 
     /// READCYCLECOUNTER - This corresponds to the readcyclecounter intrinsic.
-    /// The only operand is a chain and a value and a chain are produced.  The
-    /// value is the contents of the architecture specific cycle counter like
-    /// register (or other high accuracy low latency clock source)
+    /// It produces a chain and one i64 value. The only operand is a chain.
+    /// If i64 is not legal, the result will be expanded into smaller values.
+    /// Still, it returns an i64, so targets should set legality for i64.
+    /// The result is the content of the architecture-specific cycle
+    /// counter-like register (or other high accuracy low latency clock source).
     READCYCLECOUNTER,
 
     /// HANDLENODE node - Used as a handle for various purposes.
@@ -611,16 +688,28 @@ namespace ISD {
     /// This corresponds to "load atomic" instruction.
     ATOMIC_LOAD,
 
-    /// OUTCHAIN = ATOMIC_LOAD(INCHAIN, ptr, val)
+    /// OUTCHAIN = ATOMIC_STORE(INCHAIN, ptr, val)
     /// This corresponds to "store atomic" instruction.
     ATOMIC_STORE,
 
     /// Val, OUTCHAIN = ATOMIC_CMP_SWAP(INCHAIN, ptr, cmp, swap)
+    /// For double-word atomic operations:
+    /// ValLo, ValHi, OUTCHAIN = ATOMIC_CMP_SWAP(INCHAIN, ptr, cmpLo, cmpHi,
+    ///                                          swapLo, swapHi)
     /// This corresponds to the cmpxchg instruction.
     ATOMIC_CMP_SWAP,
 
+    /// Val, Success, OUTCHAIN
+    ///     = ATOMIC_CMP_SWAP_WITH_SUCCESS(INCHAIN, ptr, cmp, swap)
+    /// N.b. this is still a strong cmpxchg operation, so
+    /// Success == "Val == cmp".
+    ATOMIC_CMP_SWAP_WITH_SUCCESS,
+
     /// Val, OUTCHAIN = ATOMIC_SWAP(INCHAIN, ptr, amt)
     /// Val, OUTCHAIN = ATOMIC_LOAD_[OpName](INCHAIN, ptr, amt)
+    /// For double-word atomic operations:
+    /// ValLo, ValHi, OUTCHAIN = ATOMIC_SWAP(INCHAIN, ptr, amtLo, amtHi)
+    /// ValLo, ValHi, OUTCHAIN = ATOMIC_LOAD_[OpName](INCHAIN, ptr, amtLo, amtHi)
     /// These correspond to the atomicrmw instruction.
     ATOMIC_SWAP,
     ATOMIC_LOAD_ADD,
@@ -634,9 +723,28 @@ namespace ISD {
     ATOMIC_LOAD_UMIN,
     ATOMIC_LOAD_UMAX,
 
+    // Masked load and store - consecutive vector load and store operations
+    // with additional mask operand that prevents memory accesses to the
+    // masked-off lanes.
+    MLOAD, MSTORE,
+
+    // Masked gather and scatter - load and store operations for a vector of
+    // random addresses with additional mask operand that prevents memory
+    // accesses to the masked-off lanes.
+    MGATHER, MSCATTER,
+
     /// This corresponds to the llvm.lifetime.* intrinsics. The first operand
     /// is the chain and the second operand is the alloca pointer.
     LIFETIME_START, LIFETIME_END,
+
+    /// GC_TRANSITION_START/GC_TRANSITION_END - These operators mark the
+    /// beginning and end of GC transition  sequence, and carry arbitrary
+    /// information that target might need for lowering.  The first operand is
+    /// a chain, the rest are specified by the target and not touched by the DAG
+    /// optimizers. GC_TRANSITION_START..GC_TRANSITION_END pairs may not be
+    /// nested.
+    GC_TRANSITION_START,
+    GC_TRANSITION_END,
 
     /// BUILTIN_OP_END - This must be the last enum value in this list.
     /// The target-specific pre-isel opcode values start here.
@@ -647,7 +755,7 @@ namespace ISD {
   /// which do not reference a specific memory location should be less than
   /// this value. Those that do must not be less than this value, and can
   /// be used with SelectionDAG::getMemIntrinsicNode.
-  static const int FIRST_TARGET_MEMORY_OPCODE = BUILTIN_OP_END+150;
+  static const int FIRST_TARGET_MEMORY_OPCODE = BUILTIN_OP_END+300;
 
   //===--------------------------------------------------------------------===//
   /// MemIndexedMode enum - This enum defines the load / store indexed
@@ -703,6 +811,8 @@ namespace ISD {
     ZEXTLOAD,
     LAST_LOADEXT_TYPE
   };
+
+  NodeType getExtForLoadExtType(bool IsFP, LoadExtType);
 
   //===--------------------------------------------------------------------===//
   /// ISD::CondCode enum - These are ordered carefully to make the bitfields

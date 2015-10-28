@@ -10,6 +10,7 @@
 #ifndef LLVM_OPTION_OPTTABLE_H
 #define LLVM_OPTION_OPTTABLE_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Option/OptSpecifier.h"
 
@@ -44,12 +45,13 @@ public:
     unsigned short Flags;
     unsigned short GroupID;
     unsigned short AliasID;
+    const char *AliasArgs;
   };
 
 private:
   /// \brief The static option information table.
-  const Info *OptionInfos;
-  unsigned NumOptionInfos;
+  ArrayRef<Info> OptionInfos;
+  bool IgnoreCase;
 
   unsigned TheInputOptionID;
   unsigned TheUnknownOptionID;
@@ -71,12 +73,13 @@ private:
   }
 
 protected:
-  OptTable(const Info *_OptionInfos, unsigned _NumOptionInfos);
+  OptTable(ArrayRef<Info> OptionInfos, bool IgnoreCase = false);
+
 public:
   ~OptTable();
 
   /// \brief Return the total number of option classes.
-  unsigned getNumOptions() const { return NumOptionInfos; }
+  unsigned getNumOptions() const { return OptionInfos.size(); }
 
   /// \brief Get the given Opt's Option instance, lazily creating it
   /// if necessary.
@@ -99,9 +102,6 @@ public:
     return getInfo(id).GroupID;
   }
 
-  /// \brief Should the help for the given option be hidden by default.
-  bool isOptionHelpHidden(OptSpecifier id) const;
-
   /// \brief Get the help text to use to describe this option.
   const char *getOptionHelpText(OptSpecifier id) const {
     return getInfo(id).HelpText;
@@ -119,11 +119,17 @@ public:
   /// \param [in,out] Index - The current parsing position in the argument
   /// string list; on return this will be the index of the next argument
   /// string to parse.
+  /// \param [in] FlagsToInclude - Only parse options with any of these flags.
+  /// Zero is the default which includes all flags.
+  /// \param [in] FlagsToExclude - Don't parse options with this flag.  Zero
+  /// is the default and means exclude nothing.
   ///
   /// \return The parsed argument, or 0 if the argument is missing values
   /// (in which case Index still points at the conceptual next argument string
   /// to parse).
-  Arg *ParseOneArg(const ArgList &Args, unsigned &Index) const;
+  Arg *ParseOneArg(const ArgList &Args, unsigned &Index,
+                   unsigned FlagsToInclude = 0,
+                   unsigned FlagsToExclude = 0) const;
 
   /// \brief Parse an list of arguments into an InputArgList.
   ///
@@ -134,24 +140,31 @@ public:
   /// The only error that can occur in this routine is if an argument is
   /// missing values; in this case \p MissingArgCount will be non-zero.
   ///
-  /// \param ArgBegin - The beginning of the argument vector.
-  /// \param ArgEnd - The end of the argument vector.
   /// \param MissingArgIndex - On error, the index of the option which could
   /// not be parsed.
   /// \param MissingArgCount - On error, the number of missing options.
+  /// \param FlagsToInclude - Only parse options with any of these flags.
+  /// Zero is the default which includes all flags.
+  /// \param FlagsToExclude - Don't parse options with this flag.  Zero
+  /// is the default and means exclude nothing.
   /// \return An InputArgList; on error this will contain all the options
   /// which could be parsed.
-  InputArgList *ParseArgs(const char* const *ArgBegin,
-                          const char* const *ArgEnd,
-                          unsigned &MissingArgIndex,
-                          unsigned &MissingArgCount) const;
+  InputArgList ParseArgs(ArrayRef<const char *> Args, unsigned &MissingArgIndex,
+                         unsigned &MissingArgCount, unsigned FlagsToInclude = 0,
+                         unsigned FlagsToExclude = 0) const;
 
   /// \brief Render the help text for an option table.
   ///
   /// \param OS - The stream to write the help text to.
   /// \param Name - The name to use in the usage line.
   /// \param Title - The title to use in the usage line.
-  /// \param ShowHidden - Whether help-hidden arguments should be shown.
+  /// \param FlagsToInclude - If non-zero, only include options with any
+  ///                         of these flags set.
+  /// \param FlagsToExclude - Exclude options with any of these flags set.
+  void PrintHelp(raw_ostream &OS, const char *Name,
+                 const char *Title, unsigned FlagsToInclude,
+                 unsigned FlagsToExclude) const;
+
   void PrintHelp(raw_ostream &OS, const char *Name,
                   const char *Title, bool ShowHidden = false) const;
 };

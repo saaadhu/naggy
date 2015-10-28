@@ -1,0 +1,336 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|Win32">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|Win32">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGUID>{F65BBC1D-527E-4482-895A-AF050663CCFE}</ProjectGUID>
+    <Keyword>Win32Proj</Keyword>
+    <Platform>Win32</Platform>
+    <ProjectName>ClangCommentNodes</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+    <PropertyGroup>
+      <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST;C:\Users\senth\Documents\llvm\tools\clang\include;C:\Users\senth\Documents\llvm\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST;C:\Users\senth\Documents\llvm\tools\clang\include;C:\Users\senth\Documents\llvm\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST;C:\Users\senth\Documents\llvm\tools\clang\include;C:\Users\senth\Documents\llvm\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST;C:\Users\senth\Documents\llvm\tools\clang\include;C:\Users\senth\Documents\llvm\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Building Custom Rule C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -HC:/Users/senth/Documents/llvm -BC:/Users/senth/Documents/llvm --check-stamp-file C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Building Custom Rule C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -HC:/Users/senth/Documents/llvm -BC:/Users/senth/Documents/llvm --check-stamp-file C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">Building Custom Rule C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -HC:/Users/senth/Documents/llvm -BC:/Users/senth/Documents/llvm --check-stamp-file C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">Building Custom Rule C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -HC:/Users/senth/Documents/llvm -BC:/Users/senth/Documents/llvm --check-stamp-file C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeLists.txt;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\9ac951b354b7ba446242561509c947af\CommentNodes.inc.tmp.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Building CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">setlocal
+..\..\..\..\..\Debug\bin\clang-tblgen.exe -gen-clang-comment-nodes -I C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST -I C:/Users/senth/Documents/llvm/lib/Target -I C:/Users/senth/Documents/llvm/include C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/../Basic/CommentNodes.td -o C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.tmp.rule;C:\Users\senth\Documents\llvm\Debug\bin\clang-tblgen.exe;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentCommands.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLNamedCharacterReferences.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLTags.td;C:\Users\senth\Documents\llvm\include\llvm\CodeGen\ValueTypes.td;C:\Users\senth\Documents\llvm\include\llvm\IR\Intrinsics.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAArch64.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAMDGPU.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsARM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsBPF.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsHexagon.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsMips.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsNVVM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsPowerPC.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsSystemZ.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsWebAssembly.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsX86.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsXCore.td;C:\Users\senth\Documents\llvm\include\llvm\Option\OptParser.td;C:\Users\senth\Documents\llvm\include\llvm\Target\Target.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetCallingConv.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetItinerary.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSchedule.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSelectionDAG.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\Basic\CommentNodes.td;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Building CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">setlocal
+..\..\..\..\..\Release\bin\clang-tblgen.exe -gen-clang-comment-nodes -I C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST -I C:/Users/senth/Documents/llvm/lib/Target -I C:/Users/senth/Documents/llvm/include C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/../Basic/CommentNodes.td -o C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.tmp.rule;C:\Users\senth\Documents\llvm\Release\bin\clang-tblgen.exe;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentCommands.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLNamedCharacterReferences.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLTags.td;C:\Users\senth\Documents\llvm\include\llvm\CodeGen\ValueTypes.td;C:\Users\senth\Documents\llvm\include\llvm\IR\Intrinsics.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAArch64.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAMDGPU.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsARM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsBPF.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsHexagon.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsMips.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsNVVM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsPowerPC.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsSystemZ.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsWebAssembly.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsX86.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsXCore.td;C:\Users\senth\Documents\llvm\include\llvm\Option\OptParser.td;C:\Users\senth\Documents\llvm\include\llvm\Target\Target.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetCallingConv.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetItinerary.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSchedule.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSelectionDAG.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\Basic\CommentNodes.td;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">Building CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">setlocal
+..\..\..\..\..\MinSizeRel\bin\clang-tblgen.exe -gen-clang-comment-nodes -I C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST -I C:/Users/senth/Documents/llvm/lib/Target -I C:/Users/senth/Documents/llvm/include C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/../Basic/CommentNodes.td -o C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.tmp.rule;C:\Users\senth\Documents\llvm\MinSizeRel\bin\clang-tblgen.exe;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentCommands.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLNamedCharacterReferences.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLTags.td;C:\Users\senth\Documents\llvm\include\llvm\CodeGen\ValueTypes.td;C:\Users\senth\Documents\llvm\include\llvm\IR\Intrinsics.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAArch64.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAMDGPU.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsARM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsBPF.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsHexagon.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsMips.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsNVVM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsPowerPC.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsSystemZ.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsWebAssembly.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsX86.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsXCore.td;C:\Users\senth\Documents\llvm\include\llvm\Option\OptParser.td;C:\Users\senth\Documents\llvm\include\llvm\Target\Target.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetCallingConv.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetItinerary.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSchedule.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSelectionDAG.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\Basic\CommentNodes.td;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">Building CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">setlocal
+..\..\..\..\..\RelWithDebInfo\bin\clang-tblgen.exe -gen-clang-comment-nodes -I C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST -I C:/Users/senth/Documents/llvm/lib/Target -I C:/Users/senth/Documents/llvm/include C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/../Basic/CommentNodes.td -o C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.tmp.rule;C:\Users\senth\Documents\llvm\RelWithDebInfo\bin\clang-tblgen.exe;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentCommands.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLNamedCharacterReferences.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentHTMLTags.td;C:\Users\senth\Documents\llvm\include\llvm\CodeGen\ValueTypes.td;C:\Users\senth\Documents\llvm\include\llvm\IR\Intrinsics.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAArch64.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsAMDGPU.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsARM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsBPF.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsHexagon.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsMips.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsNVVM.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsPowerPC.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsSystemZ.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsWebAssembly.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsX86.td;C:\Users\senth\Documents\llvm\include\llvm\IR\IntrinsicsXCore.td;C:\Users\senth\Documents\llvm\include\llvm\Option\OptParser.td;C:\Users\senth\Documents\llvm\include\llvm\Target\Target.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetCallingConv.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetItinerary.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSchedule.td;C:\Users\senth\Documents\llvm\include\llvm\Target\TargetSelectionDAG.td;C:\Users\senth\Documents\llvm\tools\clang\include\clang\Basic\CommentNodes.td;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\9ac951b354b7ba446242561509c947af\CommentNodes.inc.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Updating CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -E copy_if_different C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Updating CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -E copy_if_different C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">Updating CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -E copy_if_different C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">Updating CommentNodes.inc...</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">setlocal
+"C:\Program Files (x86)\CMake\bin\cmake.exe" -E copy_if_different C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc.tmp C:/Users/senth/Documents/llvm/tools/clang/include/clang/AST/CommentNodes.inc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/9ac951b354b7ba446242561509c947af/CommentNodes.inc.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc.tmp;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\fdfbeee593a75522ad8d5be8f4bbc8a5\ClangCommentNodes.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/fdfbeee593a75522ad8d5be8f4bbc8a5/ClangCommentNodes.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\ClangCommentNodes</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/fdfbeee593a75522ad8d5be8f4bbc8a5/ClangCommentNodes.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\ClangCommentNodes</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/fdfbeee593a75522ad8d5be8f4bbc8a5/ClangCommentNodes.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\ClangCommentNodes</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|Win32'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:/Users/senth/Documents/llvm/CMakeFiles/fdfbeee593a75522ad8d5be8f4bbc8a5/ClangCommentNodes.rule;C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CommentNodes.inc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\ClangCommentNodes</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|Win32'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\AST\CMakeFiles\ClangCommentNodes" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="C:/Users/senth/Documents/llvm/ZERO_CHECK.vcxproj">
+      <Project>707B86CF-C6E8-44FD-A8D8-1847E9633ACE</Project>
+    </ProjectReference>
+    <ProjectReference Include="C:/Users/senth/Documents/llvm/tools/clang/utils/TableGen/clang-tblgen.vcxproj">
+      <Project>73DA9EE9-646A-4055-BF6A-4C51A70840AD</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

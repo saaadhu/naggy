@@ -7,34 +7,45 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CLANG_DRIVER_TOOLCHAIN_H_
-#define CLANG_DRIVER_TOOLCHAIN_H_
+#ifndef LLVM_CLANG_DRIVER_TOOLCHAIN_H
+#define LLVM_CLANG_DRIVER_TOOLCHAIN_H
 
+#include "clang/Basic/Sanitizers.h"
 #include "clang/Driver/Action.h"
+#include "clang/Driver/Multilib.h"
 #include "clang/Driver/Types.h"
 #include "clang/Driver/Util.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Path.h"
+#include <memory>
 #include <string>
 
+namespace llvm {
+namespace opt {
+  class ArgList;
+  class DerivedArgList;
+  class InputArgList;
+}
+}
+
 namespace clang {
-  class ObjCRuntime;
+class ObjCRuntime;
+namespace vfs {
+class FileSystem;
+}
 
 namespace driver {
-  class ArgList;
   class Compilation;
-  class DerivedArgList;
   class Driver;
-  class InputArgList;
   class JobAction;
+  class SanitizerArgs;
   class Tool;
 
 /// ToolChain - Access to tools for a single platform.
 class ToolChain {
 public:
-  typedef SmallVector<std::string, 4> path_list;
+  typedef SmallVector<std::string, 16> path_list;
 
   enum CXXStdlibType {
     CST_Libcxx,
@@ -46,10 +57,20 @@ public:
     RLT_Libgcc
   };
 
+  enum RTTIMode {
+    RM_EnabledExplicitly,
+    RM_EnabledImplicitly,
+    RM_DisabledExplicitly,
+    RM_DisabledImplicitly
+  };
+
 private:
   const Driver &D;
   const llvm::Triple Triple;
-  const ArgList &Args;
+  const llvm::opt::ArgList &Args;
+  // We need to initialize CachedRTTIArg before CachedRTTIMode
+  const llvm::opt::Arg *const CachedRTTIArg;
+  const RTTIMode CachedRTTIMode;
 
   /// The list of toolchain specific path prefixes to search for
   /// files.
@@ -59,16 +80,21 @@ private:
   /// programs.
   path_list ProgramPaths;
 
-  mutable OwningPtr<Tool> Clang;
-  mutable OwningPtr<Tool> Assemble;
-  mutable OwningPtr<Tool> Link;
+  mutable std::unique_ptr<Tool> Clang;
+  mutable std::unique_ptr<Tool> Assemble;
+  mutable std::unique_ptr<Tool> Link;
   Tool *getClang() const;
   Tool *getAssemble() const;
   Tool *getLink() const;
   Tool *getClangAs() const;
 
+  mutable std::unique_ptr<SanitizerArgs> SanitizerArguments;
+
 protected:
-  ToolChain(const Driver &D, const llvm::Triple &T, const ArgList &Args);
+  MultilibSet Multilibs;
+
+  ToolChain(const Driver &D, const llvm::Triple &T,
+            const llvm::opt::ArgList &Args);
 
   virtual Tool *buildAssembler() const;
   virtual Tool *buildLinker() const;
@@ -76,17 +102,18 @@ protected:
 
   /// \name Utilities for implementing subclasses.
   ///@{
-  static void addSystemInclude(const ArgList &DriverArgs,
-                               ArgStringList &CC1Args,
+  static void addSystemInclude(const llvm::opt::ArgList &DriverArgs,
+                               llvm::opt::ArgStringList &CC1Args,
                                const Twine &Path);
-  static void addExternCSystemInclude(const ArgList &DriverArgs,
-                                      ArgStringList &CC1Args,
+  static void addExternCSystemInclude(const llvm::opt::ArgList &DriverArgs,
+                                      llvm::opt::ArgStringList &CC1Args,
                                       const Twine &Path);
-  static void addExternCSystemIncludeIfExists(const ArgList &DriverArgs,
-                                              ArgStringList &CC1Args,
-                                              const Twine &Path);
-  static void addSystemIncludes(const ArgList &DriverArgs,
-                                ArgStringList &CC1Args,
+  static void
+      addExternCSystemIncludeIfExists(const llvm::opt::ArgList &DriverArgs,
+                                      llvm::opt::ArgStringList &CC1Args,
+                                      const Twine &Path);
+  static void addSystemIncludes(const llvm::opt::ArgList &DriverArgs,
+                                llvm::opt::ArgStringList &CC1Args,
                                 ArrayRef<StringRef> Paths);
   ///@}
 
@@ -95,7 +122,8 @@ public:
 
   // Accessors
 
-  const Driver &getDriver() const;
+  const Driver &getDriver() const { return D; }
+  vfs::FileSystem &getVFS() const;
   const llvm::Triple &getTriple() const { return Triple; }
 
   llvm::Triple::ArchType getArch() const { return Triple.getArch(); }
@@ -105,7 +133,7 @@ public:
 
   /// \brief Provide the default architecture name (as expected by -arch) for
   /// this toolchain. Note t
-  std::string getDefaultUniversalArchName() const;
+  StringRef getDefaultUniversalArchName() const;
 
   std::string getTripleString() const {
     return Triple.getTriple();
@@ -117,6 +145,30 @@ public:
   path_list &getProgramPaths() { return ProgramPaths; }
   const path_list &getProgramPaths() const { return ProgramPaths; }
 
+  const MultilibSet &getMultilibs() const { return Multilibs; }
+
+  const SanitizerArgs& getSanitizerArgs() const;
+
+  // Returns the Arg * that explicitly turned on/off rtti, or nullptr.
+  const llvm::opt::Arg *getRTTIArg() const { return CachedRTTIArg; }
+
+  // Returns the RTTIMode for the toolchain with the current arguments.
+  RTTIMode getRTTIMode() const { return CachedRTTIMode; }
+
+  /// \brief Return any implicit target and/or mode flag for an invocation of
+  /// the compiler driver as `ProgName`.
+  ///
+  /// For example, when called with i686-linux-android-g++, the first element
+  /// of the return value will be set to `"i686-linux-android"` and the second
+  /// will be set to "--driver-mode=g++"`.
+  ///
+  /// \pre `llvm::InitializeAllTargets()` has been called.
+  /// \param ProgName The name the Clang driver was invoked with (from,
+  /// e.g., argv[0])
+  /// \return A pair of (`target`, `mode-flag`), where one or both may be empty.
+  static std::pair<std::string, std::string>
+  getTargetAndModeFromProgramName(StringRef ProgName);
+
   // Tool access.
 
   /// TranslateArgs - Create a new derived argument list for any argument
@@ -124,20 +176,39 @@ public:
   /// specific translations are needed.
   ///
   /// \param BoundArch - The bound architecture name, or 0.
-  virtual DerivedArgList *TranslateArgs(const DerivedArgList &Args,
-                                        const char *BoundArch) const {
-    return 0;
+  virtual llvm::opt::DerivedArgList *
+  TranslateArgs(const llvm::opt::DerivedArgList &Args,
+                const char *BoundArch) const {
+    return nullptr;
   }
 
   /// Choose a tool to use to handle the action \p JA.
-  Tool *SelectTool(const JobAction &JA) const;
+  ///
+  /// This can be overridden when a particular ToolChain needs to use
+  /// a C compiler other than Clang.
+  virtual Tool *SelectTool(const JobAction &JA) const;
 
   // Helper methods
 
   std::string GetFilePath(const char *Name) const;
   std::string GetProgramPath(const char *Name) const;
 
+  /// Returns the linker path, respecting the -fuse-ld= argument to determine
+  /// the linker suffix or name.
+  std::string GetLinkerPath() const;
+
+  /// \brief Dispatch to the specific toolchain for verbose printing.
+  ///
+  /// This is used when handling the verbose option to print detailed,
+  /// toolchain-specific information useful for understanding the behavior of
+  /// the driver on a specific platform.
+  virtual void printVerboseInfo(raw_ostream &OS) const {}
+
   // Platform defaults information
+
+  /// \brief Returns true if the toolchain is targeting a non-native
+  /// architecture.
+  virtual bool isCrossCompiling() const;
 
   /// HasNativeLTOLinker - Check whether the linker and related tools have
   /// native LLVM support.
@@ -157,17 +228,9 @@ public:
   /// \brief Check if the toolchain should use the integrated assembler.
   bool useIntegratedAs() const;
 
-  /// IsStrictAliasingDefault - Does this tool chain use -fstrict-aliasing by
-  /// default.
-  virtual bool IsStrictAliasingDefault() const { return true; }
-
   /// IsMathErrnoDefault - Does this tool chain use -fmath-errno by default.
   virtual bool IsMathErrnoDefault() const { return true; }
 
-  /// IsObjCDefaultSynthPropertiesDefault - Does this tool chain enable
-  /// -fobjc-default-synthesize-properties by default.
-  virtual bool IsObjCDefaultSynthPropertiesDefault() const { return true; }
-  
   /// IsEncodeExtendedBlockSignatureDefault - Does this tool chain enable
   /// -fencode-extended-block-signature by default.
   virtual bool IsEncodeExtendedBlockSignatureDefault() const { return false; }
@@ -181,7 +244,7 @@ public:
   virtual bool UseObjCMixedDispatch() const { return false; }
 
   /// GetDefaultStackProtectorLevel - Get the default stack protector level for
-  /// this tool chain (0=off, 1=on, 2=all).
+  /// this tool chain (0=off, 1=on, 2=strong, 3=all).
   virtual unsigned GetDefaultStackProtectorLevel(bool KernelOrKext) const {
     return 0;
   }
@@ -190,6 +253,16 @@ public:
   virtual RuntimeLibType GetDefaultRuntimeLibType() const {
     return ToolChain::RLT_Libgcc;
   }
+
+  virtual std::string getCompilerRT(const llvm::opt::ArgList &Args,
+                                    StringRef Component,
+                                    bool Shared = false) const;
+
+  const char *getCompilerRTArgString(const llvm::opt::ArgList &Args,
+                                     StringRef Component,
+                                     bool Shared = false) const;
+  /// needsProfileRT - returns true if instrumentation profile is on.
+  static bool needsProfileRT(const llvm::opt::ArgList &Args);
 
   /// IsUnwindTablesDefault - Does this tool chain use -funwind-tables
   /// by default.
@@ -220,21 +293,39 @@ public:
   /// compile unit information.
   virtual bool UseDwarfDebugFlags() const { return false; }
 
+  // Return the DWARF version to emit, in the absence of arguments
+  // to the contrary.
+  virtual unsigned GetDefaultDwarfVersion() const { return 4; }
+
+  // True if the driver should assume "-fstandalone-debug"
+  // in the absence of an option specifying otherwise,
+  // provided that debugging was requested in the first place.
+  // i.e. a value of 'true' does not imply that debugging is wanted.
+  virtual bool GetDefaultStandaloneDebug() const { return false; }
+
   /// UseSjLjExceptions - Does this tool chain use SjLj exceptions.
   virtual bool UseSjLjExceptions() const { return false; }
 
+  /// getThreadModel() - Which thread model does this target use?
+  virtual std::string getThreadModel() const { return "posix"; }
+
+  /// isThreadModelSupported() - Does this target support a thread model?
+  virtual bool isThreadModelSupported(const StringRef Model) const;
+
   /// ComputeLLVMTriple - Return the LLVM target triple to use, after taking
   /// command line arguments into account.
-  virtual std::string ComputeLLVMTriple(const ArgList &Args,
-                                 types::ID InputType = types::TY_INVALID) const;
+  virtual std::string
+  ComputeLLVMTriple(const llvm::opt::ArgList &Args,
+                    types::ID InputType = types::TY_INVALID) const;
 
   /// ComputeEffectiveClangTriple - Return the Clang triple to use for this
   /// target, which may take into account the command line arguments. For
   /// example, on Darwin the -mmacosx-version-min= command line argument (which
   /// sets the deployment target) determines the version in the triple passed to
   /// Clang.
-  virtual std::string ComputeEffectiveClangTriple(const ArgList &Args,
-                                 types::ID InputType = types::TY_INVALID) const;
+  virtual std::string ComputeEffectiveClangTriple(
+      const llvm::opt::ArgList &Args,
+      types::ID InputType = types::TY_INVALID) const;
 
   /// getDefaultObjCRuntime - Return the default Objective-C runtime
   /// for this platform.
@@ -253,42 +344,55 @@ public:
   ///
   /// This routine is responsible for adding the necessary cc1 arguments to
   /// include headers from standard system header directories.
-  virtual void AddClangSystemIncludeArgs(const ArgList &DriverArgs,
-                                         ArgStringList &CC1Args) const;
+  virtual void
+  AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
+                            llvm::opt::ArgStringList &CC1Args) const;
 
   /// \brief Add options that need to be passed to cc1 for this target.
-  virtual void addClangTargetOptions(const ArgList &DriverArgs,
-                                     ArgStringList &CC1Args) const;
+  virtual void addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
+                                     llvm::opt::ArgStringList &CC1Args) const;
+
+  /// \brief Add warning options that need to be passed to cc1 for this target.
+  virtual void addClangWarningOptions(llvm::opt::ArgStringList &CC1Args) const;
 
   // GetRuntimeLibType - Determine the runtime library type to use with the
   // given compilation arguments.
-  virtual RuntimeLibType GetRuntimeLibType(const ArgList &Args) const;
+  virtual RuntimeLibType
+  GetRuntimeLibType(const llvm::opt::ArgList &Args) const;
 
   // GetCXXStdlibType - Determine the C++ standard library type to use with the
   // given compilation arguments.
-  virtual CXXStdlibType GetCXXStdlibType(const ArgList &Args) const;
+  virtual CXXStdlibType GetCXXStdlibType(const llvm::opt::ArgList &Args) const;
 
   /// AddClangCXXStdlibIncludeArgs - Add the clang -cc1 level arguments to set
   /// the include paths to use for the given C++ standard library type.
-  virtual void AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
-                                            ArgStringList &CC1Args) const;
+  virtual void
+  AddClangCXXStdlibIncludeArgs(const llvm::opt::ArgList &DriverArgs,
+                               llvm::opt::ArgStringList &CC1Args) const;
 
   /// AddCXXStdlibLibArgs - Add the system specific linker arguments to use
   /// for the given C++ standard library type.
-  virtual void AddCXXStdlibLibArgs(const ArgList &Args,
-                                   ArgStringList &CmdArgs) const;
+  virtual void AddCXXStdlibLibArgs(const llvm::opt::ArgList &Args,
+                                   llvm::opt::ArgStringList &CmdArgs) const;
 
   /// AddCCKextLibArgs - Add the system specific linker arguments to use
   /// for kernel extensions (Darwin-specific).
-  virtual void AddCCKextLibArgs(const ArgList &Args,
-                                ArgStringList &CmdArgs) const;
+  virtual void AddCCKextLibArgs(const llvm::opt::ArgList &Args,
+                                llvm::opt::ArgStringList &CmdArgs) const;
 
   /// AddFastMathRuntimeIfAvailable - If a runtime library exists that sets
   /// global flags for unsafe floating point math, add it and return true.
   ///
-  /// This checks for presence of the -ffast-math or -funsafe-math flags.
-  virtual bool AddFastMathRuntimeIfAvailable(const ArgList &Args,
-                                             ArgStringList &CmdArgs) const;
+  /// This checks for presence of the -Ofast, -ffast-math or -funsafe-math flags.
+  virtual bool AddFastMathRuntimeIfAvailable(
+      const llvm::opt::ArgList &Args, llvm::opt::ArgStringList &CmdArgs) const;
+  /// addProfileRTLibs - When -fprofile-instr-profile is specified, add profile
+  /// runtime library, otherwise return false.
+  virtual void addProfileRTLibs(const llvm::opt::ArgList &Args,
+                                llvm::opt::ArgStringList &CmdArgs) const;
+
+  /// \brief Return sanitizers which are available in this toolchain.
+  virtual SanitizerMask getSupportedSanitizers() const;
 };
 
 } // end namespace driver

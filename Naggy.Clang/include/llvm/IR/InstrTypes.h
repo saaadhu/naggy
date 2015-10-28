@@ -16,7 +16,9 @@
 #ifndef LLVM_IR_INSTRTYPES_H
 #define LLVM_IR_INSTRTYPES_H
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/OperandTraits.h"
@@ -29,14 +31,14 @@ class LLVMContext;
 //                            TerminatorInst Class
 //===----------------------------------------------------------------------===//
 
-/// TerminatorInst - Subclasses of this class are all able to terminate a basic
-/// block.  Thus, these are all the flow control type of operations.
+/// Subclasses of this class are all able to terminate a basic
+/// block. Thus, these are all the flow control type of operations.
 ///
 class TerminatorInst : public Instruction {
 protected:
   TerminatorInst(Type *Ty, Instruction::TermOps iType,
                  Use *Ops, unsigned NumOps,
-                 Instruction *InsertBefore = 0)
+                 Instruction *InsertBefore = nullptr)
     : Instruction(Ty, iType, Ops, NumOps, InsertBefore) {}
 
   TerminatorInst(Type *Ty, Instruction::TermOps iType,
@@ -44,30 +46,26 @@ protected:
     : Instruction(Ty, iType, Ops, NumOps, InsertAtEnd) {}
 
   // Out of line virtual method, so the vtable, etc has a home.
-  ~TerminatorInst();
+  ~TerminatorInst() override;
 
   /// Virtual methods - Terminators should overload these and provide inline
   /// overrides of non-V methods.
   virtual BasicBlock *getSuccessorV(unsigned idx) const = 0;
   virtual unsigned getNumSuccessorsV() const = 0;
   virtual void setSuccessorV(unsigned idx, BasicBlock *B) = 0;
-  virtual TerminatorInst *clone_impl() const = 0;
-public:
 
-  /// getNumSuccessors - Return the number of successors that this terminator
-  /// has.
+public:
+  /// Return the number of successors that this terminator has.
   unsigned getNumSuccessors() const {
     return getNumSuccessorsV();
   }
 
-  /// getSuccessor - Return the specified successor.
-  ///
+  /// Return the specified successor.
   BasicBlock *getSuccessor(unsigned idx) const {
     return getSuccessorV(idx);
   }
 
-  /// setSuccessor - Update the specified successor to point at the provided
-  /// block.
+  /// Update the specified successor to point at the provided block.
   void setSuccessor(unsigned idx, BasicBlock *B) {
     setSuccessorV(idx, B);
   }
@@ -79,19 +77,212 @@ public:
   static inline bool classof(const Value *V) {
     return isa<Instruction>(V) && classof(cast<Instruction>(V));
   }
-};
 
+  // \brief Returns true if this terminator relates to exception handling.
+  bool isExceptional() const {
+    switch (getOpcode()) {
+    case Instruction::CatchPad:
+    case Instruction::CatchEndPad:
+    case Instruction::CatchRet:
+    case Instruction::CleanupEndPad:
+    case Instruction::CleanupRet:
+    case Instruction::Invoke:
+    case Instruction::Resume:
+    case Instruction::TerminatePad:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  //===--------------------------------------------------------------------===//
+  // succ_iterator definition
+  //===--------------------------------------------------------------------===//
+
+  template <class Term, class BB> // Successor Iterator
+  class SuccIterator : public std::iterator<std::random_access_iterator_tag, BB,
+                                            int, BB *, BB *> {
+    typedef std::iterator<std::random_access_iterator_tag, BB, int, BB *, BB *>
+        super;
+
+  public:
+    typedef typename super::pointer pointer;
+    typedef typename super::reference reference;
+
+  private:
+    Term TermInst;
+    unsigned idx;
+    typedef SuccIterator<Term, BB> Self;
+
+    inline bool index_is_valid(unsigned idx) {
+      return idx < TermInst->getNumSuccessors();
+    }
+
+    /// \brief Proxy object to allow write access in operator[]
+    class SuccessorProxy {
+      Self it;
+
+    public:
+      explicit SuccessorProxy(const Self &it) : it(it) {}
+
+      SuccessorProxy(const SuccessorProxy &) = default;
+
+      SuccessorProxy &operator=(SuccessorProxy r) {
+        *this = reference(r);
+        return *this;
+      }
+
+      SuccessorProxy &operator=(reference r) {
+        it.TermInst->setSuccessor(it.idx, r);
+        return *this;
+      }
+
+      operator reference() const { return *it; }
+    };
+
+  public:
+    // begin iterator
+    explicit inline SuccIterator(Term T) : TermInst(T), idx(0) {}
+    // end iterator
+    inline SuccIterator(Term T, bool) : TermInst(T) {
+      if (TermInst)
+        idx = TermInst->getNumSuccessors();
+      else
+        // Term == NULL happens, if a basic block is not fully constructed and
+        // consequently getTerminator() returns NULL. In this case we construct
+        // a SuccIterator which describes a basic block that has zero
+        // successors.
+        // Defining SuccIterator for incomplete and malformed CFGs is especially
+        // useful for debugging.
+        idx = 0;
+    }
+
+    /// This is used to interface between code that wants to
+    /// operate on terminator instructions directly.
+    unsigned getSuccessorIndex() const { return idx; }
+
+    inline bool operator==(const Self &x) const { return idx == x.idx; }
+    inline bool operator!=(const Self &x) const { return !operator==(x); }
+
+    inline reference operator*() const { return TermInst->getSuccessor(idx); }
+    inline pointer operator->() const { return operator*(); }
+
+    inline Self &operator++() {
+      ++idx;
+      return *this;
+    } // Preincrement
+
+    inline Self operator++(int) { // Postincrement
+      Self tmp = *this;
+      ++*this;
+      return tmp;
+    }
+
+    inline Self &operator--() {
+      --idx;
+      return *this;
+    }                             // Predecrement
+    inline Self operator--(int) { // Postdecrement
+      Self tmp = *this;
+      --*this;
+      return tmp;
+    }
+
+    inline bool operator<(const Self &x) const {
+      assert(TermInst == x.TermInst &&
+             "Cannot compare iterators of different blocks!");
+      return idx < x.idx;
+    }
+
+    inline bool operator<=(const Self &x) const {
+      assert(TermInst == x.TermInst &&
+             "Cannot compare iterators of different blocks!");
+      return idx <= x.idx;
+    }
+    inline bool operator>=(const Self &x) const {
+      assert(TermInst == x.TermInst &&
+             "Cannot compare iterators of different blocks!");
+      return idx >= x.idx;
+    }
+
+    inline bool operator>(const Self &x) const {
+      assert(TermInst == x.TermInst &&
+             "Cannot compare iterators of different blocks!");
+      return idx > x.idx;
+    }
+
+    inline Self &operator+=(int Right) {
+      unsigned new_idx = idx + Right;
+      assert(index_is_valid(new_idx) && "Iterator index out of bound");
+      idx = new_idx;
+      return *this;
+    }
+
+    inline Self operator+(int Right) const {
+      Self tmp = *this;
+      tmp += Right;
+      return tmp;
+    }
+
+    inline Self &operator-=(int Right) { return operator+=(-Right); }
+
+    inline Self operator-(int Right) const { return operator+(-Right); }
+
+    inline int operator-(const Self &x) const {
+      assert(TermInst == x.TermInst &&
+             "Cannot work on iterators of different blocks!");
+      int distance = idx - x.idx;
+      return distance;
+    }
+
+    inline SuccessorProxy operator[](int offset) {
+      Self tmp = *this;
+      tmp += offset;
+      return SuccessorProxy(tmp);
+    }
+
+    /// Get the source BB of this iterator.
+    inline BB *getSource() {
+      assert(TermInst && "Source not available, if basic block was malformed");
+      return TermInst->getParent();
+    }
+  };
+
+  typedef SuccIterator<TerminatorInst *, BasicBlock> succ_iterator;
+  typedef SuccIterator<const TerminatorInst *, const BasicBlock>
+      succ_const_iterator;
+  typedef llvm::iterator_range<succ_iterator> succ_range;
+  typedef llvm::iterator_range<succ_const_iterator> succ_const_range;
+
+private:
+  inline succ_iterator succ_begin() { return succ_iterator(this); }
+  inline succ_const_iterator succ_begin() const {
+    return succ_const_iterator(this);
+  }
+  inline succ_iterator succ_end() { return succ_iterator(this, true); }
+  inline succ_const_iterator succ_end() const {
+    return succ_const_iterator(this, true);
+  }
+
+public:
+  inline succ_range successors() {
+    return succ_range(succ_begin(), succ_end());
+  }
+  inline succ_const_range successors() const {
+    return succ_const_range(succ_begin(), succ_end());
+  }
+};
 
 //===----------------------------------------------------------------------===//
 //                          UnaryInstruction Class
 //===----------------------------------------------------------------------===//
 
 class UnaryInstruction : public Instruction {
-  void *operator new(size_t, unsigned) LLVM_DELETED_FUNCTION;
+  void *operator new(size_t, unsigned) = delete;
 
 protected:
   UnaryInstruction(Type *Ty, unsigned iType, Value *V,
-                   Instruction *IB = 0)
+                   Instruction *IB = nullptr)
     : Instruction(Ty, iType, &Op<0>(), 1, IB) {
     Op<0>() = V;
   }
@@ -99,6 +290,7 @@ protected:
     : Instruction(Ty, iType, &Op<0>(), 1, IAE) {
     Op<0>() = V;
   }
+
 public:
   // allocate space for exactly one operand
   void *operator new(size_t s) {
@@ -106,7 +298,7 @@ public:
   }
 
   // Out of line virtual method, so the vtable, etc has a home.
-  ~UnaryInstruction();
+  ~UnaryInstruction() override;
 
   /// Transparently provide more efficient getOperand methods.
   DECLARE_TRANSPARENT_OPERAND_ACCESSORS(Value);
@@ -136,14 +328,19 @@ DEFINE_TRANSPARENT_OPERAND_ACCESSORS(UnaryInstruction, Value)
 //===----------------------------------------------------------------------===//
 
 class BinaryOperator : public Instruction {
-  void *operator new(size_t, unsigned) LLVM_DELETED_FUNCTION;
+  void *operator new(size_t, unsigned) = delete;
+
 protected:
   void init(BinaryOps iType);
   BinaryOperator(BinaryOps iType, Value *S1, Value *S2, Type *Ty,
                  const Twine &Name, Instruction *InsertBefore);
   BinaryOperator(BinaryOps iType, Value *S1, Value *S2, Type *Ty,
                  const Twine &Name, BasicBlock *InsertAtEnd);
-  virtual BinaryOperator *clone_impl() const LLVM_OVERRIDE;
+
+  // Note: Instruction needs to be a friend here to call cloneImpl.
+  friend class Instruction;
+  BinaryOperator *cloneImpl() const;
+
 public:
   // allocate space for exactly two operands
   void *operator new(size_t s) {
@@ -153,23 +350,23 @@ public:
   /// Transparently provide more efficient getOperand methods.
   DECLARE_TRANSPARENT_OPERAND_ACCESSORS(Value);
 
-  /// Create() - Construct a binary instruction, given the opcode and the two
+  /// Construct a binary instruction, given the opcode and the two
   /// operands.  Optionally (if InstBefore is specified) insert the instruction
   /// into a BasicBlock right before the specified instruction.  The specified
   /// Instruction is allowed to be a dereferenced end iterator.
   ///
   static BinaryOperator *Create(BinaryOps Op, Value *S1, Value *S2,
                                 const Twine &Name = Twine(),
-                                Instruction *InsertBefore = 0);
+                                Instruction *InsertBefore = nullptr);
 
-  /// Create() - Construct a binary instruction, given the opcode and the two
+  /// Construct a binary instruction, given the opcode and the two
   /// operands.  Also automatically insert this instruction to the end of the
   /// BasicBlock specified.
   ///
   static BinaryOperator *Create(BinaryOps Op, Value *S1, Value *S2,
                                 const Twine &Name, BasicBlock *InsertAtEnd);
 
-  /// Create* - These methods just forward to Create, and are useful when you
+  /// These methods just forward to Create, and are useful when you
   /// statically know what type of instruction you're going to create.  These
   /// helpers just save some typing.
 #define HANDLE_BINARY_INST(N, OPC, CLASS) \
@@ -209,7 +406,7 @@ public:
     BO->setHasNoSignedWrap(true);
     return BO;
   }
-  
+
   static BinaryOperator *CreateNUW(BinaryOps Opc, Value *V1, Value *V2,
                                    const Twine &Name = "") {
     BinaryOperator *BO = Create(Opc, V1, V2, Name);
@@ -228,7 +425,7 @@ public:
     BO->setHasNoUnsignedWrap(true);
     return BO;
   }
-  
+
   static BinaryOperator *CreateExact(BinaryOps Opc, Value *V1, Value *V2,
                                      const Twine &Name = "") {
     BinaryOperator *BO = Create(Opc, V1, V2, Name);
@@ -247,29 +444,29 @@ public:
     BO->setIsExact(true);
     return BO;
   }
-  
-#define DEFINE_HELPERS(OPC, NUWNSWEXACT)                                     \
-  static BinaryOperator *Create ## NUWNSWEXACT ## OPC                        \
-           (Value *V1, Value *V2, const Twine &Name = "") {                  \
-    return Create ## NUWNSWEXACT(Instruction::OPC, V1, V2, Name);            \
-  }                                                                          \
-  static BinaryOperator *Create ## NUWNSWEXACT ## OPC                        \
-           (Value *V1, Value *V2, const Twine &Name, BasicBlock *BB) {       \
-    return Create ## NUWNSWEXACT(Instruction::OPC, V1, V2, Name, BB);        \
-  }                                                                          \
-  static BinaryOperator *Create ## NUWNSWEXACT ## OPC                        \
-           (Value *V1, Value *V2, const Twine &Name, Instruction *I) {       \
-    return Create ## NUWNSWEXACT(Instruction::OPC, V1, V2, Name, I);         \
+
+#define DEFINE_HELPERS(OPC, NUWNSWEXACT)                                       \
+  static BinaryOperator *Create##NUWNSWEXACT##OPC(Value *V1, Value *V2,        \
+                                                  const Twine &Name = "") {    \
+    return Create##NUWNSWEXACT(Instruction::OPC, V1, V2, Name);                \
+  }                                                                            \
+  static BinaryOperator *Create##NUWNSWEXACT##OPC(                             \
+      Value *V1, Value *V2, const Twine &Name, BasicBlock *BB) {               \
+    return Create##NUWNSWEXACT(Instruction::OPC, V1, V2, Name, BB);            \
+  }                                                                            \
+  static BinaryOperator *Create##NUWNSWEXACT##OPC(                             \
+      Value *V1, Value *V2, const Twine &Name, Instruction *I) {               \
+    return Create##NUWNSWEXACT(Instruction::OPC, V1, V2, Name, I);             \
   }
-  
-  DEFINE_HELPERS(Add, NSW)  // CreateNSWAdd
-  DEFINE_HELPERS(Add, NUW)  // CreateNUWAdd
-  DEFINE_HELPERS(Sub, NSW)  // CreateNSWSub
-  DEFINE_HELPERS(Sub, NUW)  // CreateNUWSub
-  DEFINE_HELPERS(Mul, NSW)  // CreateNSWMul
-  DEFINE_HELPERS(Mul, NUW)  // CreateNUWMul
-  DEFINE_HELPERS(Shl, NSW)  // CreateNSWShl
-  DEFINE_HELPERS(Shl, NUW)  // CreateNUWShl
+
+  DEFINE_HELPERS(Add, NSW) // CreateNSWAdd
+  DEFINE_HELPERS(Add, NUW) // CreateNUWAdd
+  DEFINE_HELPERS(Sub, NSW) // CreateNSWSub
+  DEFINE_HELPERS(Sub, NUW) // CreateNUWSub
+  DEFINE_HELPERS(Mul, NSW) // CreateNSWMul
+  DEFINE_HELPERS(Mul, NUW) // CreateNUWMul
+  DEFINE_HELPERS(Shl, NSW) // CreateNSWShl
+  DEFINE_HELPERS(Shl, NUW) // CreateNUWShl
 
   DEFINE_HELPERS(SDiv, Exact)  // CreateExactSDiv
   DEFINE_HELPERS(UDiv, Exact)  // CreateExactUDiv
@@ -277,44 +474,41 @@ public:
   DEFINE_HELPERS(LShr, Exact)  // CreateExactLShr
 
 #undef DEFINE_HELPERS
-  
+
   /// Helper functions to construct and inspect unary operations (NEG and NOT)
   /// via binary operators SUB and XOR:
   ///
-  /// CreateNeg, CreateNot - Create the NEG and NOT
-  ///     instructions out of SUB and XOR instructions.
+  /// Create the NEG and NOT instructions out of SUB and XOR instructions.
   ///
   static BinaryOperator *CreateNeg(Value *Op, const Twine &Name = "",
-                                   Instruction *InsertBefore = 0);
+                                   Instruction *InsertBefore = nullptr);
   static BinaryOperator *CreateNeg(Value *Op, const Twine &Name,
                                    BasicBlock *InsertAtEnd);
   static BinaryOperator *CreateNSWNeg(Value *Op, const Twine &Name = "",
-                                      Instruction *InsertBefore = 0);
+                                      Instruction *InsertBefore = nullptr);
   static BinaryOperator *CreateNSWNeg(Value *Op, const Twine &Name,
                                       BasicBlock *InsertAtEnd);
   static BinaryOperator *CreateNUWNeg(Value *Op, const Twine &Name = "",
-                                      Instruction *InsertBefore = 0);
+                                      Instruction *InsertBefore = nullptr);
   static BinaryOperator *CreateNUWNeg(Value *Op, const Twine &Name,
                                       BasicBlock *InsertAtEnd);
   static BinaryOperator *CreateFNeg(Value *Op, const Twine &Name = "",
-                                    Instruction *InsertBefore = 0);
+                                    Instruction *InsertBefore = nullptr);
   static BinaryOperator *CreateFNeg(Value *Op, const Twine &Name,
                                     BasicBlock *InsertAtEnd);
   static BinaryOperator *CreateNot(Value *Op, const Twine &Name = "",
-                                   Instruction *InsertBefore = 0);
+                                   Instruction *InsertBefore = nullptr);
   static BinaryOperator *CreateNot(Value *Op, const Twine &Name,
                                    BasicBlock *InsertAtEnd);
 
-  /// isNeg, isFNeg, isNot - Check if the given Value is a
-  /// NEG, FNeg, or NOT instruction.
+  /// Check if the given Value is a NEG, FNeg, or NOT instruction.
   ///
   static bool isNeg(const Value *V);
   static bool isFNeg(const Value *V, bool IgnoreZeroSign=false);
   static bool isNot(const Value *V);
 
-  /// getNegArgument, getNotArgument - Helper functions to extract the
-  ///     unary argument of a NEG, FNEG or NOT operation implemented via
-  ///     Sub, FSub, or Xor.
+  /// Helper functions to extract the unary argument of a NEG, FNEG or NOT
+  /// operation implemented via Sub, FSub, or Xor.
   ///
   static const Value *getNegArgument(const Value *BinOp);
   static       Value *getNegArgument(      Value *BinOp);
@@ -327,36 +521,41 @@ public:
     return static_cast<BinaryOps>(Instruction::getOpcode());
   }
 
-  /// swapOperands - Exchange the two operands to this instruction.
+  /// Exchange the two operands to this instruction.
   /// This instruction is safe to use on any binary instruction and
   /// does not modify the semantics of the instruction.  If the instruction
   /// cannot be reversed (ie, it's a Div), then return true.
   ///
   bool swapOperands();
 
-  /// setHasNoUnsignedWrap - Set or clear the nsw flag on this instruction,
-  /// which must be an operator which supports this flag. See LangRef.html
-  /// for the meaning of this flag.
+  /// Set or clear the nsw flag on this instruction, which must be an operator
+  /// which supports this flag. See LangRef.html for the meaning of this flag.
   void setHasNoUnsignedWrap(bool b = true);
 
-  /// setHasNoSignedWrap - Set or clear the nsw flag on this instruction,
-  /// which must be an operator which supports this flag. See LangRef.html
-  /// for the meaning of this flag.
+  /// Set or clear the nsw flag on this instruction, which must be an operator
+  /// which supports this flag. See LangRef.html for the meaning of this flag.
   void setHasNoSignedWrap(bool b = true);
 
-  /// setIsExact - Set or clear the exact flag on this instruction,
-  /// which must be an operator which supports this flag. See LangRef.html
-  /// for the meaning of this flag.
+  /// Set or clear the exact flag on this instruction, which must be an operator
+  /// which supports this flag. See LangRef.html for the meaning of this flag.
   void setIsExact(bool b = true);
 
-  /// hasNoUnsignedWrap - Determine whether the no unsigned wrap flag is set.
+  /// Determine whether the no unsigned wrap flag is set.
   bool hasNoUnsignedWrap() const;
 
-  /// hasNoSignedWrap - Determine whether the no signed wrap flag is set.
+  /// Determine whether the no signed wrap flag is set.
   bool hasNoSignedWrap() const;
 
-  /// isExact - Determine whether the exact flag is set.
+  /// Determine whether the exact flag is set.
   bool isExact() const;
+
+  /// Convenience method to copy supported wrapping, exact, and fast-math flags
+  /// from V to this instruction.
+  void copyIRFlags(const Value *V);
+
+  /// Logical 'and' of any supported wrapping, exact, and fast-math flags of
+  /// V and this instruction.
+  void andIRFlags(const Value *V);
 
   // Methods for support type inquiry through isa, cast, and dyn_cast:
   static inline bool classof(const Instruction *I) {
@@ -378,18 +577,19 @@ DEFINE_TRANSPARENT_OPERAND_ACCESSORS(BinaryOperator, Value)
 //                               CastInst Class
 //===----------------------------------------------------------------------===//
 
-/// CastInst - This is the base class for all instructions that perform data
+/// This is the base class for all instructions that perform data
 /// casts. It is simply provided so that instruction category testing
 /// can be performed with code like:
 ///
 /// if (isa<CastInst>(Instr)) { ... }
 /// @brief Base class of casting instructions.
 class CastInst : public UnaryInstruction {
-  virtual void anchor() LLVM_OVERRIDE;
+  void anchor() override;
+
 protected:
   /// @brief Constructor with insert-before-instruction semantics for subclasses
   CastInst(Type *Ty, unsigned iType, Value *S,
-           const Twine &NameStr = "", Instruction *InsertBefore = 0)
+           const Twine &NameStr = "", Instruction *InsertBefore = nullptr)
     : UnaryInstruction(Ty, iType, S, InsertBefore) {
     setName(NameStr);
   }
@@ -399,6 +599,7 @@ protected:
     : UnaryInstruction(Ty, iType, S, InsertAtEnd) {
     setName(NameStr);
   }
+
 public:
   /// Provides a way to construct any of the CastInst subclasses using an
   /// opcode instead of the subclass's constructor. The opcode must be in the
@@ -411,7 +612,7 @@ public:
     Value *S,                ///< The value to be casted (operand 0)
     Type *Ty,          ///< The type to which cast should be made
     const Twine &Name = "", ///< Name for the instruction
-    Instruction *InsertBefore = 0 ///< Place to insert the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
   );
   /// Provides a way to construct any of the CastInst subclasses using an
   /// opcode instead of the subclass's constructor. The opcode must be in the
@@ -432,7 +633,7 @@ public:
     Value *S,                ///< The value to be casted (operand 0)
     Type *Ty,          ///< The type to which cast should be made
     const Twine &Name = "", ///< Name for the instruction
-    Instruction *InsertBefore = 0 ///< Place to insert the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
   );
 
   /// @brief Create a ZExt or BitCast cast instruction
@@ -448,7 +649,7 @@ public:
     Value *S,                ///< The value to be casted (operand 0)
     Type *Ty,          ///< The type to which cast should be made
     const Twine &Name = "", ///< Name for the instruction
-    Instruction *InsertBefore = 0 ///< Place to insert the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
   );
 
   /// @brief Create a SExt or BitCast cast instruction
@@ -459,7 +660,7 @@ public:
     BasicBlock *InsertAtEnd  ///< The block to insert the instruction into
   );
 
-  /// @brief Create a BitCast or a PtrToInt cast instruction
+  /// @brief Create a BitCast AddrSpaceCast, or a PtrToInt cast instruction.
   static CastInst *CreatePointerCast(
     Value *S,                ///< The pointer value to be casted (operand 0)
     Type *Ty,          ///< The type to which operand is casted
@@ -467,12 +668,41 @@ public:
     BasicBlock *InsertAtEnd  ///< The block to insert the instruction into
   );
 
-  /// @brief Create a BitCast or a PtrToInt cast instruction
+  /// @brief Create a BitCast, AddrSpaceCast or a PtrToInt cast instruction.
   static CastInst *CreatePointerCast(
     Value *S,                ///< The pointer value to be casted (operand 0)
     Type *Ty,          ///< The type to which cast should be made
     const Twine &Name = "", ///< Name for the instruction
-    Instruction *InsertBefore = 0 ///< Place to insert the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
+  );
+
+  /// @brief Create a BitCast or an AddrSpaceCast cast instruction.
+  static CastInst *CreatePointerBitCastOrAddrSpaceCast(
+    Value *S,                ///< The pointer value to be casted (operand 0)
+    Type *Ty,          ///< The type to which operand is casted
+    const Twine &Name, ///< The name for the instruction
+    BasicBlock *InsertAtEnd  ///< The block to insert the instruction into
+  );
+
+  /// @brief Create a BitCast or an AddrSpaceCast cast instruction.
+  static CastInst *CreatePointerBitCastOrAddrSpaceCast(
+    Value *S,                ///< The pointer value to be casted (operand 0)
+    Type *Ty,          ///< The type to which cast should be made
+    const Twine &Name = "", ///< Name for the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
+  );
+
+  /// @brief Create a BitCast, a PtrToInt, or an IntToPTr cast instruction.
+  ///
+  /// If the value is a pointer type and the destination an integer type,
+  /// creates a PtrToInt cast. If the value is an integer type and the
+  /// destination a pointer type, creates an IntToPtr cast. Otherwise, creates
+  /// a bitcast.
+  static CastInst *CreateBitOrPointerCast(
+    Value *S,                ///< The pointer value to be casted (operand 0)
+    Type *Ty,          ///< The type to which cast should be made
+    const Twine &Name = "", ///< Name for the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
   );
 
   /// @brief Create a ZExt, BitCast, or Trunc for int -> int casts.
@@ -481,7 +711,7 @@ public:
     Type *Ty,          ///< The type to which cast should be made
     bool isSigned,           ///< Whether to regard S as signed or not
     const Twine &Name = "", ///< Name for the instruction
-    Instruction *InsertBefore = 0 ///< Place to insert the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
   );
 
   /// @brief Create a ZExt, BitCast, or Trunc for int -> int casts.
@@ -498,7 +728,7 @@ public:
     Value *S,                ///< The floating point value to be casted
     Type *Ty,          ///< The floating point type to cast to
     const Twine &Name = "", ///< Name for the instruction
-    Instruction *InsertBefore = 0 ///< Place to insert the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
   );
 
   /// @brief Create an FPExt, BitCast, or FPTrunc for fp -> fp casts
@@ -514,7 +744,7 @@ public:
     Value *S,                ///< The value to be casted (operand 0)
     Type *Ty,          ///< The type to which cast should be made
     const Twine &Name = "", ///< Name for the instruction
-    Instruction *InsertBefore = 0 ///< Place to insert the instruction
+    Instruction *InsertBefore = nullptr ///< Place to insert the instruction
   );
 
   /// @brief Create a Trunc or BitCast cast instruction
@@ -530,6 +760,22 @@ public:
     Type *SrcTy, ///< The Type from which the value should be cast.
     Type *DestTy ///< The Type to which the value should be cast.
   );
+
+  /// @brief Check whether a bitcast between these types is valid
+  static bool isBitCastable(
+    Type *SrcTy, ///< The Type from which the value should be cast.
+    Type *DestTy ///< The Type to which the value should be cast.
+  );
+
+  /// @brief Check whether a bitcast, inttoptr, or ptrtoint cast between these
+  /// types is valid and a no-op.
+  ///
+  /// This ensures that any pointer<->integer cast has enough bits in the
+  /// integer and any other cast is a bitcast.
+  static bool isBitOrNoopPointerCastable(
+      Type *SrcTy,  ///< The Type from which the value should be cast.
+      Type *DestTy, ///< The Type to which the value should be cast.
+      const DataLayout &DL);
 
   /// Returns the opcode necessary to cast Val into Ty using usual casting
   /// rules.
@@ -568,13 +814,18 @@ public:
     Instruction::CastOps Opcode,  ///< Opcode of cast
     Type *SrcTy,   ///< SrcTy of cast
     Type *DstTy,   ///< DstTy of cast
-    Type *IntPtrTy ///< Integer type corresponding to Ptr types, or null
+    Type *IntPtrTy ///< Integer type corresponding to Ptr types
   );
 
   /// @brief Determine if this cast is a no-op cast.
   bool isNoopCast(
     Type *IntPtrTy ///< Integer type corresponding to pointer
   ) const;
+
+  /// @brief Determine if this cast is a no-op cast.
+  ///
+  /// \param DL is the DataLayout to get the Int Ptr type from.
+  bool isNoopCast(const DataLayout &DL) const;
 
   /// Determine how a pair of casts can be eliminated, if they can be at all.
   /// This is a helper function for both CastInst and ConstantExpr.
@@ -625,18 +876,20 @@ public:
 /// This class is the base class for the comparison instructions.
 /// @brief Abstract base class of comparison instructions.
 class CmpInst : public Instruction {
-  void *operator new(size_t, unsigned) LLVM_DELETED_FUNCTION;
-  CmpInst() LLVM_DELETED_FUNCTION;
+  void *operator new(size_t, unsigned) = delete;
+  CmpInst() = delete;
+
 protected:
   CmpInst(Type *ty, Instruction::OtherOps op, unsigned short pred,
           Value *LHS, Value *RHS, const Twine &Name = "",
-          Instruction *InsertBefore = 0);
+          Instruction *InsertBefore = nullptr);
 
   CmpInst(Type *ty, Instruction::OtherOps op, unsigned short pred,
           Value *LHS, Value *RHS, const Twine &Name,
           BasicBlock *InsertAtEnd);
 
-  virtual void anchor() LLVM_OVERRIDE; // Out of line virtual method.
+  void anchor() override; // Out of line virtual method.
+
 public:
   /// This enumeration lists the possible predicates for CmpInst subclasses.
   /// Values in the range 0-31 are reserved for FCmpInst, while values in the
@@ -690,7 +943,7 @@ public:
   static CmpInst *Create(OtherOps Op,
                          unsigned short predicate, Value *S1,
                          Value *S2, const Twine &Name = "",
-                         Instruction *InsertBefore = 0);
+                         Instruction *InsertBefore = nullptr);
 
   /// Construct a compare instruction, given the opcode, the predicate and the
   /// two operands.  Also automatically insert this instruction to the end of
@@ -698,7 +951,7 @@ public:
   /// @brief Create a CmpInst
   static CmpInst *Create(OtherOps Op, unsigned short predicate, Value *S1,
                          Value *S2, const Twine &Name, BasicBlock *InsertAtEnd);
-  
+
   /// @brief Get the opcode casted to the right type
   OtherOps getOpcode() const {
     return static_cast<OtherOps>(Instruction::getOpcode());
@@ -715,15 +968,14 @@ public:
   static bool isFPPredicate(Predicate P) {
     return P >= FIRST_FCMP_PREDICATE && P <= LAST_FCMP_PREDICATE;
   }
-  
+
   static bool isIntPredicate(Predicate P) {
     return P >= FIRST_ICMP_PREDICATE && P <= LAST_ICMP_PREDICATE;
   }
-  
+
   bool isFPPredicate() const { return isFPPredicate(getPredicate()); }
   bool isIntPredicate() const { return isIntPredicate(getPredicate()); }
-  
-  
+
   /// For example, EQ -> NE, UGT -> ULE, SLT -> SGE,
   ///              OEQ -> UNE, UGT -> OLE, OLT -> UGE, etc.
   /// @returns the inverse predicate for the instruction's current predicate.
@@ -781,6 +1033,19 @@ public:
     return isUnsigned(getPredicate());
   }
 
+  /// For example, ULT->SLT, ULE->SLE, UGT->SGT, UGE->SGE, SLT->Failed assert
+  /// @returns the signed version of the unsigned predicate pred.
+  /// @brief return the signed version of a predicate
+  static Predicate getSignedPredicate(Predicate pred);
+
+  /// For example, ULT->SLT, ULE->SLE, UGT->SGT, UGE->SGE, SLT->Failed assert
+  /// @returns the signed version of the predicate for this instruction (which
+  /// has to be an unsigned predicate).
+  /// @brief return the signed version of a predicate
+  Predicate getSignedPredicate() {
+    return getSignedPredicate(getPredicate());
+  }
+
   /// This is just a convenience.
   /// @brief Determine if this is true when both operands are the same.
   bool isTrueWhenEqual() const {
@@ -821,7 +1086,7 @@ public:
   static inline bool classof(const Value *V) {
     return isa<Instruction>(V) && classof(cast<Instruction>(V));
   }
-  
+
   /// @brief Create a result type for fcmp/icmp
   static Type* makeCmpResultType(Type* opnd_type) {
     if (VectorType* vt = dyn_cast<VectorType>(opnd_type)) {
@@ -830,6 +1095,7 @@ public:
     }
     return Type::getInt1Ty(opnd_type->getContext());
   }
+
 private:
   // Shadow Value::setValueSubclassData with a private forwarding method so that
   // subclasses cannot accidentally use it.
@@ -838,7 +1104,6 @@ private:
   }
 };
 
-
 // FIXME: these are redundant if CmpInst < BinaryOperator
 template <>
 struct OperandTraits<CmpInst> : public FixedNumOperandTraits<CmpInst, 2> {
@@ -846,6 +1111,295 @@ struct OperandTraits<CmpInst> : public FixedNumOperandTraits<CmpInst, 2> {
 
 DEFINE_TRANSPARENT_OPERAND_ACCESSORS(CmpInst, Value)
 
-} // End llvm namespace
+/// \brief A lightweight accessor for an operand bundle meant to be passed
+/// around by value.
+struct OperandBundleUse {
+  StringRef Tag;
+  ArrayRef<Use> Inputs;
 
-#endif
+  OperandBundleUse() {}
+  explicit OperandBundleUse(StringRef Tag, ArrayRef<Use> Inputs)
+      : Tag(Tag), Inputs(Inputs) {}
+};
+
+/// \brief A container for an operand bundle being viewed as a set of values
+/// rather than a set of uses.
+///
+/// Unlike OperandBundleUse, OperandBundleDefT owns the memory it carries, and
+/// so it is possible to create and pass around "self-contained" instances of
+/// OperandBundleDef and ConstOperandBundleDef.
+template <typename InputTy> struct OperandBundleDefT {
+  std::string Tag;
+  std::vector<InputTy> Inputs;
+
+  OperandBundleDefT() {}
+  explicit OperandBundleDefT(StringRef Tag, const std::vector<InputTy> &Inputs)
+      : Tag(Tag), Inputs(Inputs) {}
+};
+
+typedef OperandBundleDefT<Value *> OperandBundleDef;
+typedef OperandBundleDefT<const Value *> ConstOperandBundleDef;
+
+/// \brief A mixin to add operand bundle functionality to llvm instruction
+/// classes.
+///
+/// OperandBundleUser uses the descriptor area co-allocated with the host User
+/// to store some meta information about which operands are "normal" operands,
+/// and which ones belong to some operand bundle.
+///
+/// The layout of an operand bundle user is
+///
+///          +-----------uint32_t End-------------------------------------+
+///          |                                                            |
+///          |  +--------uint32_t Begin--------------------+              |
+///          |  |                                          |              |
+///          ^  ^                                          v              v
+///  |------|------|----|----|----|----|----|---------|----|---------|----|-----
+///  | BOI0 | BOI1 | .. | DU | U0 | U1 | .. | BOI0_U0 | .. | BOI1_U0 | .. | Un
+///  |------|------|----|----|----|----|----|---------|----|---------|----|-----
+///   v  v                                  ^              ^
+///   |  |                                  |              |
+///   |  +--------uint32_t Begin------------+              |
+///   |                                                    |
+///   +-----------uint32_t End-----------------------------+
+///
+///
+/// BOI0, BOI1 ... are descriptions of operand bundles in this User's use list.
+/// These descriptions are installed and managed by this class, and they're all
+/// instances of OperandBundleUser<T>::BundleOpInfo.
+///
+/// DU is an additional descriptor installed by User's 'operator new' to keep
+/// track of the 'BOI0 ... BOIN' co-allocation.  OperandBundleUser does not
+/// access or modify DU in any way, it's an implementation detail private to
+/// User.
+///
+/// The regular Use& vector for the User starts at U0.  The operand bundle uses
+/// are part of the Use& vector, just like normal uses.  In the diagram above,
+/// the operand bundle uses start at BOI0_U0.  Each instance of BundleOpInfo has
+/// information about a contiguous set of uses constituting an operand bundle,
+/// and the total set of operand bundle uses themselves form a contiguous set of
+/// uses (i.e. there are no gaps between uses corresponding to individual
+/// operand bundles).
+///
+/// This class does not know the location of the set of operand bundle uses
+/// within the use list -- that is decided by the User using this class via the
+/// BeginIdx argument in populateBundleOperandInfos.
+///
+/// Currently operand bundle users with hung-off operands are not supported.
+template <typename InstrTy, typename OpIteratorTy> class OperandBundleUser {
+public:
+  /// \brief Return the number of operand bundles associated with this User.
+  unsigned getNumOperandBundles() const {
+    return std::distance(bundle_op_info_begin(), bundle_op_info_end());
+  }
+
+  /// \brief Return true if this User has any operand bundles.
+  bool hasOperandBundles() const { return getNumOperandBundles() != 0; }
+
+  /// \brief Return the total number operands (not operand bundles) used by
+  /// every operand bundle in this OperandBundleUser.
+  unsigned getNumTotalBundleOperands() const {
+    if (!hasOperandBundles())
+      return 0;
+
+    auto *Begin = bundle_op_info_begin();
+    auto *Back = bundle_op_info_end() - 1;
+
+    assert(Begin <= Back && "hasOperandBundles() returned true!");
+
+    return Back->End - Begin->Begin;
+  }
+
+  /// \brief Return the operand bundle at a specific index.
+  OperandBundleUse getOperandBundle(unsigned Index) const {
+    assert(Index < getNumOperandBundles() && "Index out of bounds!");
+    auto *BOI = bundle_op_info_begin() + Index;
+    auto op_begin = static_cast<const InstrTy *>(this)->op_begin();
+    ArrayRef<Use> Inputs(op_begin + BOI->Begin, op_begin + BOI->End);
+    return OperandBundleUse(BOI->Tag->getKey(), Inputs);
+  }
+
+  /// \brief Return the number of operand bundles with the tag Name attached to
+  /// this instruction.
+  unsigned countOperandBundlesOfType(StringRef Name) const {
+    unsigned Count = 0;
+    for (unsigned i = 0, e = getNumOperandBundles(); i != e; ++i)
+      if (getOperandBundle(i).Tag == Name)
+        Count++;
+
+    return Count;
+  }
+
+  /// \brief Return an operand bundle by name, if present.
+  ///
+  /// It is an error to call this for operand bundle types that may have
+  /// multiple instances of them on the same instruction.
+  Optional<OperandBundleUse> getOperandBundle(StringRef Name) const {
+    assert(countOperandBundlesOfType(Name) < 2 && "Precondition violated!");
+
+    for (unsigned i = 0, e = getNumOperandBundles(); i != e; ++i) {
+      OperandBundleUse U = getOperandBundle(i);
+      if (U.Tag == Name)
+        return U;
+    }
+
+    return None;
+  }
+
+  /// \brief Return true if this operand bundle user has operand bundles that
+  /// may read from the heap.
+  bool hasReadingOperandBundles() const {
+    // Implementation note: this is a conservative implementation of operand
+    // bundle semantics, where *any* operand bundle forces a callsite to be at
+    // least readonly.
+    return hasOperandBundles();
+  }
+
+  /// \brief Return true if this operand bundle user has operand bundles that
+  /// may write to the heap.
+  bool hasClobberingOperandBundles() const {
+    // Implementation note: this is a conservative implementation of operand
+    // bundle semantics, where *any* operand bundle forces a callsite to be
+    // read-write.
+    return hasOperandBundles();
+  }
+
+protected:
+  /// \brief Is the function attribute S disallowed by some operand bundle on
+  /// this operand bundle user?
+  bool isFnAttrDisallowedByOpBundle(StringRef S) const {
+    // Operand bundles only possibly disallow readnone, readonly and argmenonly
+    // attributes.  All String attributes are fine.
+    return false;
+  }
+
+  /// \brief Is the function attribute A disallowed by some operand bundle on
+  /// this operand bundle user?
+  bool isFnAttrDisallowedByOpBundle(Attribute::AttrKind A) const {
+    switch (A) {
+    default:
+      return false;
+
+    case Attribute::ArgMemOnly:
+      return hasReadingOperandBundles();
+
+    case Attribute::ReadNone:
+      return hasReadingOperandBundles();
+
+    case Attribute::ReadOnly:
+      return hasClobberingOperandBundles();
+    }
+
+    llvm_unreachable("switch has a default case!");
+  }
+
+  /// \brief Used to keep track of an operand bundle.  See the main comment on
+  /// OperandBundleUser above.
+  struct BundleOpInfo {
+    /// \brief The operand bundle tag, interned by
+    /// LLVMContextImpl::getOrInsertBundleTag.
+    StringMapEntry<uint32_t> *Tag;
+
+    /// \brief The index in the Use& vector where operands for this operand
+    /// bundle starts.
+    uint32_t Begin;
+
+    /// \brief The index in the Use& vector where operands for this operand
+    /// bundle ends.
+    uint32_t End;
+  };
+
+  typedef BundleOpInfo *bundle_op_iterator;
+  typedef const BundleOpInfo *const_bundle_op_iterator;
+
+  /// \brief Return the start of the list of BundleOpInfo instances associated
+  /// with this OperandBundleUser.
+  bundle_op_iterator bundle_op_info_begin() {
+    if (!static_cast<InstrTy *>(this)->hasDescriptor())
+      return nullptr;
+
+    uint8_t *BytesBegin = static_cast<InstrTy *>(this)->getDescriptor().begin();
+    return reinterpret_cast<bundle_op_iterator>(BytesBegin);
+  }
+
+  /// \brief Return the start of the list of BundleOpInfo instances associated
+  /// with this OperandBundleUser.
+  const_bundle_op_iterator bundle_op_info_begin() const {
+    auto *NonConstThis =
+        const_cast<OperandBundleUser<InstrTy, OpIteratorTy> *>(this);
+    return NonConstThis->bundle_op_info_begin();
+  }
+
+  /// \brief Return the end of the list of BundleOpInfo instances associated
+  /// with this OperandBundleUser.
+  bundle_op_iterator bundle_op_info_end() {
+    if (!static_cast<InstrTy *>(this)->hasDescriptor())
+      return nullptr;
+
+    uint8_t *BytesEnd = static_cast<InstrTy *>(this)->getDescriptor().end();
+    return reinterpret_cast<bundle_op_iterator>(BytesEnd);
+  }
+
+  /// \brief Return the end of the list of BundleOpInfo instances associated
+  /// with this OperandBundleUser.
+  const_bundle_op_iterator bundle_op_info_end() const {
+    auto *NonConstThis =
+        const_cast<OperandBundleUser<InstrTy, OpIteratorTy> *>(this);
+    return NonConstThis->bundle_op_info_end();
+  }
+
+  /// \brief Return the range [\p bundle_op_info_begin, \p bundle_op_info_end).
+  iterator_range<bundle_op_iterator> bundle_op_infos() {
+    return iterator_range<bundle_op_iterator>(bundle_op_info_begin(),
+                                              bundle_op_info_end());
+  }
+
+  /// \brief Return the range [\p bundle_op_info_begin, \p bundle_op_info_end).
+  iterator_range<const_bundle_op_iterator> bundle_op_infos() const {
+    return iterator_range<const_bundle_op_iterator>(bundle_op_info_begin(),
+                                                    bundle_op_info_end());
+  }
+
+  /// \brief Populate the BundleOpInfo instances and the Use& vector from \p
+  /// Bundles.  Return the op_iterator pointing to the Use& one past the last
+  /// last bundle operand use.
+  ///
+  /// Each \p OperandBundleDef instance is tracked by a OperandBundleInfo
+  /// instance allocated in this User's descriptor.
+  OpIteratorTy populateBundleOperandInfos(ArrayRef<OperandBundleDef> Bundles,
+                                          const unsigned BeginIndex) {
+    auto It = static_cast<InstrTy *>(this)->op_begin() + BeginIndex;
+    for (auto &B : Bundles)
+      It = std::copy(B.Inputs.begin(), B.Inputs.end(), It);
+
+    auto *ContextImpl = static_cast<InstrTy *>(this)->getContext().pImpl;
+    auto BI = Bundles.begin();
+    unsigned CurrentIndex = BeginIndex;
+
+    for (auto &BOI : bundle_op_infos()) {
+      assert(BI != Bundles.end() && "Incorrect allocation?");
+
+      BOI.Tag = ContextImpl->getOrInsertBundleTag(BI->Tag);
+      BOI.Begin = CurrentIndex;
+      BOI.End = CurrentIndex + BI->Inputs.size();
+      CurrentIndex = BOI.End;
+      BI++;
+    }
+
+    assert(BI == Bundles.end() && "Incorrect allocation?");
+
+    return It;
+  }
+
+  /// \brief Return the total number of values used in \p Bundles.
+  static unsigned CountBundleInputs(ArrayRef<OperandBundleDef> Bundles) {
+    unsigned Total = 0;
+    for (auto &B : Bundles)
+      Total += B.Inputs.size();
+    return Total;
+  }
+};
+
+} // end llvm namespace
+
+#endif // LLVM_IR_INSTRTYPES_H

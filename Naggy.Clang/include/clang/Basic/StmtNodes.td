@@ -62,6 +62,7 @@ def UnaryOperator : DStmt<Expr>;
 def OffsetOfExpr : DStmt<Expr>;
 def UnaryExprOrTypeTraitExpr : DStmt<Expr>;
 def ArraySubscriptExpr : DStmt<Expr>;
+def OMPArraySectionExpr : DStmt<Expr>;
 def CallExpr : DStmt<Expr>;
 def MemberExpr : DStmt<Expr>;
 def CastExpr : DStmt<Expr, 1>;
@@ -77,7 +78,9 @@ def CompoundLiteralExpr : DStmt<Expr>;
 def ExtVectorElementExpr : DStmt<Expr>;
 def InitListExpr : DStmt<Expr>;
 def DesignatedInitExpr : DStmt<Expr>;
+def DesignatedInitUpdateExpr : DStmt<Expr>;
 def ImplicitValueInitExpr : DStmt<Expr>;
+def NoInitExpr : DStmt<Expr>;
 def ParenListExpr : DStmt<Expr>;
 def VAArgExpr : DStmt<Expr>;
 def GenericSelectionExpr : DStmt<Expr>;
@@ -110,12 +113,11 @@ def CXXThrowExpr : DStmt<Expr>;
 def CXXDefaultArgExpr : DStmt<Expr>;
 def CXXDefaultInitExpr : DStmt<Expr>;
 def CXXScalarValueInitExpr : DStmt<Expr>;
+def CXXStdInitializerListExpr : DStmt<Expr>;
 def CXXNewExpr : DStmt<Expr>;
 def CXXDeleteExpr : DStmt<Expr>;
 def CXXPseudoDestructorExpr : DStmt<Expr>;
 def TypeTraitExpr : DStmt<Expr>;
-def UnaryTypeTraitExpr : DStmt<Expr>;
-def BinaryTypeTraitExpr : DStmt<Expr>;
 def ArrayTypeTraitExpr : DStmt<Expr>;
 def ExpressionTraitExpr : DStmt<Expr>;
 def DependentScopeDeclRefExpr : DStmt<Expr>;
@@ -136,6 +138,7 @@ def SubstNonTypeTemplateParmPackExpr : DStmt<Expr>;
 def FunctionParmPackExpr : DStmt<Expr>;
 def MaterializeTemporaryExpr : DStmt<Expr>;
 def LambdaExpr : DStmt<Expr>;
+def CXXFoldExpr : DStmt<Expr>;
 
 // Obj-C Expressions.
 def ObjCStringLiteral : DStmt<Expr>;
@@ -161,8 +164,10 @@ def CUDAKernelCallExpr : DStmt<CallExpr>;
 
 // Clang Extensions.
 def ShuffleVectorExpr : DStmt<Expr>;
+def ConvertVectorExpr : DStmt<Expr>;
 def BlockExpr : DStmt<Expr>;
 def OpaqueValueExpr : DStmt<Expr>;
+def TypoExpr : DStmt<Expr>;
 
 // Microsoft Extensions.
 def MSPropertyRefExpr : DStmt<Expr>;
@@ -170,7 +175,37 @@ def CXXUuidofExpr : DStmt<Expr>;
 def SEHTryStmt : Stmt;
 def SEHExceptStmt : Stmt;
 def SEHFinallyStmt : Stmt;
+def SEHLeaveStmt : Stmt;
 def MSDependentExistsStmt : Stmt;
 
 // OpenCL Extensions.
 def AsTypeExpr : DStmt<Expr>;
+
+// OpenMP Directives.
+def OMPExecutableDirective : Stmt<1>;
+def OMPLoopDirective : DStmt<OMPExecutableDirective, 1>;
+def OMPParallelDirective : DStmt<OMPExecutableDirective>;
+def OMPSimdDirective : DStmt<OMPLoopDirective>;
+def OMPForDirective : DStmt<OMPLoopDirective>;
+def OMPForSimdDirective : DStmt<OMPLoopDirective>;
+def OMPSectionsDirective : DStmt<OMPExecutableDirective>;
+def OMPSectionDirective : DStmt<OMPExecutableDirective>;
+def OMPSingleDirective : DStmt<OMPExecutableDirective>;
+def OMPMasterDirective : DStmt<OMPExecutableDirective>;
+def OMPCriticalDirective : DStmt<OMPExecutableDirective>;
+def OMPParallelForDirective : DStmt<OMPLoopDirective>;
+def OMPParallelForSimdDirective : DStmt<OMPLoopDirective>;
+def OMPParallelSectionsDirective : DStmt<OMPExecutableDirective>;
+def OMPTaskDirective : DStmt<OMPExecutableDirective>;
+def OMPTaskyieldDirective : DStmt<OMPExecutableDirective>;
+def OMPBarrierDirective : DStmt<OMPExecutableDirective>;
+def OMPTaskwaitDirective : DStmt<OMPExecutableDirective>;
+def OMPTaskgroupDirective : DStmt<OMPExecutableDirective>;
+def OMPFlushDirective : DStmt<OMPExecutableDirective>;
+def OMPOrderedDirective : DStmt<OMPExecutableDirective>;
+def OMPAtomicDirective : DStmt<OMPExecutableDirective>;
+def OMPTargetDirective : DStmt<OMPExecutableDirective>;
+def OMPTargetDataDirective : DStmt<OMPExecutableDirective>;
+def OMPTeamsDirective : DStmt<OMPExecutableDirective>;
+def OMPCancellationPointDirective : DStmt<OMPExecutableDirective>;
+def OMPCancelDirective : DStmt<OMPExecutableDirective>;

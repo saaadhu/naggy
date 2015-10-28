@@ -39,7 +39,7 @@ public:
     HandlerBlock(handlerBlock) {}
 
   CXXCatchStmt(EmptyShell Empty)
-  : Stmt(CXXCatchStmtClass), ExceptionDecl(0), HandlerBlock(0) {}
+  : Stmt(CXXCatchStmtClass), ExceptionDecl(nullptr), HandlerBlock(nullptr) {}
 
   SourceLocation getLocStart() const LLVM_READONLY { return CatchLoc; }
   SourceLocation getLocEnd() const LLVM_READONLY {
@@ -79,10 +79,10 @@ class CXXTryStmt : public Stmt {
   }
 
 public:
-  static CXXTryStmt *Create(ASTContext &C, SourceLocation tryLoc,
+  static CXXTryStmt *Create(const ASTContext &C, SourceLocation tryLoc,
                             Stmt *tryBlock, ArrayRef<Stmt*> handlers);
 
-  static CXXTryStmt *Create(ASTContext &C, EmptyShell Empty,
+  static CXXTryStmt *Create(const ASTContext &C, EmptyShell Empty,
                             unsigned numHandlers);
 
   SourceLocation getLocStart() const LLVM_READONLY { return getTryLoc(); }
@@ -126,11 +126,11 @@ public:
 /// analysis of the constituent components. The original syntactic components
 /// can be extracted using getLoopVariable and getRangeInit.
 class CXXForRangeStmt : public Stmt {
+  SourceLocation ForLoc;
   enum { RANGE, BEGINEND, COND, INC, LOOPVAR, BODY, END };
   // SubExprs[RANGE] is an expression or declstmt.
   // SubExprs[COND] and SubExprs[INC] are expressions.
   Stmt *SubExprs[END];
-  SourceLocation ForLoc;
   SourceLocation ColonLoc;
   SourceLocation RParenLoc;
 public:

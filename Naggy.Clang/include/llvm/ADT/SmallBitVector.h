@@ -53,7 +53,11 @@ class SmallBitVector {
     SmallNumDataBits = SmallNumRawBits - SmallNumSizeBits
   };
 
+  static_assert(NumBaseBits == 64 || NumBaseBits == 32,
+                "Unsupported word size");
+
 public:
+  typedef unsigned size_type;
   // Encapsulation of a single bit.
   class reference {
     SmallBitVector &TheVector;
@@ -61,6 +65,8 @@ public:
 
   public:
     reference(SmallBitVector &b, unsigned Idx) : TheVector(b), BitPos(Idx) {}
+
+    reference(const reference&) = default;
 
     reference& operator=(reference t) {
       *this = bool(t);
@@ -153,11 +159,9 @@ public:
       switchToLarge(new BitVector(*RHS.getPointer()));
   }
 
-#if LLVM_HAS_RVALUE_REFERENCES
   SmallBitVector(SmallBitVector &&RHS) : X(RHS.X) {
     RHS.X = 1;
   }
-#endif
 
   ~SmallBitVector() {
     if (!isSmall())
@@ -175,14 +179,10 @@ public:
   }
 
   /// count - Returns the number of bits which are set.
-  unsigned count() const {
+  size_type count() const {
     if (isSmall()) {
       uintptr_t Bits = getSmallBits();
-      if (NumBaseBits == 32)
-        return CountPopulation_32(Bits);
-      if (NumBaseBits == 64)
-        return CountPopulation_64(Bits);
-      llvm_unreachable("Unsupported!");
+      return countPopulation(Bits);
     }
     return getPointer()->count();
   }
@@ -215,11 +215,7 @@ public:
       uintptr_t Bits = getSmallBits();
       if (Bits == 0)
         return -1;
-      if (NumBaseBits == 32)
-        return CountTrailingZeros_32(Bits);
-      if (NumBaseBits == 64)
-        return CountTrailingZeros_64(Bits);
-      llvm_unreachable("Unsupported!");
+      return countTrailingZeros(Bits);
     }
     return getPointer()->find_first();
   }
@@ -233,11 +229,7 @@ public:
       Bits &= ~uintptr_t(0) << (Prev + 1);
       if (Bits == 0 || Prev + 1 >= getSmallSize())
         return -1;
-      if (NumBaseBits == 32)
-        return CountTrailingZeros_32(Bits);
-      if (NumBaseBits == 64)
-        return CountTrailingZeros_64(Bits);
-      llvm_unreachable("Unsupported!");
+      return countTrailingZeros(Bits);
     }
     return getPointer()->find_next(Prev);
   }
@@ -293,8 +285,12 @@ public:
   }
 
   SmallBitVector &set(unsigned Idx) {
-    if (isSmall())
+    if (isSmall()) {
+      assert(Idx <= static_cast<unsigned>(
+                        std::numeric_limits<uintptr_t>::digits) &&
+             "undefined behavior");
       setSmallBits(getSmallBits() | (uintptr_t(1) << Idx));
+    }
     else
       getPointer()->set(Idx);
     return *this;
@@ -426,6 +422,40 @@ public:
     return *this;
   }
 
+  /// reset - Reset bits that are set in RHS. Same as *this &= ~RHS.
+  SmallBitVector &reset(const SmallBitVector &RHS) {
+    if (isSmall() && RHS.isSmall())
+      setSmallBits(getSmallBits() & ~RHS.getSmallBits());
+    else if (!isSmall() && !RHS.isSmall())
+      getPointer()->reset(*RHS.getPointer());
+    else
+      for (unsigned i = 0, e = std::min(size(), RHS.size()); i != e; ++i)
+        if (RHS.test(i))
+          reset(i);
+
+    return *this;
+  }
+
+  /// test - Check if (This - RHS) is zero.
+  /// This is the same as reset(RHS) and any().
+  bool test(const SmallBitVector &RHS) const {
+    if (isSmall() && RHS.isSmall())
+      return (getSmallBits() & ~RHS.getSmallBits()) != 0;
+    if (!isSmall() && !RHS.isSmall())
+      return getPointer()->test(*RHS.getPointer());
+
+    unsigned i, e;
+    for (i = 0, e = std::min(size(), RHS.size()); i != e; ++i)
+      if (test(i) && !RHS.test(i))
+        return true;
+
+    for (e = size(); i != e; ++i)
+      if (test(i))
+        return true;
+
+    return false;
+  }
+
   SmallBitVector &operator|=(const SmallBitVector &RHS) {
     resize(std::max(size(), RHS.size()));
     if (isSmall())
@@ -472,7 +502,6 @@ public:
     return *this;
   }
 
-#if LLVM_HAS_RVALUE_REFERENCES
   const SmallBitVector &operator=(SmallBitVector &&RHS) {
     if (this != &RHS) {
       clear();
@@ -480,7 +509,6 @@ public:
     }
     return *this;
   }
-#endif
 
   void swap(SmallBitVector &RHS) {
     std::swap(X, RHS.X);
@@ -523,20 +551,18 @@ public:
   }
 
 private:
-  template<bool AddBits, bool InvertMask>
+  template <bool AddBits, bool InvertMask>
   void applyMask(const uint32_t *Mask, unsigned MaskWords) {
-    assert((NumBaseBits == 64 || NumBaseBits == 32) && "Unsupported word size");
-    if (NumBaseBits == 64 && MaskWords >= 2) {
-      uint64_t M = Mask[0] | (uint64_t(Mask[1]) << 32);
-      if (InvertMask) M = ~M;
-      if (AddBits) setSmallBits(getSmallBits() | M);
-      else         setSmallBits(getSmallBits() & ~M);
-    } else {
-      uint32_t M = Mask[0];
-      if (InvertMask) M = ~M;
-      if (AddBits) setSmallBits(getSmallBits() | M);
-      else         setSmallBits(getSmallBits() & ~M);
-    }
+    assert(MaskWords <= sizeof(uintptr_t) && "Mask is larger than base!");
+    uintptr_t M = Mask[0];
+    if (NumBaseBits == 64)
+      M |= uint64_t(Mask[1]) << 32;
+    if (InvertMask)
+      M = ~M;
+    if (AddBits)
+      setSmallBits(getSmallBits() | M);
+    else
+      setSmallBits(getSmallBits() & ~M);
   }
 };
 
