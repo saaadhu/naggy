@@ -125,7 +125,7 @@ void ClangAdapter::Process(String ^contents)
 	InitializeInvocation(pInvocation);
 
 	if (pContents)
-		pInvocation->getPreprocessorOpts().addRemappedFile(m_filePath, pContents);
+		pInvocation->getPreprocessorOpts().addRemappedFile(m_filePath, llvm::MemoryBuffer::getMemBuffer(pContents).release());
 
 	m_pInstance->setInvocation(pInvocation);
 

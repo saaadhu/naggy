@@ -4782,19 +4782,6 @@ Index: lib/Target/AVR/patch.diff
 +   else if (ArchName == "mips" || ArchName == "mipseb" ||
 +            ArchName == "mipsallegrex")
 +     return mips;
-+diff --git a/lib/Target/LLVMBuild.txt b/lib/Target/LLVMBuild.txt
-+index 5a42ca5..fa142a3 100644
-+--- a/lib/Target/LLVMBuild.txt
-++++ b/lib/Target/LLVMBuild.txt
-+@@ -16,7 +16,7 @@
-+ ;===------------------------------------------------------------------------===;
-+ 
-+ [common]
-+-subdirectories = ARM CBackend CellSPU CppBackend Hexagon MBlaze MSP430 Mips PTX PowerPC Sparc X86 XCore
-++subdirectories = ARM CBackend CellSPU CppBackend Hexagon MBlaze MSP430 AVR Mips PTX PowerPC Sparc X86 XCore
-+ 
-+ ; This is a special group whose required libraries are extended (by llvm-build)
-+ ; with the best execution engine (the native JIT, if available, or the
 +diff --git a/projects/sample/configure b/projects/sample/configure
 +index 860faa2..38f6bf0 100755
 +--- a/projects/sample/configure
