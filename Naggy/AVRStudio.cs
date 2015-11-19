@@ -71,7 +71,7 @@ namespace Naggy
 
         private static NaggyClang.Arch GetArchFromCommandLine (string toolchainName)
         {
-            if (toolchainName.Contains("AVRGCC32"))
+			if (toolchainName.Contains("AVRGCC32") || toolchainName.Contains("avr32"))
                 return NaggyClang.Arch.AVR32;
             if (toolchainName.Contains("ARM"))
                 return NaggyClang.Arch.ARM;
@@ -119,8 +119,8 @@ namespace Naggy
             string outputFolder = ((dynamic)project.Object).GetProjectProperty("OutputDirectory");
             var absoluteProjectSpecificFolderPaths = expandedProjectSpecificIncludePaths
                 .Select(p => Path.IsPathRooted(p) ? p : Path.Combine(outputFolder, p));
-            
-            return adjustedDefaultIncludePaths.Concat(absoluteProjectSpecificFolderPaths);
+
+			return absoluteProjectSpecificFolderPaths.Concat(adjustedDefaultIncludePaths);
         }
 
         private static string[] GetPredefinedSymbols(dynamic compiler)
