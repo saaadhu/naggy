@@ -16,17 +16,32 @@
 
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/IndexedMap.h"
+#include "llvm/ADT/iterator_range.h"
+#include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBundle.h"
 #include "llvm/Target/TargetRegisterInfo.h"
+#include "llvm/Target/TargetSubtargetInfo.h"
 #include <vector>
 
 namespace llvm {
+class PSetIterator;
 
 /// MachineRegisterInfo - Keep track of information for virtual and physical
 /// registers, including vreg register classes, use/def chains for registers,
 /// etc.
 class MachineRegisterInfo {
-  const TargetRegisterInfo *const TRI;
+public:
+  class Delegate {
+    virtual void anchor();
+  public:
+    virtual void MRI_NoteNewVirtualRegister(unsigned Reg) = 0;
+
+    virtual ~Delegate() {}
+  };
+
+private:
+  const MachineFunction *MF;
+  Delegate *TheDelegate;
 
   /// IsSSA - True when the machine function is in SSA form and virtual
   /// registers have a single def.
@@ -36,6 +51,9 @@ class MachineRegisterInfo {
   /// Basic block live-in lists, kill flags, and implicit defs may not be
   /// accurate when after this flag is cleared.
   bool TracksLiveness;
+
+  /// True if subregister liveness is tracked.
+  bool TracksSubRegLiveness;
 
   /// VRegInfo - Information we keep for each virtual register.
   ///
@@ -55,7 +73,7 @@ class MachineRegisterInfo {
 
   /// PhysRegUseDefLists - This is an array of the head of the use/def list for
   /// physical registers.
-  MachineOperand **PhysRegUseDefLists;
+  std::vector<MachineOperand *> PhysRegUseDefLists;
 
   /// getRegUseDefListHead - Return the head pointer for the register use/def
   /// list for the specified virtual or physical register.
@@ -77,20 +95,8 @@ class MachineRegisterInfo {
     return MO->Contents.Reg.Next;
   }
 
-  /// UsedRegUnits - This is a bit vector that is computed and set by the
-  /// register allocator, and must be kept up to date by passes that run after
-  /// register allocation (though most don't modify this).  This is used
-  /// so that the code generator knows which callee save registers to save and
-  /// for other target specific uses.
-  /// This vector has bits set for register units that are modified in the
-  /// current function. It doesn't include registers clobbered by function
-  /// calls with register mask operands.
-  BitVector UsedRegUnits;
-
   /// UsedPhysRegMask - Additional used physregs including aliases.
   /// This bit vector represents all the registers clobbered by function calls.
-  /// It can model things that UsedRegUnits can't, such as function calls that
-  /// clobber ymm7 but preserve the low half in xmm7.
   BitVector UsedPhysRegMask;
 
   /// ReservedRegs - This is a bit vector of reserved registers.  The target
@@ -105,11 +111,31 @@ class MachineRegisterInfo {
   /// second element.
   std::vector<std::pair<unsigned, unsigned> > LiveIns;
 
-  MachineRegisterInfo(const MachineRegisterInfo&) LLVM_DELETED_FUNCTION;
-  void operator=(const MachineRegisterInfo&) LLVM_DELETED_FUNCTION;
+  MachineRegisterInfo(const MachineRegisterInfo&) = delete;
+  void operator=(const MachineRegisterInfo&) = delete;
 public:
-  explicit MachineRegisterInfo(const TargetRegisterInfo &TRI);
-  ~MachineRegisterInfo();
+  explicit MachineRegisterInfo(const MachineFunction *MF);
+
+  const TargetRegisterInfo *getTargetRegisterInfo() const {
+    return MF->getSubtarget().getRegisterInfo();
+  }
+
+  void resetDelegate(Delegate *delegate) {
+    // Ensure another delegate does not take over unless the current
+    // delegate first unattaches itself. If we ever need to multicast
+    // notifications, we will need to change to using a list.
+    assert(TheDelegate == delegate &&
+           "Only the current delegate can perform reset!");
+    TheDelegate = nullptr;
+  }
+
+  void setDelegate(Delegate *delegate) {
+    assert(delegate && !TheDelegate &&
+           "Attempted to set delegate to null, or to change it without "
+           "first resetting it!");
+
+    TheDelegate = delegate;
+  }
 
   //===--------------------------------------------------------------------===//
   // Function State
@@ -144,6 +170,23 @@ public:
   /// information.
   void invalidateLiveness() { TracksLiveness = false; }
 
+  /// Returns true if liveness for register class @p RC should be tracked at
+  /// the subregister level.
+  bool shouldTrackSubRegLiveness(const TargetRegisterClass &RC) const {
+    return subRegLivenessEnabled() && RC.HasDisjunctSubRegs;
+  }
+  bool shouldTrackSubRegLiveness(unsigned VReg) const {
+    assert(TargetRegisterInfo::isVirtualRegister(VReg) && "Must pass a VReg");
+    return shouldTrackSubRegLiveness(*getRegClass(VReg));
+  }
+  bool subRegLivenessEnabled() const {
+    return TracksSubRegLiveness;
+  }
+
+  void enableSubRegLiveness(bool Enable = true) {
+    TracksSubRegLiveness = Enable;
+  }
+
   //===--------------------------------------------------------------------===//
   // Register Info
   //===--------------------------------------------------------------------===//
@@ -166,19 +209,66 @@ public:
   /// reg_begin/reg_end - Provide iteration support to walk over all definitions
   /// and uses of a register within the MachineFunction that corresponds to this
   /// MachineRegisterInfo object.
-  template<bool Uses, bool Defs, bool SkipDebug>
+  template<bool Uses, bool Defs, bool SkipDebug,
+           bool ByOperand, bool ByInstr, bool ByBundle>
   class defusechain_iterator;
+  template<bool Uses, bool Defs, bool SkipDebug,
+           bool ByOperand, bool ByInstr, bool ByBundle>
+  class defusechain_instr_iterator;
 
   // Make it a friend so it can access getNextOperandForReg().
-  template<bool, bool, bool> friend class defusechain_iterator;
+  template<bool, bool, bool, bool, bool, bool>
+    friend class defusechain_iterator;
+  template<bool, bool, bool, bool, bool, bool>
+    friend class defusechain_instr_iterator;
+
+
 
   /// reg_iterator/reg_begin/reg_end - Walk all defs and uses of the specified
   /// register.
-  typedef defusechain_iterator<true,true,false> reg_iterator;
+  typedef defusechain_iterator<true,true,false,true,false,false>
+          reg_iterator;
   reg_iterator reg_begin(unsigned RegNo) const {
     return reg_iterator(getRegUseDefListHead(RegNo));
   }
-  static reg_iterator reg_end() { return reg_iterator(0); }
+  static reg_iterator reg_end() { return reg_iterator(nullptr); }
+
+  inline iterator_range<reg_iterator>  reg_operands(unsigned Reg) const {
+    return iterator_range<reg_iterator>(reg_begin(Reg), reg_end());
+  }
+
+  /// reg_instr_iterator/reg_instr_begin/reg_instr_end - Walk all defs and uses
+  /// of the specified register, stepping by MachineInstr.
+  typedef defusechain_instr_iterator<true,true,false,false,true,false>
+          reg_instr_iterator;
+  reg_instr_iterator reg_instr_begin(unsigned RegNo) const {
+    return reg_instr_iterator(getRegUseDefListHead(RegNo));
+  }
+  static reg_instr_iterator reg_instr_end() {
+    return reg_instr_iterator(nullptr);
+  }
+
+  inline iterator_range<reg_instr_iterator>
+  reg_instructions(unsigned Reg) const {
+    return iterator_range<reg_instr_iterator>(reg_instr_begin(Reg),
+                                              reg_instr_end());
+  }
+
+  /// reg_bundle_iterator/reg_bundle_begin/reg_bundle_end - Walk all defs and uses
+  /// of the specified register, stepping by bundle.
+  typedef defusechain_instr_iterator<true,true,false,false,false,true>
+          reg_bundle_iterator;
+  reg_bundle_iterator reg_bundle_begin(unsigned RegNo) const {
+    return reg_bundle_iterator(getRegUseDefListHead(RegNo));
+  }
+  static reg_bundle_iterator reg_bundle_end() {
+    return reg_bundle_iterator(nullptr);
+  }
+
+  inline iterator_range<reg_bundle_iterator> reg_bundles(unsigned Reg) const {
+    return iterator_range<reg_bundle_iterator>(reg_bundle_begin(Reg),
+                                               reg_bundle_end());
+  }
 
   /// reg_empty - Return true if there are no instructions using or defining the
   /// specified register (it may be live-in).
@@ -186,11 +276,56 @@ public:
 
   /// reg_nodbg_iterator/reg_nodbg_begin/reg_nodbg_end - Walk all defs and uses
   /// of the specified register, skipping those marked as Debug.
-  typedef defusechain_iterator<true,true,true> reg_nodbg_iterator;
+  typedef defusechain_iterator<true,true,true,true,false,false>
+          reg_nodbg_iterator;
   reg_nodbg_iterator reg_nodbg_begin(unsigned RegNo) const {
     return reg_nodbg_iterator(getRegUseDefListHead(RegNo));
   }
-  static reg_nodbg_iterator reg_nodbg_end() { return reg_nodbg_iterator(0); }
+  static reg_nodbg_iterator reg_nodbg_end() {
+    return reg_nodbg_iterator(nullptr);
+  }
+
+  inline iterator_range<reg_nodbg_iterator>
+  reg_nodbg_operands(unsigned Reg) const {
+    return iterator_range<reg_nodbg_iterator>(reg_nodbg_begin(Reg),
+                                              reg_nodbg_end());
+  }
+
+  /// reg_instr_nodbg_iterator/reg_instr_nodbg_begin/reg_instr_nodbg_end - Walk
+  /// all defs and uses of the specified register, stepping by MachineInstr,
+  /// skipping those marked as Debug.
+  typedef defusechain_instr_iterator<true,true,true,false,true,false>
+          reg_instr_nodbg_iterator;
+  reg_instr_nodbg_iterator reg_instr_nodbg_begin(unsigned RegNo) const {
+    return reg_instr_nodbg_iterator(getRegUseDefListHead(RegNo));
+  }
+  static reg_instr_nodbg_iterator reg_instr_nodbg_end() {
+    return reg_instr_nodbg_iterator(nullptr);
+  }
+
+  inline iterator_range<reg_instr_nodbg_iterator>
+  reg_nodbg_instructions(unsigned Reg) const {
+    return iterator_range<reg_instr_nodbg_iterator>(reg_instr_nodbg_begin(Reg),
+                                                    reg_instr_nodbg_end());
+  }
+
+  /// reg_bundle_nodbg_iterator/reg_bundle_nodbg_begin/reg_bundle_nodbg_end - Walk
+  /// all defs and uses of the specified register, stepping by bundle,
+  /// skipping those marked as Debug.
+  typedef defusechain_instr_iterator<true,true,true,false,false,true>
+          reg_bundle_nodbg_iterator;
+  reg_bundle_nodbg_iterator reg_bundle_nodbg_begin(unsigned RegNo) const {
+    return reg_bundle_nodbg_iterator(getRegUseDefListHead(RegNo));
+  }
+  static reg_bundle_nodbg_iterator reg_bundle_nodbg_end() {
+    return reg_bundle_nodbg_iterator(nullptr);
+  }
+
+  inline iterator_range<reg_bundle_nodbg_iterator>
+  reg_nodbg_bundles(unsigned Reg) const {
+    return iterator_range<reg_bundle_nodbg_iterator>(reg_bundle_nodbg_begin(Reg),
+                                                     reg_bundle_nodbg_end());
+  }
 
   /// reg_nodbg_empty - Return true if the only instructions using or defining
   /// Reg are Debug instructions.
@@ -199,11 +334,49 @@ public:
   }
 
   /// def_iterator/def_begin/def_end - Walk all defs of the specified register.
-  typedef defusechain_iterator<false,true,false> def_iterator;
+  typedef defusechain_iterator<false,true,false,true,false,false>
+          def_iterator;
   def_iterator def_begin(unsigned RegNo) const {
     return def_iterator(getRegUseDefListHead(RegNo));
   }
-  static def_iterator def_end() { return def_iterator(0); }
+  static def_iterator def_end() { return def_iterator(nullptr); }
+
+  inline iterator_range<def_iterator> def_operands(unsigned Reg) const {
+    return iterator_range<def_iterator>(def_begin(Reg), def_end());
+  }
+
+  /// def_instr_iterator/def_instr_begin/def_instr_end - Walk all defs of the
+  /// specified register, stepping by MachineInst.
+  typedef defusechain_instr_iterator<false,true,false,false,true,false>
+          def_instr_iterator;
+  def_instr_iterator def_instr_begin(unsigned RegNo) const {
+    return def_instr_iterator(getRegUseDefListHead(RegNo));
+  }
+  static def_instr_iterator def_instr_end() {
+    return def_instr_iterator(nullptr);
+  }
+
+  inline iterator_range<def_instr_iterator>
+  def_instructions(unsigned Reg) const {
+    return iterator_range<def_instr_iterator>(def_instr_begin(Reg),
+                                              def_instr_end());
+  }
+
+  /// def_bundle_iterator/def_bundle_begin/def_bundle_end - Walk all defs of the
+  /// specified register, stepping by bundle.
+  typedef defusechain_instr_iterator<false,true,false,false,false,true>
+          def_bundle_iterator;
+  def_bundle_iterator def_bundle_begin(unsigned RegNo) const {
+    return def_bundle_iterator(getRegUseDefListHead(RegNo));
+  }
+  static def_bundle_iterator def_bundle_end() {
+    return def_bundle_iterator(nullptr);
+  }
+
+  inline iterator_range<def_bundle_iterator> def_bundles(unsigned Reg) const {
+    return iterator_range<def_bundle_iterator>(def_bundle_begin(Reg),
+                                               def_bundle_end());
+  }
 
   /// def_empty - Return true if there are no instructions defining the
   /// specified register (it may be live-in).
@@ -219,11 +392,49 @@ public:
   }
 
   /// use_iterator/use_begin/use_end - Walk all uses of the specified register.
-  typedef defusechain_iterator<true,false,false> use_iterator;
+  typedef defusechain_iterator<true,false,false,true,false,false>
+          use_iterator;
   use_iterator use_begin(unsigned RegNo) const {
     return use_iterator(getRegUseDefListHead(RegNo));
   }
-  static use_iterator use_end() { return use_iterator(0); }
+  static use_iterator use_end() { return use_iterator(nullptr); }
+
+  inline iterator_range<use_iterator> use_operands(unsigned Reg) const {
+    return iterator_range<use_iterator>(use_begin(Reg), use_end());
+  }
+
+  /// use_instr_iterator/use_instr_begin/use_instr_end - Walk all uses of the
+  /// specified register, stepping by MachineInstr.
+  typedef defusechain_instr_iterator<true,false,false,false,true,false>
+          use_instr_iterator;
+  use_instr_iterator use_instr_begin(unsigned RegNo) const {
+    return use_instr_iterator(getRegUseDefListHead(RegNo));
+  }
+  static use_instr_iterator use_instr_end() {
+    return use_instr_iterator(nullptr);
+  }
+
+  inline iterator_range<use_instr_iterator>
+  use_instructions(unsigned Reg) const {
+    return iterator_range<use_instr_iterator>(use_instr_begin(Reg),
+                                              use_instr_end());
+  }
+
+  /// use_bundle_iterator/use_bundle_begin/use_bundle_end - Walk all uses of the
+  /// specified register, stepping by bundle.
+  typedef defusechain_instr_iterator<true,false,false,false,false,true>
+          use_bundle_iterator;
+  use_bundle_iterator use_bundle_begin(unsigned RegNo) const {
+    return use_bundle_iterator(getRegUseDefListHead(RegNo));
+  }
+  static use_bundle_iterator use_bundle_end() {
+    return use_bundle_iterator(nullptr);
+  }
+
+  inline iterator_range<use_bundle_iterator> use_bundles(unsigned Reg) const {
+    return iterator_range<use_bundle_iterator>(use_bundle_begin(Reg),
+                                               use_bundle_end());
+  }
 
   /// use_empty - Return true if there are no instructions using the specified
   /// register.
@@ -240,11 +451,56 @@ public:
 
   /// use_nodbg_iterator/use_nodbg_begin/use_nodbg_end - Walk all uses of the
   /// specified register, skipping those marked as Debug.
-  typedef defusechain_iterator<true,false,true> use_nodbg_iterator;
+  typedef defusechain_iterator<true,false,true,true,false,false>
+          use_nodbg_iterator;
   use_nodbg_iterator use_nodbg_begin(unsigned RegNo) const {
     return use_nodbg_iterator(getRegUseDefListHead(RegNo));
   }
-  static use_nodbg_iterator use_nodbg_end() { return use_nodbg_iterator(0); }
+  static use_nodbg_iterator use_nodbg_end() {
+    return use_nodbg_iterator(nullptr);
+  }
+
+  inline iterator_range<use_nodbg_iterator>
+  use_nodbg_operands(unsigned Reg) const {
+    return iterator_range<use_nodbg_iterator>(use_nodbg_begin(Reg),
+                                              use_nodbg_end());
+  }
+
+  /// use_instr_nodbg_iterator/use_instr_nodbg_begin/use_instr_nodbg_end - Walk
+  /// all uses of the specified register, stepping by MachineInstr, skipping
+  /// those marked as Debug.
+  typedef defusechain_instr_iterator<true,false,true,false,true,false>
+          use_instr_nodbg_iterator;
+  use_instr_nodbg_iterator use_instr_nodbg_begin(unsigned RegNo) const {
+    return use_instr_nodbg_iterator(getRegUseDefListHead(RegNo));
+  }
+  static use_instr_nodbg_iterator use_instr_nodbg_end() {
+    return use_instr_nodbg_iterator(nullptr);
+  }
+
+  inline iterator_range<use_instr_nodbg_iterator>
+  use_nodbg_instructions(unsigned Reg) const {
+    return iterator_range<use_instr_nodbg_iterator>(use_instr_nodbg_begin(Reg),
+                                                    use_instr_nodbg_end());
+  }
+
+  /// use_bundle_nodbg_iterator/use_bundle_nodbg_begin/use_bundle_nodbg_end - Walk
+  /// all uses of the specified register, stepping by bundle, skipping
+  /// those marked as Debug.
+  typedef defusechain_instr_iterator<true,false,true,false,false,true>
+          use_bundle_nodbg_iterator;
+  use_bundle_nodbg_iterator use_bundle_nodbg_begin(unsigned RegNo) const {
+    return use_bundle_nodbg_iterator(getRegUseDefListHead(RegNo));
+  }
+  static use_bundle_nodbg_iterator use_bundle_nodbg_end() {
+    return use_bundle_nodbg_iterator(nullptr);
+  }
+
+  inline iterator_range<use_bundle_nodbg_iterator>
+  use_nodbg_bundles(unsigned Reg) const {
+    return iterator_range<use_bundle_nodbg_iterator>(use_bundle_nodbg_begin(Reg),
+                                                     use_bundle_nodbg_end());
+  }
 
   /// use_nodbg_empty - Return true if there are no non-Debug instructions
   /// using the specified register.
@@ -267,6 +523,10 @@ public:
   ///
   /// That function will return NULL if the virtual registers have incompatible
   /// constraints.
+  ///
+  /// Note that if ToReg is a physical register the function will replace and
+  /// apply sub registers to ToReg in order to obtain a final/proper physical
+  /// register.
   void replaceRegWith(unsigned FromReg, unsigned ToReg);
 
   /// getVRegDef - Return the machine instr that defines the specified virtual
@@ -293,6 +553,11 @@ public:
   /// throughout the function.  It is safe to move instructions that read such
   /// a physreg.
   bool isConstantPhysReg(unsigned PhysReg, const MachineFunction &MF) const;
+
+  /// Get an iterator over the pressure sets affected by the given physical or
+  /// virtual register. If RegUnit is physical, it must be a register unit (from
+  /// MCRegUnitIterator).
+  PSetIterator getPressureSets(unsigned RegUnit) const;
 
   //===--------------------------------------------------------------------===//
   // Virtual Register Info
@@ -327,7 +592,7 @@ public:
   /// virtual register, for example after removing instructions or splitting
   /// the live range.
   ///
-  bool recomputeRegClass(unsigned Reg, const TargetMachine&);
+  bool recomputeRegClass(unsigned Reg);
 
   /// createVirtualRegister - Create and return a new virtual register in the
   /// function with the specified register class.
@@ -343,58 +608,51 @@ public:
 
   /// setRegAllocationHint - Specify a register allocation hint for the
   /// specified virtual register.
-  void setRegAllocationHint(unsigned Reg, unsigned Type, unsigned PrefReg) {
-    RegAllocHints[Reg].first  = Type;
-    RegAllocHints[Reg].second = PrefReg;
+  void setRegAllocationHint(unsigned VReg, unsigned Type, unsigned PrefReg) {
+    assert(TargetRegisterInfo::isVirtualRegister(VReg));
+    RegAllocHints[VReg].first  = Type;
+    RegAllocHints[VReg].second = PrefReg;
+  }
+
+  /// Specify the preferred register allocation hint for the specified virtual
+  /// register.
+  void setSimpleHint(unsigned VReg, unsigned PrefReg) {
+    setRegAllocationHint(VReg, /*Type=*/0, PrefReg);
   }
 
   /// getRegAllocationHint - Return the register allocation hint for the
   /// specified virtual register.
   std::pair<unsigned, unsigned>
-  getRegAllocationHint(unsigned Reg) const {
-    return RegAllocHints[Reg];
+  getRegAllocationHint(unsigned VReg) const {
+    assert(TargetRegisterInfo::isVirtualRegister(VReg));
+    return RegAllocHints[VReg];
   }
 
   /// getSimpleHint - Return the preferred register allocation hint, or 0 if a
   /// standard simple hint (Type == 0) is not set.
-  unsigned getSimpleHint(unsigned Reg) const {
-    std::pair<unsigned, unsigned> Hint = getRegAllocationHint(Reg);
+  unsigned getSimpleHint(unsigned VReg) const {
+    assert(TargetRegisterInfo::isVirtualRegister(VReg));
+    std::pair<unsigned, unsigned> Hint = getRegAllocationHint(VReg);
     return Hint.first ? 0 : Hint.second;
   }
 
+  /// markUsesInDebugValueAsUndef - Mark every DBG_VALUE referencing the
+  /// specified register as undefined which causes the DBG_VALUE to be
+  /// deleted during LiveDebugVariables analysis.
+  void markUsesInDebugValueAsUndef(unsigned Reg) const;
 
-  //===--------------------------------------------------------------------===//
-  // Physical Register Use Info
-  //===--------------------------------------------------------------------===//
+  /// Return true if the specified register is modified in this function.
+  /// This checks that no defining machine operands exist for the register or
+  /// any of its aliases. Definitions found on functions marked noreturn are
+  /// ignored. The register is also considered modified when it is set in the
+  /// UsedPhysRegMask.
+  bool isPhysRegModified(unsigned PhysReg) const;
 
-  /// isPhysRegUsed - Return true if the specified register is used in this
-  /// function. Also check for clobbered aliases and registers clobbered by
-  /// function calls with register mask operands.
-  ///
-  /// This only works after register allocation. It is primarily used by
-  /// PrologEpilogInserter to determine which callee-saved registers need
-  /// spilling.
-  bool isPhysRegUsed(unsigned Reg) const {
-    if (UsedPhysRegMask.test(Reg))
-      return true;
-    for (MCRegUnitIterator Units(Reg, TRI); Units.isValid(); ++Units)
-      if (UsedRegUnits.test(*Units))
-        return true;
-    return false;
-  }
-
-  /// Mark the specified register unit as used in this function.
-  /// This should only be called during and after register allocation.
-  void setRegUnitUsed(unsigned RegUnit) {
-    UsedRegUnits.set(RegUnit);
-  }
-
-  /// setPhysRegUsed - Mark the specified register used in this function.
-  /// This should only be called during and after register allocation.
-  void setPhysRegUsed(unsigned Reg) {
-    for (MCRegUnitIterator Units(Reg, TRI); Units.isValid(); ++Units)
-      UsedRegUnits.set(*Units);
-  }
+  /// Return true if the specified register is modified or read in this
+  /// function. This checks that no machine operands exist for the register or
+  /// any of its aliases. The register is also considered used when it is set
+  /// in the UsedPhysRegMask.
+  bool isPhysRegUsed(unsigned PhysReg) const;
 
   /// addPhysRegsUsedFromRegMask - Mark any registers not in RegMask as used.
   /// This corresponds to the bit mask attached to register mask operands.
@@ -402,14 +660,9 @@ public:
     UsedPhysRegMask.setBitsNotInMask(RegMask);
   }
 
-  /// setPhysRegUnused - Mark the specified register unused in this function.
-  /// This should only be called during and after register allocation.
-  void setPhysRegUnused(unsigned Reg) {
-    UsedPhysRegMask.reset(Reg);
-    for (MCRegUnitIterator Units(Reg, TRI); Units.isValid(); ++Units)
-      UsedRegUnits.reset(*Units);
-  }
+  const BitVector &getUsedPhysRegsMask() const { return UsedPhysRegMask; }
 
+  void setUsedPhysRegMask(BitVector &Mask) { UsedPhysRegMask = Mask; }
 
   //===--------------------------------------------------------------------===//
   // Reserved Register Info
@@ -466,7 +719,8 @@ public:
   /// register, so a register allocator needs to track its liveness and
   /// availability.
   bool isAllocatable(unsigned PhysReg) const {
-    return TRI->isInAllocatableClass(PhysReg) && !isReserved(PhysReg);
+    return getTargetRegisterInfo()->isInAllocatableClass(PhysReg) &&
+      !isReserved(PhysReg);
   }
 
   //===--------------------------------------------------------------------===//
@@ -503,13 +757,18 @@ public:
                         const TargetRegisterInfo &TRI,
                         const TargetInstrInfo &TII);
 
+  /// Returns a mask covering all bits that can appear in lane masks of
+  /// subregisters of the virtual register @p Reg.
+  LaneBitmask getMaxLaneMaskForVReg(unsigned Reg) const;
+
   /// defusechain_iterator - This class provides iterator support for machine
   /// operands in the function that use or define a specific register.  If
   /// ReturnUses is true it returns uses of registers, if ReturnDefs is true it
   /// returns defs.  If neither are true then you are silly and it always
   /// returns end().  If SkipDebug is true it skips uses marked Debug
   /// when incrementing.
-  template<bool ReturnUses, bool ReturnDefs, bool SkipDebug>
+  template<bool ReturnUses, bool ReturnDefs, bool SkipDebug,
+           bool ByOperand, bool ByInstr, bool ByBundle>
   class defusechain_iterator
     : public std::iterator<std::forward_iterator_tag, MachineInstr, ptrdiff_t> {
     MachineOperand *Op;
@@ -520,31 +779,12 @@ public:
         if ((!ReturnUses && op->isUse()) ||
             (!ReturnDefs && op->isDef()) ||
             (SkipDebug && op->isDebug()))
-          ++*this;
+          advance();
       }
     }
     friend class MachineRegisterInfo;
-  public:
-    typedef std::iterator<std::forward_iterator_tag,
-                          MachineInstr, ptrdiff_t>::reference reference;
-    typedef std::iterator<std::forward_iterator_tag,
-                          MachineInstr, ptrdiff_t>::pointer pointer;
 
-    defusechain_iterator(const defusechain_iterator &I) : Op(I.Op) {}
-    defusechain_iterator() : Op(0) {}
-
-    bool operator==(const defusechain_iterator &x) const {
-      return Op == x.Op;
-    }
-    bool operator!=(const defusechain_iterator &x) const {
-      return !operator==(x);
-    }
-
-    /// atEnd - return true if this iterator is equal to reg_end() on the value.
-    bool atEnd() const { return Op == 0; }
-
-    // Iterator traversal: forward iteration only
-    defusechain_iterator &operator++() {          // Preincrement
+    void advance() {
       assert(Op && "Cannot increment end iterator!");
       Op = getNextOperandForReg(Op);
 
@@ -552,7 +792,7 @@ public:
       if (!ReturnUses) {
         if (Op) {
           if (Op->isUse())
-            Op = 0;
+            Op = nullptr;
           else
             assert(!Op->isDebug() && "Can't have debug defs");
         }
@@ -562,35 +802,46 @@ public:
                       (SkipDebug && Op->isDebug())))
           Op = getNextOperandForReg(Op);
       }
+    }
+  public:
+    typedef std::iterator<std::forward_iterator_tag,
+                          MachineInstr, ptrdiff_t>::reference reference;
+    typedef std::iterator<std::forward_iterator_tag,
+                          MachineInstr, ptrdiff_t>::pointer pointer;
+
+    defusechain_iterator() : Op(nullptr) {}
+
+    bool operator==(const defusechain_iterator &x) const {
+      return Op == x.Op;
+    }
+    bool operator!=(const defusechain_iterator &x) const {
+      return !operator==(x);
+    }
+
+    /// atEnd - return true if this iterator is equal to reg_end() on the value.
+    bool atEnd() const { return Op == nullptr; }
+
+    // Iterator traversal: forward iteration only
+    defusechain_iterator &operator++() {          // Preincrement
+      assert(Op && "Cannot increment end iterator!");
+      if (ByOperand)
+        advance();
+      else if (ByInstr) {
+        MachineInstr *P = Op->getParent();
+        do {
+          advance();
+        } while (Op && Op->getParent() == P);
+      } else if (ByBundle) {
+        MachineInstr *P = getBundleStart(Op->getParent());
+        do {
+          advance();
+        } while (Op && getBundleStart(Op->getParent()) == P);
+      }
 
       return *this;
     }
     defusechain_iterator operator++(int) {        // Postincrement
       defusechain_iterator tmp = *this; ++*this; return tmp;
-    }
-
-    /// skipInstruction - move forward until reaching a different instruction.
-    /// Return the skipped instruction that is no longer pointed to, or NULL if
-    /// already pointing to end().
-    MachineInstr *skipInstruction() {
-      if (!Op) return 0;
-      MachineInstr *MI = Op->getParent();
-      do ++*this;
-      while (Op && Op->getParent() == MI);
-      return MI;
-    }
-
-    MachineInstr *skipBundle() {
-      if (!Op) return 0;
-      MachineInstr *MI = getBundleStart(Op->getParent());
-      do ++*this;
-      while (Op && getBundleStart(Op->getParent()) == MI);
-      return MI;
-    }
-
-    MachineOperand &getOperand() const {
-      assert(Op && "Cannot dereference end iterator!");
-      return *Op;
     }
 
     /// getOperandNo - Return the operand # of this MachineOperand in its
@@ -601,18 +852,155 @@ public:
     }
 
     // Retrieve a reference to the current operand.
+    MachineOperand &operator*() const {
+      assert(Op && "Cannot dereference end iterator!");
+      return *Op;
+    }
+
+    MachineOperand *operator->() const {
+      assert(Op && "Cannot dereference end iterator!");
+      return Op;
+    }
+  };
+
+  /// defusechain_iterator - This class provides iterator support for machine
+  /// operands in the function that use or define a specific register.  If
+  /// ReturnUses is true it returns uses of registers, if ReturnDefs is true it
+  /// returns defs.  If neither are true then you are silly and it always
+  /// returns end().  If SkipDebug is true it skips uses marked Debug
+  /// when incrementing.
+  template<bool ReturnUses, bool ReturnDefs, bool SkipDebug,
+           bool ByOperand, bool ByInstr, bool ByBundle>
+  class defusechain_instr_iterator
+    : public std::iterator<std::forward_iterator_tag, MachineInstr, ptrdiff_t> {
+    MachineOperand *Op;
+    explicit defusechain_instr_iterator(MachineOperand *op) : Op(op) {
+      // If the first node isn't one we're interested in, advance to one that
+      // we are interested in.
+      if (op) {
+        if ((!ReturnUses && op->isUse()) ||
+            (!ReturnDefs && op->isDef()) ||
+            (SkipDebug && op->isDebug()))
+          advance();
+      }
+    }
+    friend class MachineRegisterInfo;
+
+    void advance() {
+      assert(Op && "Cannot increment end iterator!");
+      Op = getNextOperandForReg(Op);
+
+      // All defs come before the uses, so stop def_iterator early.
+      if (!ReturnUses) {
+        if (Op) {
+          if (Op->isUse())
+            Op = nullptr;
+          else
+            assert(!Op->isDebug() && "Can't have debug defs");
+        }
+      } else {
+        // If this is an operand we don't care about, skip it.
+        while (Op && ((!ReturnDefs && Op->isDef()) ||
+                      (SkipDebug && Op->isDebug())))
+          Op = getNextOperandForReg(Op);
+      }
+    }
+  public:
+    typedef std::iterator<std::forward_iterator_tag,
+                          MachineInstr, ptrdiff_t>::reference reference;
+    typedef std::iterator<std::forward_iterator_tag,
+                          MachineInstr, ptrdiff_t>::pointer pointer;
+
+    defusechain_instr_iterator() : Op(nullptr) {}
+
+    bool operator==(const defusechain_instr_iterator &x) const {
+      return Op == x.Op;
+    }
+    bool operator!=(const defusechain_instr_iterator &x) const {
+      return !operator==(x);
+    }
+
+    /// atEnd - return true if this iterator is equal to reg_end() on the value.
+    bool atEnd() const { return Op == nullptr; }
+
+    // Iterator traversal: forward iteration only
+    defusechain_instr_iterator &operator++() {          // Preincrement
+      assert(Op && "Cannot increment end iterator!");
+      if (ByOperand)
+        advance();
+      else if (ByInstr) {
+        MachineInstr *P = Op->getParent();
+        do {
+          advance();
+        } while (Op && Op->getParent() == P);
+      } else if (ByBundle) {
+        MachineInstr *P = getBundleStart(Op->getParent());
+        do {
+          advance();
+        } while (Op && getBundleStart(Op->getParent()) == P);
+      }
+
+      return *this;
+    }
+    defusechain_instr_iterator operator++(int) {        // Postincrement
+      defusechain_instr_iterator tmp = *this; ++*this; return tmp;
+    }
+
+    // Retrieve a reference to the current operand.
     MachineInstr &operator*() const {
       assert(Op && "Cannot dereference end iterator!");
+      if (ByBundle) return *(getBundleStart(Op->getParent()));
       return *Op->getParent();
     }
 
     MachineInstr *operator->() const {
       assert(Op && "Cannot dereference end iterator!");
+      if (ByBundle) return getBundleStart(Op->getParent());
       return Op->getParent();
     }
   };
-
 };
+
+/// Iterate over the pressure sets affected by the given physical or virtual
+/// register. If Reg is physical, it must be a register unit (from
+/// MCRegUnitIterator).
+class PSetIterator {
+  const int *PSet;
+  unsigned Weight;
+public:
+  PSetIterator(): PSet(nullptr), Weight(0) {}
+  PSetIterator(unsigned RegUnit, const MachineRegisterInfo *MRI) {
+    const TargetRegisterInfo *TRI = MRI->getTargetRegisterInfo();
+    if (TargetRegisterInfo::isVirtualRegister(RegUnit)) {
+      const TargetRegisterClass *RC = MRI->getRegClass(RegUnit);
+      PSet = TRI->getRegClassPressureSets(RC);
+      Weight = TRI->getRegClassWeight(RC).RegWeight;
+    }
+    else {
+      PSet = TRI->getRegUnitPressureSets(RegUnit);
+      Weight = TRI->getRegUnitWeight(RegUnit);
+    }
+    if (*PSet == -1)
+      PSet = nullptr;
+  }
+  bool isValid() const { return PSet; }
+
+  unsigned getWeight() const { return Weight; }
+
+  unsigned operator*() const { return *PSet; }
+
+  void operator++() {
+    assert(isValid() && "Invalid PSetIterator.");
+    ++PSet;
+    if (*PSet == -1)
+      PSet = nullptr;
+  }
+};
+
+inline PSetIterator MachineRegisterInfo::
+getPressureSets(unsigned RegUnit) const {
+  return PSetIterator(RegUnit, this);
+}
 
 } // End llvm namespace
 

@@ -1,5 +1,6 @@
 ﻿1636 : invalid asm constraint
-1640 : invalid output constraint
-1639 : unknown register name
-3780 : unknown attribute
-3292 : use of unknown builtin
+1768 : invalid output constraint
+1764 : invalid input constraint
+1776 : unknown register name
+4433 : unknown attribute
+3915 : use of unknown builtin

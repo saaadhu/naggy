@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\Parse\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\e2e18f88a3dc692522eee61dca380f5b\AttrParserStringSwitches.inc.tmp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\e2e18f88a3dc692522eee61dca380f5b\AttrParserStringSwitches.inc.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\senth\Documents\llvm\CMakeFiles\d1d261453b7403aefcbfb897f5c0c308\ClangAttrParserStringSwitches.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\senth\Documents\llvm\tools\clang\include\clang\Parse\CMakeFiles\ClangAttrParserStringSwitches" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{40F6E61E-06AD-4A12-8D2E-D1032AFAB4EC}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

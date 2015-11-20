@@ -22,27 +22,6 @@ namespace llvm {
   class ModulePass;
   class Pass;
   class PassInfo;
-  class LibCallInfo;
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createGlobalsModRefPass - This pass provides alias and mod/ref info for
-  // global values that do not have their addresses taken.
-  //
-  Pass *createGlobalsModRefPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createAliasDebugger - This pass helps debug clients of AA
-  //
-  Pass *createAliasDebugger();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createAliasAnalysisCounterPass - This pass counts alias queries and how the
-  // alias analysis implementation responds.
-  //
-  ModulePass *createAliasAnalysisCounterPass();
 
   //===--------------------------------------------------------------------===//
   //
@@ -53,124 +32,12 @@ namespace llvm {
 
   //===--------------------------------------------------------------------===//
   //
-  // createNoAAPass - This pass implements a "I don't know" alias analysis.
-  //
-  ImmutablePass *createNoAAPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createBasicAliasAnalysisPass - This pass implements the stateless alias
-  // analysis.
-  //
-  ImmutablePass *createBasicAliasAnalysisPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  /// createLibCallAliasAnalysisPass - Create an alias analysis pass that knows
-  /// about the semantics of a set of libcalls specified by LCI.  The newly
-  /// constructed pass takes ownership of the pointer that is provided.
-  ///
-  FunctionPass *createLibCallAliasAnalysisPass(LibCallInfo *LCI);
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createScalarEvolutionAliasAnalysisPass - This pass implements a simple
-  // alias analysis using ScalarEvolution queries.
-  //
-  FunctionPass *createScalarEvolutionAliasAnalysisPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createTypeBasedAliasAnalysisPass - This pass implements metadata-based
-  // type-based alias analysis.
-  //
-  ImmutablePass *createTypeBasedAliasAnalysisPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createObjCARCAliasAnalysisPass - This pass implements ObjC-ARC-based
+  // createObjCARCAAWrapperPass - This pass implements ObjC-ARC-based
   // alias analysis.
   //
-  ImmutablePass *createObjCARCAliasAnalysisPass();
+  ImmutablePass *createObjCARCAAWrapperPass();
 
-  //===--------------------------------------------------------------------===//
-  //
-  // createProfileLoaderPass - This pass loads information from a profile dump
-  // file.
-  //
-  ModulePass *createProfileLoaderPass();
-  extern char &ProfileLoaderPassID;
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createProfileMetadataLoaderPass - This pass loads information from a
-  // profile dump file and sets branch weight metadata.
-  //
-  ModulePass *createProfileMetadataLoaderPass();
-  extern char &ProfileMetadataLoaderPassID;
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createNoProfileInfoPass - This pass implements the default "no profile".
-  //
-  ImmutablePass *createNoProfileInfoPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createProfileEstimatorPass - This pass estimates profiling information
-  // instead of loading it from a previous run.
-  //
-  FunctionPass *createProfileEstimatorPass();
-  extern char &ProfileEstimatorPassID;
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createProfileVerifierPass - This pass verifies profiling information.
-  //
-  FunctionPass *createProfileVerifierPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createPathProfileLoaderPass - This pass loads information from a path
-  // profile dump file.
-  //
-  ModulePass *createPathProfileLoaderPass();
-  extern char &PathProfileLoaderPassID;
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createNoPathProfileInfoPass - This pass implements the default
-  // "no path profile".
-  //
-  ImmutablePass *createNoPathProfileInfoPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createPathProfileVerifierPass - This pass verifies path profiling
-  // information.
-  //
-  ModulePass *createPathProfileVerifierPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createDSAAPass - This pass implements simple context sensitive alias
-  // analysis.
-  //
-  ModulePass *createDSAAPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createDSOptPass - This pass uses DSA to do a series of simple
-  // optimizations.
-  //
-  ModulePass *createDSOptPass();
-
-  //===--------------------------------------------------------------------===//
-  //
-  // createSteensgaardPass - This pass uses the data structure graphs to do a
-  // simple context insensitive alias analysis.
-  //
-  ModulePass *createSteensgaardPass();
+  FunctionPass *createPAEvalPass();
 
   //===--------------------------------------------------------------------===//
   //
@@ -194,6 +61,20 @@ namespace llvm {
 
   //===--------------------------------------------------------------------===//
   //
+  // createDelinearizationPass - This pass implements attempts to restore
+  // multidimensional array indices from linearized expressions.
+  //
+  FunctionPass *createDelinearizationPass();
+
+  //===--------------------------------------------------------------------===//
+  //
+  // createDivergenceAnalysisPass - This pass determines which branches in a GPU
+  // program are divergent.
+  //
+  FunctionPass *createDivergenceAnalysisPass();
+
+  //===--------------------------------------------------------------------===//
+  //
   // Minor pass prototypes, allowing us to expose them through bugpoint and
   // analyze.
   FunctionPass *createInstCountPass();
@@ -214,6 +95,14 @@ namespace llvm {
   // information and prints it with -analyze.
   //
   FunctionPass *createMemDepPrinter();
+
+  //===--------------------------------------------------------------------===//
+  //
+  // createMemDerefPrinter - This pass collects memory dereferenceability
+  // information and prints it with -analyze.
+  //
+  FunctionPass *createMemDerefPrinter();
+
 }
 
 #endif

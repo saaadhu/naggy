@@ -82,11 +82,13 @@ public:
   }
     
   // Iterators
-  child_range children() { return child_range(); }
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
 };
 
 /// ObjCBoxedExpr - used for generalized expression boxing.
-/// as in: @(strdup("hello world")) or @(random())
+/// as in: @(strdup("hello world")), @(random()) or @(view.frame)
 /// Also used for boxing non-parenthesized numeric literals;
 /// as in: @42 or \@true (c++/objc++) or \@__yes (c/objc).
 class ObjCBoxedExpr : public Expr {
@@ -124,6 +126,15 @@ public:
   
   // Iterators
   child_range children() { return child_range(&SubExpr, &SubExpr+1); }
+
+  typedef ConstExprIterator const_arg_iterator;
+
+  const_arg_iterator arg_begin() const {
+    return reinterpret_cast<Stmt const * const*>(&SubExpr);
+  }
+  const_arg_iterator arg_end() const {
+    return reinterpret_cast<Stmt const * const*>(&SubExpr + 1);
+  }
   
   friend class ASTStmtReader;
 };
@@ -143,12 +154,13 @@ class ObjCArrayLiteral : public Expr {
     : Expr(ObjCArrayLiteralClass, Empty), NumElements(NumElements) {}
 
 public:
-  static ObjCArrayLiteral *Create(ASTContext &C, 
+  static ObjCArrayLiteral *Create(const ASTContext &C,
                                   ArrayRef<Expr *> Elements,
                                   QualType T, ObjCMethodDecl * Method,
                                   SourceRange SR);
 
-  static ObjCArrayLiteral *CreateEmpty(ASTContext &C, unsigned NumElements);
+  static ObjCArrayLiteral *CreateEmpty(const ASTContext &C,
+                                       unsigned NumElements);
 
   SourceLocation getLocStart() const LLVM_READONLY { return Range.getBegin(); }
   SourceLocation getLocEnd() const LLVM_READONLY { return Range.getEnd(); }
@@ -214,7 +226,7 @@ struct ObjCDictionaryElement {
 } // end namespace clang
 
 namespace llvm {
-template <> struct isPodLike<clang::ObjCDictionaryElement> : llvm::true_type {};
+template <> struct isPodLike<clang::ObjCDictionaryElement> : std::true_type {};
 }
 
 namespace clang {
@@ -276,26 +288,26 @@ class ObjCDictionaryLiteral : public Expr {
 
   ExpansionData *getExpansionData() {
     if (!HasPackExpansions)
-      return 0;
+      return nullptr;
     
     return reinterpret_cast<ExpansionData *>(getKeyValues() + NumElements);
   }
 
   const ExpansionData *getExpansionData() const {
     if (!HasPackExpansions)
-      return 0;
+      return nullptr;
     
     return reinterpret_cast<const ExpansionData *>(getKeyValues()+NumElements);
   }
 
 public:
-  static ObjCDictionaryLiteral *Create(ASTContext &C,
+  static ObjCDictionaryLiteral *Create(const ASTContext &C,
                                        ArrayRef<ObjCDictionaryElement> VK, 
                                        bool HasPackExpansions,
                                        QualType T, ObjCMethodDecl *method,
                                        SourceRange SR);
   
-  static ObjCDictionaryLiteral *CreateEmpty(ASTContext &C, 
+  static ObjCDictionaryLiteral *CreateEmpty(const ASTContext &C,
                                             unsigned NumElements,
                                             bool HasPackExpansions);
   
@@ -331,6 +343,8 @@ public:
   child_range children() { 
     // Note: we're taking advantage of the layout of the KeyValuePair struct
     // here. If that struct changes, this code will need to change as well.
+    static_assert(sizeof(KeyValuePair) == sizeof(Stmt *) * 2,
+                  "KeyValuePair is expected size");
     return child_range(reinterpret_cast<Stmt **>(this + 1),
                        reinterpret_cast<Stmt **>(this + 1) + NumElements * 2);
   }
@@ -379,7 +393,9 @@ public:
   }
 
   // Iterators
-  child_range children() { return child_range(); }
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
 };
 
 /// ObjCSelectorExpr used for \@selector in Objective-C.
@@ -414,7 +430,9 @@ public:
   }
 
   // Iterators
-  child_range children() { return child_range(); }
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
 };
 
 /// ObjCProtocolExpr used for protocol expression in Objective-C.
@@ -454,7 +472,9 @@ public:
   }
 
   // Iterators
-  child_range children() { return child_range(); }
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
 
   friend class ASTStmtReader;
   friend class ASTStmtWriter;
@@ -677,46 +697,16 @@ public:
   QualType getSuperReceiverType() const { 
     return QualType(Receiver.get<const Type*>(), 0); 
   }
-  QualType getGetterResultType() const {
-    QualType ResultType;
-    if (isExplicitProperty()) {
-      const ObjCPropertyDecl *PDecl = getExplicitProperty();
-      if (const ObjCMethodDecl *Getter = PDecl->getGetterMethodDecl())
-        ResultType = Getter->getResultType();
-      else
-        ResultType = PDecl->getType();
-    } else {
-      const ObjCMethodDecl *Getter = getImplicitPropertyGetter();
-      if (Getter)
-        ResultType = Getter->getResultType(); // with reference!
-    }
-    return ResultType;
-  }
 
-  QualType getSetterArgType() const {
-    QualType ArgType;
-    if (isImplicitProperty()) {
-      const ObjCMethodDecl *Setter = getImplicitPropertySetter();
-      ObjCMethodDecl::param_const_iterator P = Setter->param_begin(); 
-      ArgType = (*P)->getType();
-    } else {
-      if (ObjCPropertyDecl *PDecl = getExplicitProperty())
-        if (const ObjCMethodDecl *Setter = PDecl->getSetterMethodDecl()) {
-          ObjCMethodDecl::param_const_iterator P = Setter->param_begin(); 
-          ArgType = (*P)->getType();
-        }
-      if (ArgType.isNull())
-        ArgType = getType();
-    }
-    return ArgType;
-  }
-  
   ObjCInterfaceDecl *getClassReceiver() const {
     return Receiver.get<ObjCInterfaceDecl*>();
   }
   bool isObjectReceiver() const { return Receiver.is<Stmt*>(); }
   bool isSuperReceiver() const { return Receiver.is<const Type*>(); }
   bool isClassReceiver() const { return Receiver.is<ObjCInterfaceDecl*>(); }
+
+  /// Determine the type of the base, regardless of the kind of receiver.
+  QualType getReceiverType(const ASTContext &ctx) const;
 
   SourceLocation getLocStart() const LLVM_READONLY {
     return isObjectReceiver() ? getBase()->getLocStart() :getReceiverLocation();
@@ -733,7 +723,7 @@ public:
       Stmt **begin = reinterpret_cast<Stmt**>(&Receiver); // hack!
       return child_range(begin, begin+1);
     }
-    return child_range();
+    return child_range(child_iterator(), child_iterator());
   }
 
 private:
@@ -742,7 +732,7 @@ private:
   void setExplicitProperty(ObjCPropertyDecl *D, unsigned methRefFlags) {
     PropertyOrGetter.setPointer(D);
     PropertyOrGetter.setInt(false);
-    SetterAndMethodRefFlags.setPointer(0);
+    SetterAndMethodRefFlags.setPointer(nullptr);
     SetterAndMethodRefFlags.setInt(methRefFlags);
   }
   void setImplicitProperty(ObjCMethodDecl *Getter, ObjCMethodDecl *Setter,
@@ -807,7 +797,7 @@ public:
   explicit ObjCSubscriptRefExpr(EmptyShell Empty)
     : Expr(ObjCSubscriptRefExprClass, Empty) {}
   
-  static ObjCSubscriptRefExpr *Create(ASTContext &C,
+  static ObjCSubscriptRefExpr *Create(const ASTContext &C,
                                       Expr *base,
                                       Expr *key, QualType T, 
                                       ObjCMethodDecl *getMethod,
@@ -1003,13 +993,13 @@ class ObjCMessageExpr : public Expr {
     return getNumSelectorLocs();
   }
 
-  static ObjCMessageExpr *alloc(ASTContext &C,
+  static ObjCMessageExpr *alloc(const ASTContext &C,
                                 ArrayRef<Expr *> Args,
                                 SourceLocation RBraceLoc,
                                 ArrayRef<SourceLocation> SelLocs,
                                 Selector Sel,
                                 SelectorLocationsKind &SelLocsK);
-  static ObjCMessageExpr *alloc(ASTContext &C,
+  static ObjCMessageExpr *alloc(const ASTContext &C,
                                 unsigned NumArgs,
                                 unsigned NumStoredSelLocs);
 
@@ -1051,7 +1041,7 @@ public:
   /// \param Args The message send arguments.
   ///
   /// \param RBracLoc The location of the closing square bracket ']'.
-  static ObjCMessageExpr *Create(ASTContext &Context, QualType T, 
+  static ObjCMessageExpr *Create(const ASTContext &Context, QualType T,
                                  ExprValueKind VK,
                                  SourceLocation LBracLoc,
                                  SourceLocation SuperLoc,
@@ -1087,7 +1077,7 @@ public:
   /// \param Args The message send arguments.
   ///
   /// \param RBracLoc The location of the closing square bracket ']'.
-  static ObjCMessageExpr *Create(ASTContext &Context, QualType T,
+  static ObjCMessageExpr *Create(const ASTContext &Context, QualType T,
                                  ExprValueKind VK,
                                  SourceLocation LBracLoc,
                                  TypeSourceInfo *Receiver,
@@ -1121,7 +1111,7 @@ public:
   /// \param Args The message send arguments.
   ///
   /// \param RBracLoc The location of the closing square bracket ']'.
-  static ObjCMessageExpr *Create(ASTContext &Context, QualType T,
+  static ObjCMessageExpr *Create(const ASTContext &Context, QualType T,
                                  ExprValueKind VK,
                                  SourceLocation LBracLoc,
                                  Expr *Receiver,
@@ -1139,7 +1129,7 @@ public:
   ///
   /// \param NumArgs The number of message arguments, not including
   /// the receiver.
-  static ObjCMessageExpr *CreateEmpty(ASTContext &Context,
+  static ObjCMessageExpr *CreateEmpty(const ASTContext &Context,
                                       unsigned NumArgs,
                                       unsigned NumStoredSelLocs);
 
@@ -1173,7 +1163,7 @@ public:
     if (getReceiverKind() == Instance)
       return static_cast<Expr *>(getReceiverPointer());
 
-    return 0;
+    return nullptr;
   }
   const Expr *getInstanceReceiver() const {
     return const_cast<ObjCMessageExpr*>(this)->getInstanceReceiver();
@@ -1200,7 +1190,7 @@ public:
   TypeSourceInfo *getClassReceiverTypeInfo() const {
     if (getReceiverKind() == Class)
       return reinterpret_cast<TypeSourceInfo *>(getReceiverPointer());
-    return 0;
+    return nullptr;
   }
 
   void setClassReceiver(TypeSourceInfo *TSInfo) {
@@ -1269,14 +1259,14 @@ public:
     if (HasMethod)
       return reinterpret_cast<const ObjCMethodDecl *>(SelectorOrMethod);
 
-    return 0;
+    return nullptr;
   }
 
   ObjCMethodDecl *getMethodDecl() { 
     if (HasMethod)
       return reinterpret_cast<ObjCMethodDecl *>(SelectorOrMethod);
 
-    return 0;
+    return nullptr;
   }
 
   void setMethodDecl(ObjCMethodDecl *MD) { 
@@ -1369,6 +1359,14 @@ public:
 
   typedef ExprIterator arg_iterator;
   typedef ConstExprIterator const_arg_iterator;
+
+  llvm::iterator_range<arg_iterator> arguments() {
+    return llvm::make_range(arg_begin(), arg_end());
+  }
+
+  llvm::iterator_range<const_arg_iterator> arguments() const {
+    return llvm::make_range(arg_begin(), arg_end());
+  }
 
   arg_iterator arg_begin() { return reinterpret_cast<Stmt **>(getArgs()); }
   arg_iterator arg_end()   { 

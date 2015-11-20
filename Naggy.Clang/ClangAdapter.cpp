@@ -125,7 +125,7 @@ void ClangAdapter::Process(String ^contents)
 	InitializeInvocation(pInvocation);
 
 	if (pContents)
-		pInvocation->getPreprocessorOpts().addRemappedFile(m_filePath, llvm::MemoryBuffer::getMemBufferCopy(pContents));
+		pInvocation->getPreprocessorOpts().addRemappedFile(m_filePath, llvm::MemoryBuffer::getMemBuffer(pContents).release());
 
 	m_pInstance->setInvocation(pInvocation);
 
@@ -147,7 +147,7 @@ List<Diagnostic^>^ ClangAdapter::GetDiagnostics()
 
 List<Diagnostic^>^ ClangAdapter::ComputeDiagnostics()
 {
-	StoredDiagnosticClient *client = dynamic_cast<StoredDiagnosticClient*>(m_pInstance->getDiagnostics().takeClient());
+	StoredDiagnosticClient *client = (StoredDiagnosticClient *)&(m_pInstance->getDiagnosticClient());
 	unsigned int numDiagnostics = client->size();
 	List<Diagnostic^> ^diagnostics = gcnew List<Diagnostic^>();
 

@@ -14,16 +14,16 @@
 #ifndef LLVM_ANALYSIS_INLINECOST_H
 #define LLVM_ANALYSIS_INLINECOST_H
 
-#include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/CallGraphSCCPass.h"
 #include <cassert>
 #include <climits>
 
 namespace llvm {
+class AssumptionCacheTracker;
 class CallSite;
 class DataLayout;
 class Function;
-class TargetTransformInfo;
+class TargetTransformInfoWrapperPass;
 
 namespace InlineConstants {
   // Various magic constants used to adjust heuristics.
@@ -77,7 +77,7 @@ public:
   }
 
   /// \brief Test whether the inline cost is low enough for inlining.
-  operator bool() const {
+  explicit operator bool() const {
     return Cost < Threshold;
   }
 
@@ -100,18 +100,18 @@ public:
 
 /// \brief Cost analyzer used by inliner.
 class InlineCostAnalysis : public CallGraphSCCPass {
-  const DataLayout *TD;
-  const TargetTransformInfo *TTI;
+  TargetTransformInfoWrapperPass *TTIWP;
+  AssumptionCacheTracker *ACT;
 
 public:
   static char ID;
 
   InlineCostAnalysis();
-  ~InlineCostAnalysis();
+  ~InlineCostAnalysis() override;
 
   // Pass interface implementation.
-  void getAnalysisUsage(AnalysisUsage &AU) const;
-  bool runOnSCC(CallGraphSCC &SCC);
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
+  bool runOnSCC(CallGraphSCC &SCC) override;
 
   /// \brief Get an InlineCost object representing the cost of inlining this
   /// callsite.

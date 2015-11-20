@@ -17,6 +17,7 @@
 #include "clang/AST/CanonicalType.h"
 #include "clang/AST/Type.h"
 #include "clang/Sema/CodeCompleteOptions.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
@@ -271,22 +272,17 @@ private:
   QualType BaseType;
 
   /// \brief The identifiers for Objective-C selector parts.
-  IdentifierInfo **SelIdents;
-
-  /// \brief The number of Objective-C selector parts.
-  unsigned NumSelIdents;
+  ArrayRef<IdentifierInfo *> SelIdents;
 
 public:
   /// \brief Construct a new code-completion context of the given kind.
-  CodeCompletionContext(enum Kind Kind) : Kind(Kind), SelIdents(NULL),
-                                          NumSelIdents(0) { }
+  CodeCompletionContext(enum Kind Kind) : Kind(Kind), SelIdents(None) { }
 
   /// \brief Construct a new code-completion context of the given kind.
   CodeCompletionContext(enum Kind Kind, QualType T,
-                        IdentifierInfo **SelIdents = NULL,
-                        unsigned NumSelIdents = 0) : Kind(Kind),
-                                                     SelIdents(SelIdents),
-                                                    NumSelIdents(NumSelIdents) {
+                        ArrayRef<IdentifierInfo *> SelIdents = None)
+                        : Kind(Kind),
+                          SelIdents(SelIdents) {
     if (Kind == CCC_DotMemberAccess || Kind == CCC_ArrowMemberAccess ||
         Kind == CCC_ObjCPropertyAccess || Kind == CCC_ObjCClassMessage ||
         Kind == CCC_ObjCInstanceMessage)
@@ -308,10 +304,7 @@ public:
   QualType getBaseType() const { return BaseType; }
 
   /// \brief Retrieve the Objective-C selector identifiers.
-  IdentifierInfo **getSelIdents() const { return SelIdents; }
-
-  /// \brief Retrieve the number of Objective-C selector identifiers.
-  unsigned getNumSelIdents() const { return NumSelIdents; }
+  ArrayRef<IdentifierInfo *> getSelIdents() const { return SelIdents; }
 
   /// \brief Determines whether we want C++ constructors as results within this
   /// context.
@@ -405,7 +398,7 @@ public:
       CodeCompletionString *Optional;
     };
 
-    Chunk() : Kind(CK_Text), Text(0) { }
+    Chunk() : Kind(CK_Text), Text(nullptr) { }
 
     explicit Chunk(ChunkKind Kind, const char *Text = "");
 
@@ -448,15 +441,15 @@ private:
   /// entity being completed by this result.
   const char *BriefComment;
   
-  CodeCompletionString(const CodeCompletionString &) LLVM_DELETED_FUNCTION;
-  void operator=(const CodeCompletionString &) LLVM_DELETED_FUNCTION;
+  CodeCompletionString(const CodeCompletionString &) = delete;
+  void operator=(const CodeCompletionString &) = delete;
 
   CodeCompletionString(const Chunk *Chunks, unsigned NumChunks,
                        unsigned Priority, CXAvailabilityKind Availability,
                        const char **Annotations, unsigned NumAnnotations,
                        StringRef ParentName,
                        const char *BriefComment);
-  ~CodeCompletionString() { }
+  ~CodeCompletionString() = default;
 
   friend class CodeCompletionBuilder;
   friend class CodeCompletionResult;
@@ -506,20 +499,7 @@ public:
 class CodeCompletionAllocator : public llvm::BumpPtrAllocator {
 public:
   /// \brief Copy the given string into this allocator.
-  const char *CopyString(StringRef String);
-
-  /// \brief Copy the given string into this allocator.
-  const char *CopyString(Twine String);
-
-  // \brief Copy the given string into this allocator.
-  const char *CopyString(const char *String) {
-    return CopyString(StringRef(String));
-  }
-
-  /// \brief Copy the given string into this allocator.
-  const char *CopyString(const std::string &String) {
-    return CopyString(StringRef(String));
-  }
+  const char *CopyString(const Twine &String);
 };
 
 /// \brief Allocator for a cached set of global code completions.
@@ -583,14 +563,14 @@ public:
                         CodeCompletionTUInfo &CCTUInfo)
     : Allocator(Allocator), CCTUInfo(CCTUInfo),
       Priority(0), Availability(CXAvailability_Available),
-      BriefComment(NULL) { }
+      BriefComment(nullptr) { }
 
   CodeCompletionBuilder(CodeCompletionAllocator &Allocator,
                         CodeCompletionTUInfo &CCTUInfo,
                         unsigned Priority, CXAvailabilityKind Availability)
     : Allocator(Allocator), CCTUInfo(CCTUInfo),
       Priority(Priority), Availability(Availability),
-      BriefComment(NULL) { }
+      BriefComment(nullptr) { }
 
   /// \brief Retrieve the allocator into which the code completion
   /// strings should be allocated.
@@ -708,7 +688,7 @@ public:
   /// \brief Build a result that refers to a declaration.
   CodeCompletionResult(const NamedDecl *Declaration,
                        unsigned Priority,
-                       NestedNameSpecifier *Qualifier = 0,
+                       NestedNameSpecifier *Qualifier = nullptr,
                        bool QualifierIsInformative = false,
                        bool Accessible = true)
     : Declaration(Declaration), Priority(Priority),
@@ -722,36 +702,34 @@ public:
 
   /// \brief Build a result that refers to a keyword or symbol.
   CodeCompletionResult(const char *Keyword, unsigned Priority = CCP_Keyword)
-    : Declaration(0), Keyword(Keyword), Priority(Priority), StartParameter(0),
-      Kind(RK_Keyword), CursorKind(CXCursor_NotImplemented),
+    : Declaration(nullptr), Keyword(Keyword), Priority(Priority),
+      StartParameter(0), Kind(RK_Keyword), CursorKind(CXCursor_NotImplemented),
       Availability(CXAvailability_Available), Hidden(false),
       QualifierIsInformative(0), StartsNestedNameSpecifier(false),
-      AllParametersAreInformative(false), DeclaringEntity(false), Qualifier(0)
-  {
-  }
+      AllParametersAreInformative(false), DeclaringEntity(false),
+      Qualifier(nullptr) {}
 
   /// \brief Build a result that refers to a macro.
   CodeCompletionResult(const IdentifierInfo *Macro,
                        unsigned Priority = CCP_Macro)
-    : Declaration(0), Macro(Macro), Priority(Priority), StartParameter(0),
+    : Declaration(nullptr), Macro(Macro), Priority(Priority), StartParameter(0),
       Kind(RK_Macro), CursorKind(CXCursor_MacroDefinition),
       Availability(CXAvailability_Available), Hidden(false),
       QualifierIsInformative(0), StartsNestedNameSpecifier(false),
-      AllParametersAreInformative(false), DeclaringEntity(false), Qualifier(0)
-  {
-  }
+      AllParametersAreInformative(false), DeclaringEntity(false),
+      Qualifier(nullptr) {}
 
   /// \brief Build a result that refers to a pattern.
   CodeCompletionResult(CodeCompletionString *Pattern,
                        unsigned Priority = CCP_CodePattern,
                        CXCursorKind CursorKind = CXCursor_NotImplemented,
                    CXAvailabilityKind Availability = CXAvailability_Available,
-                       const NamedDecl *D = 0)
+                       const NamedDecl *D = nullptr)
     : Declaration(D), Pattern(Pattern), Priority(Priority), StartParameter(0),
       Kind(RK_Pattern), CursorKind(CursorKind), Availability(Availability),
       Hidden(false), QualifierIsInformative(0),
       StartsNestedNameSpecifier(false), AllParametersAreInformative(false),
-      DeclaringEntity(false), Qualifier(0)
+      DeclaringEntity(false), Qualifier(nullptr)
   {
   }
 
@@ -762,7 +740,8 @@ public:
     : Declaration(D), Pattern(Pattern), Priority(Priority), StartParameter(0),
       Kind(RK_Pattern), Availability(CXAvailability_Available), Hidden(false),
       QualifierIsInformative(false), StartsNestedNameSpecifier(false),
-      AllParametersAreInformative(false), DeclaringEntity(false), Qualifier(0) {
+      AllParametersAreInformative(false), DeclaringEntity(false),
+      Qualifier(nullptr) {
     computeCursorKindAndAvailability();
   }  
   
@@ -786,11 +765,13 @@ public:
   /// \param Allocator The allocator that will be used to allocate the
   /// string itself.
   CodeCompletionString *CreateCodeCompletionString(Sema &S,
+                                         const CodeCompletionContext &CCContext,
                                            CodeCompletionAllocator &Allocator,
                                            CodeCompletionTUInfo &CCTUInfo,
                                            bool IncludeBriefComments);
   CodeCompletionString *CreateCodeCompletionString(ASTContext &Ctx,
                                                    Preprocessor &PP,
+                                         const CodeCompletionContext &CCContext,
                                            CodeCompletionAllocator &Allocator,
                                            CodeCompletionTUInfo &CCTUInfo,
                                            bool IncludeBriefComments);
@@ -894,7 +875,8 @@ public:
     CodeCompletionString *CreateSignatureString(unsigned CurrentArg,
                                                 Sema &S,
                                       CodeCompletionAllocator &Allocator,
-                                      CodeCompletionTUInfo &CCTUInfo) const;
+                                      CodeCompletionTUInfo &CCTUInfo,
+                                      bool IncludeBriefComments) const;
   };
 
   CodeCompleteConsumer(const CodeCompleteOptions &CodeCompleteOpts,
@@ -974,20 +956,19 @@ public:
       CCTUInfo(new GlobalCodeCompletionAllocator) {}
 
   /// \brief Prints the finalized code-completion results.
-  virtual void ProcessCodeCompleteResults(Sema &S,
-                                          CodeCompletionContext Context,
-                                          CodeCompletionResult *Results,
-                                          unsigned NumResults);
+  void ProcessCodeCompleteResults(Sema &S, CodeCompletionContext Context,
+                                  CodeCompletionResult *Results,
+                                  unsigned NumResults) override;
 
-  virtual void ProcessOverloadCandidates(Sema &S, unsigned CurrentArg,
-                                         OverloadCandidate *Candidates,
-                                         unsigned NumCandidates);
+  void ProcessOverloadCandidates(Sema &S, unsigned CurrentArg,
+                                 OverloadCandidate *Candidates,
+                                 unsigned NumCandidates) override;
 
-  virtual CodeCompletionAllocator &getAllocator() {
+  CodeCompletionAllocator &getAllocator() override {
     return CCTUInfo.getAllocator();
   }
 
-  virtual CodeCompletionTUInfo &getCodeCompletionTUInfo() { return CCTUInfo; }
+  CodeCompletionTUInfo &getCodeCompletionTUInfo() override { return CCTUInfo; }
 };
 
 } // end namespace clang

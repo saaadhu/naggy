@@ -31,7 +31,8 @@ namespace Naggy
 
         static void documentEvents_DocumentClosing(Document document)
         {
-            ClearDiagnosticsFromFile(document.FullName);
+            if (document != null)
+                ClearDiagnosticsFromFile(document.FullName);
         }
 
         public static void ClearDiagnosticsFromFile(string filePath)
@@ -71,7 +72,7 @@ namespace Naggy
                                Column = diag.StartColumn,
                                Line = diag.StartLine - 1,
                                Document = diag.FilePath,
-                               HierarchyItem = (IVsHierarchy)AVRStudio.GetProjectItem(dte, diag.FilePath).Object,
+                               HierarchyItem = (IVsHierarchy)(AVRStudio.GetProjectItem(dte, diag.FilePath).ContainingProject != null ? AVRStudio.GetProjectItem(dte, diag.FilePath).ContainingProject.Object : null),
                            };
 
             task.Navigate += (sender, args) =>

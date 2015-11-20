@@ -26,7 +26,7 @@ namespace Naggy
             var implicitSymbol = DeviceNameToPredefinedSymbolMapper.GetSymbols(deviceName, arch);
 
             dynamic toolchainOptions = project.Properties.Item("ToolchainOptions").Value;
-            var symbolsInProject = GetPredefinedSymbols(IsCPP(fileName, project) ? toolchainOptions.CppCompiler: toolchainOptions.CCompiler);
+            var symbolsInProject = GetPredefinedSymbols(IsCPP(fileName, project) ? toolchainOptions.CppCompiler: toolchainOptions.CCompiler, project);
 
             var predefinedSymbols = new List<string>();
             predefinedSymbols.Add(NaggyMacro);
@@ -115,21 +115,49 @@ namespace Naggy
             
             IEnumerable<string> projectSpecificIncludePaths = compiler.IncludePaths;
             var expandedProjectSpecificIncludePaths = projectSpecificIncludePaths
-                .Select(p => p.Replace("$(ToolchainDir)", (string)((dynamic)project).Object.GetProjectProperty("ToolchainDir")));
-            string outputFolder = ((dynamic)project.Object).GetProjectProperty("OutputDirectory");
+                .Select(p => p.Replace("$(ToolchainDir)", GetProjectProperty(project, "ToolchainDir"))
+                              .Replace("$(PackRepoDir)", GetProjectProperty(project, "PackRepoDir"))
+                              .Replace("/", "\\"));
+            string outputFolder = GetProjectProperty(project, "OutputDirectory");
             var absoluteProjectSpecificFolderPaths = expandedProjectSpecificIncludePaths
                 .Select(p => Path.IsPathRooted(p) ? p : Path.Combine(outputFolder, p));
 
 			return absoluteProjectSpecificFolderPaths.Concat(adjustedDefaultIncludePaths);
         }
 
-        private static string[] GetPredefinedSymbols(dynamic compiler)
+        private static string[] GetPredefinedSymbols(dynamic compiler, dynamic project)
         {
             var commandLine = (string)compiler.CommandLine;
             var options = commandLine.Split(new char[] { ' ' });
             var symbols = options.Where(p => p.StartsWith("-D")).Select(p => p.Substring("-D".Length)).ToList();
             symbols.AddRange(compiler.SymbolDefines);
+
+            symbols.AddRange(GetSpecFilePredefinedSymbols(commandLine, project));
+
             return symbols.Distinct().ToArray();
+        }
+
+        private static IEnumerable<string> GetSpecFilePredefinedSymbols(string commandLine, dynamic project)
+        {
+            int index = commandLine.IndexOf(" -B \"");
+            if (index == -1)
+                return new string[] { };
+
+            var start = index + " -B \"".Length;
+            var end = commandLine.IndexOf("\"", start + 1);
+            var specFileBasePath = commandLine.Substring(start, end - start);
+            specFileBasePath = specFileBasePath.Replace("$(PackRepoDir)", GetProjectProperty(project, "PackRepoDir")).Replace("/", "\\");
+            var specFilePath = Path.Combine(specFileBasePath, "device-specs", "specs-" + Path.GetFileName(specFileBasePath));
+
+            var fileContents = File.ReadAllLines(specFilePath);
+            var predefinedSymbolsLine = fileContents.SkipWhile(line => line != "*cpp:").Skip(1).FirstOrDefault();
+
+            if (predefinedSymbolsLine == null)
+                return new string[] { };
+
+            return predefinedSymbolsLine.Split(new char[] { ' ','\t' })
+                .Where(p => p.StartsWith("-D"))
+                .Select(p => p.Substring("-D".Length)).ToList();
         }
 
         internal static ProjectItem GetProjectItem(DTE dte, string fileName)
@@ -138,6 +166,16 @@ namespace Naggy
                 return null;
 
             return dte.Solution.FindProjectItem(fileName);
+        }
+
+        static string GetProjectProperty(dynamic project, string name)
+        {
+            try
+            {
+                return project.Object.GetProjectProperty(name);
+            }
+            catch (Exception) { }
+            return "";
         }
 
         static Project GetProject(DTE dte, string fileName)
