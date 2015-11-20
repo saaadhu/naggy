@@ -1,10 +1,27 @@
 Naggy is an Atmel Studio extension that uses the Clang frontend from the LLVM project to show errors/warnings on the fly, and to lowlight code excluded by preprocessor directives.
 
+0.4.0
+-----
+
+* Upgrade to Oct version of LLVM/Clang, and use avr-llvm project instead of custom patch.
+* Upgrade project to VS 2015, and build for Atmel Studio 7.0
+* Make Naggy aware of the new pack based device support mechanism used by Atmel Studio 7.0
+* Define __NAGGY__  as a preprocessor symbol to let code know it's being processed by Naggy.
+* Fix broken preprocessor include directories processing - make Clang look at user specified directories first, and implicit compiler directories next.
+* Misc bug fixes.
+
+
+0.3.7
+-----
+
+* Fix broken mode attribute interpretation in AVR projects, which was causing spurious warnings for types in stdint.h (like uint32_t).
+
 0.3.6
 -----
+
 * Make Naggy know about AVR and its type sizes.
 * Make Naggy aware of toolchain type (ARM or AVR) and use the correct target triple.
-* Prefix Naggy's diagnostics with a [N} to make it distinct from build errors.
+* Prefix Naggy's diagnostics with a [N] to make it distinct from build errors.
 
 0.3.5
 ------
